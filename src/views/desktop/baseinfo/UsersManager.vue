@@ -15,17 +15,24 @@ const permsCatalog = [
   { key: "view.baseInfo", title: "مشاهده اطلاعات پایه" },
   { key: "view.reports", title: "مشاهده گزارشات" },
   { key: "view.settings", title: "مشاهده تنظیمات" },
+  { key: "view.discounts", title: "مشاهده صفحه تخفیف‌ها" },
   { key: "manage.products", title: "مدیریت کالا" },
   { key: "manage.categories", title: "مدیریت دسته‌بندی" },
   { key: "manage.toppings", title: "مدیریت تاپینگ" },
   { key: "manage.customers", title: "مدیریت مشتری" },
-  { key: "sales.discount.percent", title: "تخفیف درصدی" },
-  { key: "sales.discount.amount", title: "تخفیف مبلغی" },
+  { key: "customers.edit", title: "ویرایش مشتری" },
+  { key: "customers.credit.add", title: "افزایش اعتبار مشتری" },
+  { key: "customers.credit.subtract", title: "کاهش اعتبار مشتری" },
+  { key: "manage.discounts", title: "مدیریت تخفیف‌ها" },
+  { key: "manage.discountCards", title: "مدیریت کارت تخفیف" },
+  { key: "sales.discount.percent", title: "تخفیف درصدی در فروش" },
+  { key: "sales.discount.amount", title: "تخفیف مبلغی در فروش" },
   { key: "reports.export.excel", title: "خروجی اکسل گزارشات" },
   { key: "reports.invoices.edit", title: "ویرایش فاکتور گزارشات" },
   { key: "reports.invoices.delete", title: "حذف فاکتور گزارشات" },
   { key: "users.manage", title: "مدیریت کاربران" },
   { key: "settings.manage", title: "مدیریت تنظیمات" },
+  { key: "backup.database", title: "گرفتن بکاپ دیتابیس" },
 ];
 
 const roles = ref<DesktopRole[]>([]);
@@ -225,8 +232,7 @@ function formatLimit(value: unknown, suffix = "") {
           </label>
           <label class="field">
             <span>رمز عبور</span>
-            <input class="u-input" v-model="editorUser.password" type="password"
-              placeholder="برای عدم تغییر خالی بماند" />
+            <input class="u-input" v-model="editorUser.password" type="password" placeholder="برای عدم تغییر خالی بماند" />
           </label>
           <label class="field">
             <span>نقش</span>
@@ -261,212 +267,32 @@ function formatLimit(value: unknown, suffix = "") {
 </template>
 
 <style scoped>
-.u-shell {
-  height: 100%;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.u-head,
-.u-card-head,
-.u-row,
-.u-actions,
-.modal-header,
-.modal-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.u-title {
-  font-weight: 900;
-  font-size: 18px;
-}
-
-.u-sub {
-  margin-top: 4px;
-  font-size: 12px;
-  color: #a7b0c3;
-}
-
-.u-grid {
-  flex: 1;
-  min-height: 0;
-  display: grid;
-  grid-template-columns: 1.15fr 1fr;
-  gap: 12px;
-}
-
-.u-card {
-  min-height: 0;
-  overflow: hidden;
-  border-radius: 8px;
-  padding: 12px;
-  background: rgba(255, 255, 255, 0.035);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.u-title2 {
-  font-weight: 900;
-}
-
-.u-input,
-.u-select,
-.u-btn {
-  min-height: 42px;
-  border-radius: 8px;
-  padding: 8px 10px;
-  font-size: 14px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #eef2ff;
-}
-
-.u-input,
-.u-select {
-  width: 90%;
-}
-
-.u-btn {
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.u-btn.small {
-  min-height: 34px;
-  padding: 6px 9px;
-}
-
-.u-btn.primary {
-  font-weight: 900;
-  background: rgba(20, 184, 166, 0.18);
-  border-color: rgba(20, 184, 166, 0.34);
-}
-
-.field {
-  display: grid;
-  gap: 7px;
-  color: #a7b0c3;
-}
-
-.limit-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.u-perms {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
-  align-content: start;
-  gap: 8px;
-}
-
-.perm {
-  min-height: 42px;
-  border-radius: 8px;
-  padding: 8px 10px;
-  text-align: right;
-  color: #eef2ff;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  cursor: pointer;
-}
-
-.perm.on {
-  font-weight: 900;
-  color: #bbf7d0;
-  background: rgba(34, 197, 94, 0.1);
-  border-color: rgba(34, 197, 94, 0.22);
-}
-
-.u-table {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.u-tr {
-  display: grid;
-  grid-template-columns: 70px 1fr 1fr 96px 120px 86px 86px;
-  gap: 10px;
-  align-items: center;
-  padding: 10px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.u-th {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  font-weight: 900;
-  color: #a7b0c3;
-  background: rgba(16, 19, 26, 0.96);
-}
-
-.bold {
-  font-weight: 900;
-}
-
-.u-message {
-  border-radius: 8px;
-  padding: 10px 12px;
-  color: #fde68a;
-  background: rgba(245, 158, 11, 0.12);
-  border: 1px solid rgba(245, 158, 11, 0.22);
-}
-
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  display: grid;
-  place-items: center;
-  background: rgba(0, 0, 0, 0.58);
-}
-
-.modal-content {
-  width: min(480px, calc(100vw - 32px));
-  border-radius: 8px;
-  padding: 14px;
-  background: #171b24;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.modal-body {
-  display: grid;
-  gap: 12px;
-  padding: 14px 0;
-}
-
-.close-btn {
-  min-width: 38px;
-  min-height: 38px;
-  border-radius: 8px;
-  color: #eef2ff;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  cursor: pointer;
-}
-
-.check-row {
-  display: flex;
-  justify-content: space-between;
-}
-
-.nope {
-  padding: 20px;
-  opacity: 0.85;
-}
+.u-shell { height: 100%; min-height: 0; display: flex; flex-direction: column; gap: 12px; }
+.u-head, .u-card-head, .u-row, .u-actions, .modal-header, .modal-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.u-title { font-weight: 900; font-size: 18px; }
+.u-sub { margin-top: 4px; font-size: 12px; color: #a7b0c3; }
+.u-grid { flex: 1; min-height: 0; display: grid; grid-template-columns: 1.15fr 1fr; gap: 12px; }
+.u-card { min-height: 0; overflow: hidden; border-radius: 8px; padding: 12px; background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.08); display: flex; flex-direction: column; gap: 12px; }
+.u-title2 { font-weight: 900; }
+.u-input, .u-select, .u-btn { min-height: 42px; border-radius: 8px; padding: 8px 10px; font-size: 14px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.1); color: #eef2ff; }
+.u-input, .u-select { width: 90%; }
+.u-btn { cursor: pointer; white-space: nowrap; }
+.u-btn.small { min-height: 34px; padding: 6px 9px; }
+.u-btn.primary { font-weight: 900; background: rgba(20,184,166,.18); border-color: rgba(20,184,166,.34); }
+.field { display: grid; gap: 7px; color: #a7b0c3; }
+.limit-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.u-perms { flex: 1; min-height: 0; overflow: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); align-content: start; gap: 8px; }
+.perm { min-height: 42px; border-radius: 8px; padding: 8px 10px; text-align: right; color: #eef2ff; background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.08); cursor: pointer; }
+.perm.on { font-weight: 900; color: #bbf7d0; background: rgba(34,197,94,.1); border-color: rgba(34,197,94,.22); }
+.u-table { flex: 1; min-height: 0; overflow: auto; border-radius: 8px; border: 1px solid rgba(255,255,255,.08); }
+.u-tr { display: grid; grid-template-columns: 70px 1fr 1fr 96px 120px 86px 86px; gap: 10px; align-items: center; padding: 10px; border-bottom: 1px solid rgba(255,255,255,.06); }
+.u-th { position: sticky; top: 0; z-index: 2; font-weight: 900; color: #a7b0c3; background: rgba(16,19,26,.96); }
+.bold { font-weight: 900; }
+.u-message { border-radius: 8px; padding: 10px 12px; color: #fde68a; background: rgba(245,158,11,.12); border: 1px solid rgba(245,158,11,.22); }
+.modal-overlay { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; background: rgba(0,0,0,.58); }
+.modal-content { width: min(480px, calc(100vw - 32px)); border-radius: 8px; padding: 14px; background: #171b24; border: 1px solid rgba(255,255,255,.1); }
+.modal-body { display: grid; gap: 12px; padding: 14px 0; }
+.close-btn { min-width: 38px; min-height: 38px; border-radius: 8px; color: #eef2ff; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.1); cursor: pointer; }
+.check-row { display: flex; justify-content: space-between; }
+.nope { padding: 20px; opacity: .85; }
 </style>
