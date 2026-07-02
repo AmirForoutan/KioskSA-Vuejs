@@ -4,7 +4,18 @@ import { createDbBackup, getDbBackupPath, saveDbBackupPath, selectDbBackupPath }
 const backupPath = ref("");
 const loading = ref(false);
 const message = ref("");
+const errorMessage = ref(false);
 onMounted(loadSavedPath);
+function friendlyError(error, fallback) {
+    const text = error instanceof Error ? error.message : fallback;
+    if (text.includes("HTTP 404")) {
+        return "سرویس هنوز endpoint بکاپ را نمی‌شناسد. routeهای بکاپ باید داخل Program.cs اضافه شوند و سرویس دوباره اجرا شود.";
+    }
+    if (text.includes("Failed to fetch") || text.includes("NetworkError")) {
+        return "ارتباط با سرویس برقرار نشد. سرویس را اجرا کنید و آدرس API مدیریت را بررسی کنید.";
+    }
+    return text || fallback;
+}
 async function loadSavedPath() {
     if (!can("backup.database"))
         return;
@@ -20,7 +31,8 @@ async function choosePathAndBackup() {
     if (!can("backup.database"))
         return;
     loading.value = true;
-    message.value = "";
+    errorMessage.value = false;
+    message.value = "در حال باز کردن انتخاب مسیر روی سیستم سرویس...";
     try {
         const selected = await selectDbBackupPath();
         backupPath.value = String(selected.path || selected.backupPath || backupPath.value || "");
@@ -28,11 +40,13 @@ async function choosePathAndBackup() {
             message.value = selected.message || "انتخاب مسیر لغو شد";
             return;
         }
+        message.value = "مسیر انتخاب شد؛ در حال گرفتن بکاپ...";
         const result = await createDbBackup(backupPath.value.trim());
         message.value = `${result.message || "بکاپ ساخته شد"}${result.path ? ` - ${result.path}` : ""}`;
     }
     catch (error) {
-        message.value = error instanceof Error ? error.message : "خطا در انتخاب مسیر یا گرفتن بکاپ";
+        errorMessage.value = true;
+        message.value = friendlyError(error, "خطا در انتخاب مسیر یا گرفتن بکاپ");
     }
     finally {
         loading.value = false;
@@ -42,18 +56,21 @@ async function savePathOnly() {
     if (!can("backup.database"))
         return;
     if (!backupPath.value.trim()) {
+        errorMessage.value = true;
         message.value = "مسیر را وارد یا انتخاب کنید";
         return;
     }
     loading.value = true;
-    message.value = "";
+    errorMessage.value = false;
+    message.value = "در حال ذخیره مسیر...";
     try {
         const result = await saveDbBackupPath(backupPath.value.trim());
         backupPath.value = String(result.path || result.backupPath || backupPath.value);
         message.value = result.message || "مسیر ذخیره شد";
     }
     catch (error) {
-        message.value = error instanceof Error ? error.message : "خطا در ذخیره مسیر";
+        errorMessage.value = true;
+        message.value = friendlyError(error, "خطا در ذخیره مسیر");
     }
     finally {
         loading.value = false;
@@ -63,18 +80,21 @@ async function runBackup() {
     if (!can("backup.database"))
         return;
     if (!backupPath.value.trim()) {
+        errorMessage.value = true;
         message.value = "مسیر را وارد یا انتخاب کنید";
         return;
     }
     loading.value = true;
-    message.value = "";
+    errorMessage.value = false;
+    message.value = "در حال گرفتن بکاپ...";
     try {
         const result = await createDbBackup(backupPath.value.trim());
         backupPath.value = String(result.backupPath || backupPath.value);
         message.value = `${result.message || "بکاپ ساخته شد"}${result.path ? ` - ${result.path}` : ""}`;
     }
     catch (error) {
-        message.value = error instanceof Error ? error.message : "خطا در گرفتن بکاپ";
+        errorMessage.value = true;
+        message.value = friendlyError(error, "خطا در گرفتن بکاپ");
     }
     finally {
         loading.value = false;
@@ -87,6 +107,7 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['field']} */ ;
 /** @type {__VLS_StyleScopedClasses['s-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['s-btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['backup-message']} */ ;
 /** @type {__VLS_StyleScopedClasses['backup-message']} */ ;
 /** @type {__VLS_StyleScopedClasses['path-row']} */ ;
 // CSS variable injection 
@@ -118,6 +139,7 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElement
     type: "button",
     disabled: (!__VLS_ctx.can('backup.database') || __VLS_ctx.loading),
 });
+(__VLS_ctx.loading ? "در حال انجام" : "انتخاب مسیر و بکاپ");
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "backup-actions" },
 });
@@ -140,6 +162,7 @@ if (!__VLS_ctx.can('backup.database')) {
 if (__VLS_ctx.message) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "backup-message" },
+        ...{ class: ({ error: __VLS_ctx.errorMessage }) },
     });
     (__VLS_ctx.message);
 }
@@ -156,6 +179,7 @@ if (__VLS_ctx.message) {
 /** @type {__VLS_StyleScopedClasses['backup-message']} */ ;
 /** @type {__VLS_StyleScopedClasses['warn']} */ ;
 /** @type {__VLS_StyleScopedClasses['backup-message']} */ ;
+/** @type {__VLS_StyleScopedClasses['error']} */ ;
 var __VLS_dollars;
 const __VLS_self = (await import('vue')).defineComponent({
     setup() {
@@ -164,6 +188,7 @@ const __VLS_self = (await import('vue')).defineComponent({
             backupPath: backupPath,
             loading: loading,
             message: message,
+            errorMessage: errorMessage,
             choosePathAndBackup: choosePathAndBackup,
             savePathOnly: savePathOnly,
             runBackup: runBackup,
