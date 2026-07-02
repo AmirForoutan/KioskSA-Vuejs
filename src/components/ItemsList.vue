@@ -66,6 +66,19 @@
                   </div>
                 </div>
 
+                <div v-if="IsShowDiscountCartField && count != 0" class="discount-card-box">
+                  <input id="discountCartField" v-model="discountCart" type="text" placeholder="شماره/بارکد کارت تخفیف"
+                    @focus="handleInputClick2" @blur="handleInputBlur2"
+                    oninput="this.value = this.value.replace(/[^0-9A-Za-z؀-ۿ_-]/g, '');" />
+                  <button @click="CheckDiscountCart">بررسی و اعمال کارت تخفیف</button>
+                  <button v-if="selectedDiscountCard" class="clear-discount-btn" @click="clearCustomerDiscountState">
+                    حذف تخفیف
+                  </button>
+                  <div v-if="selectedDiscountCard" class="discount-card-result">
+                    کارت {{ selectedDiscountCard.CardNumber || selectedDiscountCard.DiscountCardId }} اعمال شد
+                  </div>
+                </div>
+
                 <!-- اگر کارت انتخاب شد، مبلغ کارت -->
                 <div v-if="paymentMethod === 'pos' && count != 0" style="display: none;">
                   <input type="hidden" v-model.number="posAmount" :max="totalPrice - creditAmount"
@@ -362,6 +375,7 @@ const showKeyboard5 = ref(false);
 
 const phoneNumber = ref('');
 const discountCart = ref('');
+const selectedDiscountCard = ref(null);
 
 const cartPanelRef = ref(null)
 
@@ -726,7 +740,7 @@ async function addToCart(item) {
     }
     saveCart()
   }
-  totalDiscountApplied.value = 0;
+  clearCustomerDiscountState();
 }
 
 async function removeFromCart(index) {
@@ -746,9 +760,10 @@ function resetCart() {
   cartItems.value = []
   cartToppings.value = {}
   discount.value = 0;
-  totalDiscountApplied.value = 0
   HamiClubUserData.value = null
   selectedTableId.value = 0
+  selectedDiscountCard.value = null
+  discountCart.value = ''
   saveCart()
 }
 
@@ -784,7 +799,7 @@ async function increaseQuantity(index) {
   cartItems.value[index].quantity++;
   await saveCart();
   discount.value = 0;
-  totalDiscountApplied.value = 0;
+  clearCustomerDiscountState();
 }
 
 async function decreaseQuantity(index) {
@@ -795,7 +810,7 @@ async function decreaseQuantity(index) {
     await removeFromCart(index);
   }
   discount.value = 0;
-  totalDiscountApplied.value = 0;
+  clearCustomerDiscountState();
 }
 
 // کم و زیاد کردن آیتم در قسمت نمایش آیتم ها
@@ -811,7 +826,7 @@ function decreaseCartQuantity(item) {
     }
     saveCart();
   }
-  totalDiscountApplied.value = 0;
+  clearCustomerDiscountState();
   discount.value = 0;
 }
 
@@ -1027,6 +1042,15 @@ async function checkout() {
       CashPrice: 0,
       CreditPrice: skipPaymentForTable ? 0 : invoiceCreditAmount
     };
+
+    if (HamiClubUserData.value) {
+      HamiClubUserData.value.totalDiscount = discountAmount;
+      if (selectedDiscountCard.value) {
+        HamiClubUserData.value.DiscountCardId = selectedDiscountCard.value.DiscountCardId;
+        HamiClubUserData.value.DiscountCardNumber = selectedDiscountCard.value.CardNumber || discountCart.value;
+        HamiClubUserData.value.DiscountCardUsedAmount = discountAmount;
+      }
+    }
 
     const SendInvoiceFinall = {
       customerData: prepareCustomerData(HamiClubUserData.value),
@@ -1382,8 +1406,73 @@ function getToppingCount(product) {
 
 //  اطلاعات بررسی و اعمال تخفیفات باشگاه مشتریان حامی //
 const totalDiscountApplied = computed(() => {
-  return goodsDiscountTotal.value + discount.value;
+  return Math.round(goodsDiscountTotal.value + discount.value);
 });
+
+function clearCustomerDiscountState() {
+  discount.value = 0;
+  selectedDiscountCard.value = null;
+  discountCart.value = '';
+  cartItems.value.forEach(item => {
+    if (item.discount?.isCartDiscount || item.discount?.isCustomerDiscount) {
+      delete item.discount;
+    }
+  });
+  if (HamiClubUserData.value) {
+    HamiClubUserData.value.usedDiscount = null;
+    HamiClubUserData.value.totalDiscount = goodsDiscountTotal.value || 0;
+    HamiClubUserData.value.DiscountCardId = 0;
+    HamiClubUserData.value.DiscountCardNumber = '';
+    HamiClubUserData.value.DiscountCardUsedAmount = 0;
+  }
+}
+
+function lineBaseAmount(item) {
+  const toppings = getToppingsForCartItem(item.id);
+  const toppingsPrice = toppings.reduce((sum, topping) => sum + (topping.Price || 0) * (topping.Count || 1), 0);
+  return ((item.item.GoodsPrice || 0) + toppingsPrice) * item.quantity;
+}
+
+function isPercentDiscountType(value) {
+  return value === true || value === 1 || value === '1' || value === 'percent' || value === 'percentage';
+}
+
+function normalizeDiscountValue(discount) {
+  return Number(discount?.DiscountValue ?? discount?.DiscountPercent ?? discount?.Percent ?? discount?.Price ?? discount?.DiscountAmount ?? 0);
+}
+
+function normalizeDiscountCardData(response) {
+  const data = response?.data ?? response?.Data ?? response;
+  if (!data || typeof data !== 'object') return null;
+  return {
+    ...data,
+    DiscountCardId: Number(data.DiscountCardId ?? data.discountCardId ?? 0),
+    CardNumber: String(data.CardNumber ?? data.cardNumber ?? discountCart.value ?? ''),
+    Percent: Number(data.Percent ?? data.DiscountPercent ?? 0),
+    Price: Number(data.Price ?? data.DiscountAmount ?? data.Balance ?? 0),
+    MinBuy: Number(data.MinBuy ?? data.MinInvoiceAmount ?? 0),
+    Goods: Array.isArray(data.Goods) ? data.Goods : [],
+    IsActive: data.IsActive !== false
+  };
+}
+
+function ensureCustomerDataForDiscount(extra = {}) {
+  const current = HamiClubUserData.value || {};
+  HamiClubUserData.value = {
+    userName: current.userName || current.CustomerName || extra.CustomerName || 'مشتری تخفیف',
+    UserPhone: current.UserPhone || current.CustomerPhone || extra.CustomerPhone || '',
+    CustomerId: current.CustomerId || extra.CustomerId || 0,
+    usedCredit: current.usedCredit || 0,
+    usedDiscount: current.usedDiscount || null,
+    totalDiscount: current.totalDiscount || 0,
+    DiscountCardId: current.DiscountCardId || 0,
+    DiscountCardNumber: current.DiscountCardNumber || '',
+    DiscountCardUsedAmount: current.DiscountCardUsedAmount || 0,
+    ...current,
+    ...extra
+  };
+  return HamiClubUserData.value;
+}
 
 
 async function getHamiClubDetails() {
@@ -1439,7 +1528,6 @@ async function getHamiClubDetails() {
     // اعمال اعتبار مشتری
     if (customerData.Credit > 0) {
       const creditAmount = Math.min(customerData.Credit, totalPrice.value);
-      totalDiscountApplied.value += creditAmount;
       discount.value = creditAmount;
       userData.usedCredit = creditAmount;
       userData.totalDiscount = creditAmount;
@@ -1499,84 +1587,99 @@ async function getHamiClubDetails() {
 
 
 function findBestApplicableDiscount(discounts, discountProducts) {
-  const applicableDiscounts = discounts.map(discount => {
-    const products = discountProducts.filter(dp => dp.DiscountId === discount.DiscountId);
+  const applicableDiscounts = discounts.map(discountRow => {
+    const discountId = Number(discountRow?.DiscountId ?? discountRow?.DiscountCodeId ?? 0);
+    const products = Array.isArray(discountProducts)
+      ? discountProducts.filter(dp => Number(dp.DiscountId) === discountId)
+      : [];
+    const useForAll = discountRow?.UseForAll === true || discountRow?.ApplyToAllGoods === true || products.length === 0;
 
-    // پیدا کردن آیتم‌های سبد خرید که شامل محصولات تخفیف‌دار هستند
+    let totalApplicablePrice = 0;
     const applicableItems = cartItems.value.filter(item => {
-      return products.some(p => Number(p.ProductCode) === item.item.GoodsCode);
+      const isApplicable = useForAll || products.some(p =>
+        Number(p.ProductCode ?? p.GoodsId ?? p.Goodsid) === Number(item.item.GoodsId) ||
+        String(p.ProductCode ?? '') === String(item.item.GoodsCode ?? '')
+      );
+      if (isApplicable) totalApplicablePrice += lineBaseAmount(item);
+      return isApplicable;
     });
 
     if (applicableItems.length === 0) return null;
 
-    // محاسبه قیمت کل قابل تخفیف (شامل قیمت پایه + تاپینگ‌ها)
-    const totalApplicablePrice = applicableItems.reduce((sum, item) => {
-      const toppings = getToppingsForCartItem(item.id);
-      const toppingsPrice = toppings.reduce((sum, topping) => sum + (topping.Price || 0) * (topping.Count || 1), 0);
-
-      return sum + ((item.item.GoodsPrice + toppingsPrice) * item.quantity);
-    }, 0);
-
     return {
-      ...discount,
+      ...discountRow,
       applicableItems,
       totalApplicablePrice,
-      discountValue: calculateDiscountValue(discount, totalApplicablePrice)
+      discountValue: calculateDiscountValue(discountRow, totalApplicablePrice)
     };
   }).filter(Boolean);
 
   if (applicableDiscounts.length === 0) return null;
 
-  // انتخاب تخفیف با بیشترین مقدار
   return applicableDiscounts.reduce((best, current) =>
     current.discountValue > best.discountValue ? current : best
   );
 }
 
 function calculateDiscountValue(discount, price) {
-  if (discount.DiscountType === false) { // درصدی
-    return price * (discount.DiscountValue / 100);
-  } else if (discount.DiscountType === true) { // مبلغی
-    return Math.min(discount.DiscountValue, price);
+  const safePrice = Number(price || 0);
+  if (!discount || safePrice <= 0) return 0;
+
+  const minBuy = Number(discount.MinBuy ?? discount.MinInvoiceAmount ?? 0);
+  if (minBuy > 0 && safePrice < minBuy) return 0;
+
+  let amount = 0;
+  if (isPercentDiscountType(discount.DiscountType)) {
+    amount = safePrice * (normalizeDiscountValue(discount) / 100);
+  } else {
+    amount = Math.min(normalizeDiscountValue(discount), safePrice);
   }
-  return 0;
+
+  const maxDiscount = Number(discount.DiscountMax ?? discount.MaxDiscountAmount ?? 0);
+  if (maxDiscount > 0) amount = Math.min(amount, maxDiscount);
+  return Math.max(0, Math.round(amount));
 }
 
-function applyDiscountToCart(discount, discountProducts) {
-  const applicableProducts = discountProducts.filter(
-    dp => dp.DiscountId === discount.DiscountId
-  );
+function applyDiscountToCart(discountRow, discountProducts) {
+  const discountId = Number(discountRow?.DiscountId ?? discountRow?.DiscountCodeId ?? 0);
+  const applicableProducts = Array.isArray(discountProducts)
+    ? discountProducts.filter(dp => Number(dp.DiscountId) === discountId)
+    : [];
+  const useForAll = discountRow?.UseForAll === true || discountRow?.ApplyToAllGoods === true || applicableProducts.length === 0;
 
-  let totalDiscountAmount = 0;
-
-  cartItems.value.forEach(item => {
-    const isApplicable = applicableProducts.some(
-      dp => Number(dp.ProductCode) === item.item.GoodsCode
+  let totalApplicablePrice = 0;
+  const applicableItems = cartItems.value.filter(item => {
+    const isApplicable = useForAll || applicableProducts.some(dp =>
+      Number(dp.ProductCode ?? dp.GoodsId ?? dp.Goodsid) === Number(item.item.GoodsId) ||
+      String(dp.ProductCode ?? '') === String(item.item.GoodsCode ?? '')
     );
-
-    if (isApplicable) {
-      const itemBasePrice = item.item.GoodsPrice * item.quantity;
-
-      const discountValue = discount.DiscountType === false ? // درصدی
-        itemBasePrice * (discount.DiscountValue / 100) :
-        Math.min(discount.DiscountValue, itemBasePrice); // مبلغی
-
-      totalDiscountAmount += discountValue;
-
-      // ذخیره اطلاعات تخفیف برای نمایش
-      item.discount = {
-        ...discount,
-        discountValue,
-        originalPrice: itemBasePrice,
-        finalPrice: itemBasePrice - discountValue
-      };
-    }
+    if (isApplicable) totalApplicablePrice += lineBaseAmount(item);
+    return isApplicable;
   });
 
-  // به روزرسانی تخفیف کل
-  discount.value = totalDiscountAmount;
-  totalDiscountApplied.value = totalDiscountAmount;
+  if (applicableItems.length === 0 || totalApplicablePrice <= 0) {
+    discount.value = 0;
+    return 0;
+  }
 
+  const totalDiscountAmount = calculateDiscountValue(discountRow, totalApplicablePrice);
+
+  applicableItems.forEach(item => {
+    const itemBasePrice = lineBaseAmount(item);
+    const itemDiscount = totalApplicablePrice > 0
+      ? Math.round((itemBasePrice / totalApplicablePrice) * totalDiscountAmount)
+      : 0;
+
+    item.discount = {
+      ...discountRow,
+      discountValue: itemDiscount,
+      originalPrice: itemBasePrice,
+      finalPrice: Math.max(itemBasePrice - itemDiscount, 0),
+      isCustomerDiscount: true
+    };
+  });
+
+  discount.value = totalDiscountAmount;
   return totalDiscountAmount;
 }
 
@@ -1995,15 +2098,17 @@ function handleKeyPress5(key, event) {
 
 /// بررسی کارت تخفیف حامی
 async function CheckDiscountCart() {
-  const discountCartField = document.getElementById('discountCartField');
-  const discountCartValue = discountCartField.value.trim();
+  const discountCartValue = String(discountCart.value || document.getElementById('discountCartField')?.value || '').trim();
 
   if (discountCartValue.length < 1) {
-    toast.error('لطفاً بارکد خود را وارد نمائید.');
+    toast.error('لطفاً بارکد یا شماره کارت تخفیف را وارد نمائید.');
     return;
   }
 
   try {
+    clearCustomerDiscountState();
+    discountCart.value = discountCartValue;
+
     const ResultDiscountCart = await fetchDiscountsCarts(discountCartValue, props.connectionId);
 
     if (!ResultDiscountCart?.status) {
@@ -2011,23 +2116,23 @@ async function CheckDiscountCart() {
       return;
     }
 
-    const discountCartData = ResultDiscountCart.data;
+    const discountCartData = normalizeDiscountCardData(ResultDiscountCart);
 
-    if (!discountCartData.IsActive) {
-      toast.error('کارت تخفیف مورد نظر یافت نشد');
+    if (!discountCartData?.IsActive) {
+      toast.error('کارت تخفیف مورد نظر یافت نشد یا فعال نیست');
       return;
     }
 
-    // محاسبه مجموع مبلغ کالاهای واجد شرایط تخفیف
+    const goodsRules = Array.isArray(discountCartData.Goods) ? discountCartData.Goods : [];
+    const useForAllGoods = goodsRules.length === 0;
     let totalApplicablePrice = 0;
-    let applicableCartItems = [];
+    const applicableCartItems = [];
 
     cartItems.value.forEach(item => {
-      const isEligible = discountCartData.Goods.some(g => Number(g.Goodsid) === item.item.GoodsId);
+      const isEligible = useForAllGoods || goodsRules.some(g => Number(g.Goodsid ?? g.GoodsId) === Number(item.item.GoodsId));
       if (isEligible) {
         applicableCartItems.push(item);
-        const itemPrice = item.item.GoodsPrice * item.quantity;
-        totalApplicablePrice += itemPrice;
+        totalApplicablePrice += lineBaseAmount(item);
       }
     });
 
@@ -2036,16 +2141,14 @@ async function CheckDiscountCart() {
       return;
     }
 
-    // بررسی حداقل خرید
     if (discountCartData.MinBuy > 0 && totalApplicablePrice < discountCartData.MinBuy) {
       toast.error(`حداقل مبلغ خرید برای استفاده از این کارت تخفیف ${discountCartData.MinBuy.toLocaleString()} ${currency.value} می‌باشد.`);
       return;
     }
 
-    // محاسبه تخفیف
     let totalDiscountAmount = 0;
     if (discountCartData.Percent > 0) {
-      totalDiscountAmount = totalApplicablePrice * (discountCartData.Percent / 100);
+      totalDiscountAmount = Math.round(totalApplicablePrice * (discountCartData.Percent / 100));
     } else if (discountCartData.Price > 0) {
       totalDiscountAmount = Math.min(discountCartData.Price, totalApplicablePrice);
     } else {
@@ -2053,30 +2156,49 @@ async function CheckDiscountCart() {
       return;
     }
 
-    // اعمال تخفیف به کالاهای مشمول
     applicableCartItems.forEach(item => {
-      const itemPrice = item.item.GoodsPrice * item.quantity;
-      let itemDiscount = 0;
-
-      if (discountCartData.Percent > 0) {
-        itemDiscount = itemPrice * (discountCartData.Percent / 100);
-      } else {
-        itemDiscount = (itemPrice / totalApplicablePrice) * discountCartData.Price;
-      }
+      const itemPrice = lineBaseAmount(item);
+      const itemDiscount = totalApplicablePrice > 0
+        ? Math.round((itemPrice / totalApplicablePrice) * totalDiscountAmount)
+        : 0;
 
       item.discount = {
         discountId: discountCartData.DiscountCardId,
         discountPercent: discountCartData.Percent,
         discountAmount: itemDiscount,
         originalPrice: itemPrice,
-        finalPrice: itemPrice - itemDiscount,
+        finalPrice: Math.max(itemPrice - itemDiscount, 0),
         isCartDiscount: true
       };
     });
 
-    // اعمال به متغیر کلی تخفیف
-    discount.value = totalDiscountAmount;
-    toast.success(`تخفیف ${totalDiscountAmount.toLocaleString()} ${currency.value} روی کالاهای مشمول اعمال شد`);
+    discount.value = Math.round(totalDiscountAmount);
+    selectedDiscountCard.value = discountCartData;
+
+    const customerData = ensureCustomerDataForDiscount({
+      CustomerId: Number(discountCartData.CustomerId || 0),
+      CustomerPhone: discountCartData.CustomerPhone || '',
+      CustomerName: discountCartData.CustomerName || '',
+      userName: discountCartData.CustomerName || 'مشتری کارت تخفیف',
+      UserPhone: discountCartData.CustomerPhone || '',
+      usedDiscount: {
+        DiscountId: discountCartData.DiscountCardId,
+        DiscountCardId: discountCartData.DiscountCardId,
+        DiscountCart: discountCartValue,
+        DiscountType: discountCartData.Percent > 0,
+        DiscountValue: discountCartData.Percent > 0 ? discountCartData.Percent : discountCartData.Price,
+        DiscountAmount: discount.value,
+        IsCartDiscount: true
+      },
+      totalDiscount: totalDiscountApplied.value,
+      DiscountCardId: discountCartData.DiscountCardId,
+      DiscountCardNumber: discountCartValue,
+      DiscountCardUsedAmount: discount.value
+    });
+    HamiClubUserData.value = customerData;
+
+    await saveCart();
+    toast.success(`تخفیف ${discount.value.toLocaleString()} ${currency.value} روی کالاهای مشمول اعمال شد`);
 
   } catch (error) {
     console.error('Error in CheckDiscountCart:', error);
