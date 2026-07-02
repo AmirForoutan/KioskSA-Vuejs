@@ -1,6 +1,5 @@
 <template>
   <div>
-    <!-- حالت نمایش دسته‌بندی‌ها -->
     <div v-if="!selectedGroup">
       <button @click="confirmBack" v-if="isScaleOrder || selectedGroup" class="back-button2">
         بازگشت
@@ -23,8 +22,7 @@
       </div>
     </div>
 
-    <!-- حالت نمایش کالاهای دسته‌بندی انتخاب شده -->
-    <GoodsList v-else :group="selectedGroup" @go-back="selectedGroup = null" />
+    <GoodsList v-else :group="selectedGroup" :connectionId="props.connectionId" @go-back="selectedGroup = null" />
   </div>
 </template>
 
@@ -32,8 +30,9 @@
 import { ref, onMounted, computed, inject } from 'vue'
 import { getData, removeData, saveData } from '../services/storageService'
 import GoodsList from './GoodsList.vue'
-import { IsScaleOrderStat, GetResetTimer } from '../utilities'
-import { fetchCategories, fetchGoods, fetchToppingProducts, fetchToppings, fetchToppingLevels, GetCountBranches } from '../services/apiService'
+import { IsScaleOrderStat } from '../utilities'
+import { fetchCategories, fetchGoods, fetchToppingProducts, fetchToppings, fetchToppingLevels, GetCountBranches, fetchGoodsDiscounts } from '../services/apiService'
+import { applyGoodsDiscounts } from '../services/discountService'
 import { useToast } from 'vue-toastification';
 import Swal from 'sweetalert2';
 
@@ -51,7 +50,6 @@ const cart = inject('cart')
 const cartItems = computed(() => cart?.value?.items || [])
 const cartToppings = computed(() => cart?.value?.toppings || {})
 
-// دریافت شعبه انتخاب شده
 const props = defineProps({
   connectionId: {
     type: Number,
@@ -74,7 +72,6 @@ const resetCategories = () => {
   selectedGroup.value = null;
 };
 
-// expose متد به parent
 defineExpose({
   resetCategories
 });
@@ -113,7 +110,7 @@ onMounted(async () => {
       ? JSON.parse(JSON.stringify(toppingsData))
       : {}
   } catch (error) {
-    console.error('خطا در دریافت داده:', error)
+    console.error('load data error:', error)
     toast.error('خطا در دریافت داده')
   } finally {
     loading.value = false
@@ -126,13 +123,12 @@ function handleBack() {
   if (CountOfConnections.value > 1) {
     if (!isScaleOrder) {
       emit('back')
-    } // فقط اگر چند کانکشن داریم برگردیم
+    }
   } else {
     if (!isScaleOrder) {
       emit('go-to-main')
     }
-    selectedGroup.value = null // برای حالت عادی
-    // اگر یک کانکشن داریم یا در حالت scale هستیم، به صفحه اصلی برو    
+    selectedGroup.value = null
   }
 }
 
@@ -156,39 +152,40 @@ function selectGroup(group) {
   selectedGroup.value = group
 }
 
-// دریافت اطلاعات کالاها و دسته بندی ها
 async function loadData(conId) {
-
   try {
     await Promise.all([
       removeData('category'),
       removeData('goods'),
       removeData('topping'),
       removeData('toppinglevel'),
-      removeData('toppingproducts')
+      removeData('toppingproducts'),
+      removeData('goodsDiscounts')
     ])
 
-    const [categories, goods, toppings, toppingLevels, toppingProducts] = await Promise.all([
+    const [categories, rawGoods, toppings, toppingLevels, toppingProducts, goodsDiscounts] = await Promise.all([
       fetchCategories(conId).then(res => res.GoodsGroup || res),
       fetchGoods(conId).then(res => res.Goods || res),
       fetchToppings(conId).then(res => res.ToppingGoods || res),
       fetchToppingLevels(conId).then(res => res.ToppingLevel || res),
-      fetchToppingProducts(conId).then(res => res.Goods || res)
+      fetchToppingProducts(conId).then(res => res.Goods || res),
+      fetchGoodsDiscounts(conId).then(res => res.Discounts || res.GoodsDiscounts || res.Discount || res || [])
     ])
+
+    const discountedGoods = applyGoodsDiscounts(rawGoods, goodsDiscounts)
 
     await Promise.all([
       saveData('category', categories),
-      saveData('goods', goods),
+      saveData('goods', discountedGoods),
+      saveData('goodsDiscounts', goodsDiscounts),
       saveData('topping', toppings),
       saveData('toppinglevel', toppingLevels),
       saveData('toppingproducts', toppingProducts)
     ])
   } catch (error) {
-    console.error("خطا در بارگذاری اطلاعات:", error)
+    console.error("load error:", error)
   }
 }
-
-/// باکس سوالی برای برگشت و خالی کردن سبد خرید
 
 function confirmResetCart() {
   Swal.fire({
@@ -238,7 +235,6 @@ function confirmBack() {
   }
 }
 
-// پاک کردن سبد خرید
 function resetCart() {
   cartItems.value = []
   cartToppings.value = {}
@@ -253,7 +249,6 @@ function resetCart() {
 
 async function saveCart() {
   try {
-    // تبدیل ساختار تاپینگ‌ها قبل از ذخیره
     const normalizedCartToppings = {};
     for (const key in cartToppings.value) {
       normalizedCartToppings[key] = cartToppings.value[key].flat();
@@ -264,7 +259,7 @@ async function saveCart() {
       saveData('cartToppings', JSON.parse(JSON.stringify(normalizedCartToppings)))
     ]);
   } catch (error) {
-    console.error('خطا در ذخیره سبد خرید:', error);
+    console.error('cart save error:', error);
   }
 }
 </script>
