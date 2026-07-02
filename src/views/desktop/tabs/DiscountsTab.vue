@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from "vue";
+import { loadDesktopCatalog, type DesktopProduct } from "../../../services/desktopApi";
 import {
   disableLocalDiscount,
   disableLocalDiscountCard,
@@ -14,10 +15,15 @@ import {
 } from "../../../services/localDiscountApi";
 
 const loading = ref(false);
+const productLoading = ref(false);
+const productPickerOpen = ref(false);
+const productSearch = ref("");
 const message = ref("");
 const discounts = ref<LocalDiscount[]>([]);
 const cards = ref<LocalDiscountCard[]>([]);
 const transactions = ref<LocalDiscountCardTransaction[]>([]);
+const products = ref<DesktopProduct[]>([]);
+const selectedProductIds = ref<number[]>([]);
 const activeTab = ref<"discounts" | "cards" | "transactions">("discounts");
 
 const discountForm = reactive({
@@ -54,6 +60,24 @@ const cardForm = reactive({
 });
 
 const hasMessage = computed(() => message.value.trim().length > 0);
+const selectedProductIdSet = computed(() => new Set(selectedProductIds.value));
+const selectedGoodsCount = computed(() => parseGoodsIds(discountForm.GoodsIdsText).length);
+const selectedGoodsSummary = computed(() => {
+  const ids = parseGoodsIds(discountForm.GoodsIdsText);
+  if (!ids.length) return "کالایی انتخاب نشده";
+  if (ids.length <= 4) return ids.join(", ");
+  return `${ids.slice(0, 4).join(", ")} و ${ids.length - 4} مورد دیگر`;
+});
+
+const filteredProducts = computed(() => {
+  const q = productSearch.value.trim().toLowerCase();
+  const rows = products.value.filter((item) => item && item.IsActive !== false);
+  if (!q) return rows;
+  return rows.filter((item) => {
+    const haystack = `${item.GoodsId ?? ""} ${item.GoodsCode ?? ""} ${item.GoodsName ?? ""}`.toLowerCase();
+    return haystack.includes(q);
+  });
+});
 
 onMounted(() => {
   void refreshAll();
@@ -78,6 +102,19 @@ async function refreshAll() {
   }
 }
 
+async function loadProducts() {
+  if (products.value.length) return;
+  productLoading.value = true;
+  try {
+    const catalog = await loadDesktopCatalog(0);
+    products.value = catalog.goods || [];
+  } catch (error) {
+    message.value = error instanceof Error ? error.message : "خطا در دریافت لیست کالاها";
+  } finally {
+    productLoading.value = false;
+  }
+}
+
 function toNumber(value: unknown) {
   const numberValue = Number(value);
   return Number.isFinite(numberValue) ? numberValue : 0;
@@ -88,12 +125,37 @@ function nullableText(value: string) {
   return normalized.length ? normalized : null;
 }
 
-function parseGoodsIds(value: string) {
+function parseGoodsIds(value: unknown) {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => Number(item))
+      .filter((item) => Number.isFinite(item) && item > 0)
+      .filter((item, index, array) => array.indexOf(item) === index);
+  }
+
   return String(value || "")
     .split(/[,،\n\s]+/)
     .map((item) => Number(item.trim()))
     .filter((item) => Number.isFinite(item) && item > 0)
     .filter((item, index, array) => array.indexOf(item) === index);
+}
+
+function rowGoodsIds(row: LocalDiscount) {
+  const record = row as Record<string, unknown>;
+  if (Array.isArray(row.GoodsIds)) return parseGoodsIds(row.GoodsIds);
+  if (Array.isArray(record.goodsIds)) return parseGoodsIds(record.goodsIds);
+  if (typeof row.GoodsIds === "string") return parseGoodsIds(row.GoodsIds);
+  if (typeof record.GoodsIdsText === "string") return parseGoodsIds(record.GoodsIdsText);
+  return [];
+}
+
+function productId(product: DesktopProduct) {
+  return Number(product.GoodsId ?? product.ProductId ?? 0);
+}
+
+function productTitle(product: DesktopProduct) {
+  const code = product.GoodsCode ? `کد ${product.GoodsCode} - ` : "";
+  return `${code}${product.GoodsName ?? "کالا"}`;
 }
 
 function resetDiscountForm() {
@@ -115,9 +177,11 @@ function resetDiscountForm() {
     IsActive: true,
     GoodsIdsText: "",
   });
+  selectedProductIds.value = [];
 }
 
 function editDiscount(row: LocalDiscount) {
+  const goodsIds = rowGoodsIds(row);
   Object.assign(discountForm, {
     DiscountId: toNumber(row.DiscountId),
     DiscountCode: String(row.DiscountCode ?? ""),
@@ -134,9 +198,54 @@ function editDiscount(row: LocalDiscount) {
     ToTime: String(row.ToTime ?? ""),
     ApplyToAllGoods: row.ApplyToAllGoods !== false,
     IsActive: row.IsActive !== false,
-    GoodsIdsText: Array.isArray(row.GoodsIds) ? row.GoodsIds.join(",") : String(row.GoodsIds ?? ""),
+    GoodsIdsText: goodsIds.join(","),
   });
+  selectedProductIds.value = goodsIds;
   activeTab.value = "discounts";
+}
+
+async function openProductPicker() {
+  selectedProductIds.value = parseGoodsIds(discountForm.GoodsIdsText);
+  productSearch.value = "";
+  productPickerOpen.value = true;
+  await loadProducts();
+}
+
+function closeProductPicker() {
+  productPickerOpen.value = false;
+}
+
+function isProductSelected(product: DesktopProduct) {
+  const id = productId(product);
+  return id > 0 && selectedProductIdSet.value.has(id);
+}
+
+function toggleProduct(product: DesktopProduct) {
+  const id = productId(product);
+  if (id <= 0) return;
+  const current = new Set(selectedProductIds.value);
+  if (current.has(id)) current.delete(id);
+  else current.add(id);
+  selectedProductIds.value = Array.from(current).sort((a, b) => a - b);
+}
+
+function selectFilteredProducts() {
+  const current = new Set(selectedProductIds.value);
+  for (const product of filteredProducts.value) {
+    const id = productId(product);
+    if (id > 0) current.add(id);
+  }
+  selectedProductIds.value = Array.from(current).sort((a, b) => a - b);
+}
+
+function clearProductSelection() {
+  selectedProductIds.value = [];
+}
+
+function confirmProductSelection() {
+  discountForm.GoodsIdsText = selectedProductIds.value.join(",");
+  discountForm.ApplyToAllGoods = selectedProductIds.value.length === 0 ? discountForm.ApplyToAllGoods : false;
+  productPickerOpen.value = false;
 }
 
 async function submitDiscount() {
@@ -315,7 +424,17 @@ async function removeCard(row: LocalDiscountCard) {
           <label>تا تاریخ<input v-model="discountForm.EndDate" placeholder="1405/12/29" /></label>
           <label>از ساعت<input v-model="discountForm.FromTime" placeholder="09:00" /></label>
           <label>تا ساعت<input v-model="discountForm.ToTime" placeholder="23:59" /></label>
-          <label class="wide">شناسه کالاها، با کاما جدا شود<input v-model="discountForm.GoodsIdsText" :disabled="discountForm.ApplyToAllGoods" /></label>
+
+          <div class="product-select-box wide" :class="{ disabled: discountForm.ApplyToAllGoods }">
+            <div>
+              <strong>کالاهای شامل تخفیف</strong>
+              <span>{{ discountForm.ApplyToAllGoods ? 'همه کالاها' : `${selectedGoodsCount} کالا انتخاب شده` }}</span>
+              <small v-if="!discountForm.ApplyToAllGoods">{{ selectedGoodsSummary }}</small>
+            </div>
+            <button class="btn" type="button" :disabled="discountForm.ApplyToAllGoods" @click="openProductPicker">
+              انتخاب از لیست کالاها
+            </button>
+          </div>
         </div>
         <div class="checks">
           <label><input v-model="discountForm.ApplyToAllGoods" type="checkbox" /> برای همه کالاها</label>
@@ -340,7 +459,7 @@ async function removeCard(row: LocalDiscountCard) {
               <td>{{ row.Title }}</td>
               <td>{{ Number(row.DiscountType) === 1 ? 'درصدی' : 'مبلغی' }}</td>
               <td>{{ Number(row.DiscountType) === 1 ? row.DiscountPercent + '%' : Number(row.DiscountAmount).toLocaleString() }}</td>
-              <td>{{ row.ApplyToAllGoods ? 'همه' : (row.GoodsIds || []).join(',') }}</td>
+              <td>{{ row.ApplyToAllGoods ? 'همه' : rowGoodsIds(row).join(',') }}</td>
               <td>{{ row.IsActive ? 'بله' : 'خیر' }}</td>
               <td class="row-actions"><button @click="editDiscount(row)">ویرایش</button><button @click="removeDiscount(row)">غیرفعال</button></td>
             </tr>
@@ -407,6 +526,40 @@ async function removeCard(row: LocalDiscountCard) {
         </tbody>
       </table>
     </div>
+
+    <div v-if="productPickerOpen" class="modal-backdrop" @click.self="closeProductPicker">
+      <div class="product-modal">
+        <header class="modal-head">
+          <div>
+            <h3>انتخاب کالاهای شامل تخفیف</h3>
+            <p>{{ selectedProductIds.length }} کالا انتخاب شده است</p>
+          </div>
+          <button class="icon-btn" type="button" @click="closeProductPicker">×</button>
+        </header>
+
+        <div class="modal-toolbar">
+          <input v-model="productSearch" placeholder="جستجو بر اساس نام، کد یا شناسه کالا" />
+          <button class="btn" type="button" @click="selectFilteredProducts">انتخاب همه نتایج</button>
+          <button class="btn" type="button" @click="clearProductSelection">پاک کردن انتخاب</button>
+        </div>
+
+        <div v-if="productLoading" class="modal-state">در حال دریافت کالاها...</div>
+        <div v-else-if="!filteredProducts.length" class="modal-state">کالایی یافت نشد</div>
+        <div v-else class="product-list">
+          <label v-for="product in filteredProducts" :key="productId(product)" class="product-row">
+            <input type="checkbox" :checked="isProductSelected(product)" @change="toggleProduct(product)" />
+            <span class="product-main">{{ productTitle(product) }}</span>
+            <span class="product-meta">شناسه: {{ productId(product) }}</span>
+            <span class="product-price">{{ Number(product.GoodsPrice || 0).toLocaleString() }}</span>
+          </label>
+        </div>
+
+        <footer class="modal-footer">
+          <button class="btn primary" type="button" @click="confirmProductSelection">تأیید انتخاب</button>
+          <button class="btn" type="button" @click="closeProductPicker">انصراف</button>
+        </footer>
+      </div>
+    </div>
   </section>
 </template>
 
@@ -420,12 +573,13 @@ async function removeCard(row: LocalDiscountCard) {
 .tabs button, .btn, .row-actions button { border: 1px solid rgba(255,255,255,.1); color: #e5e7eb; background: rgba(255,255,255,.05); border-radius: 10px; padding: 9px 14px; cursor: pointer; }
 .tabs button.active, .btn.primary { background: rgba(20,184,166,.22); border-color: rgba(20,184,166,.45); font-weight: 800; }
 .btn.ghost { background: transparent; }
+.btn:disabled { opacity: .55; cursor: not-allowed; }
 .grid-layout { display: grid; grid-template-columns: minmax(330px, 420px) 1fr; gap: 12px; align-items: start; }
 .card { background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); border-radius: 16px; padding: 14px; }
 .form h3 { margin: 0 0 12px; }
 .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .form-grid label { display: flex; flex-direction: column; gap: 6px; color: #cbd5e1; font-size: 13px; }
-.form-grid label.wide { grid-column: 1 / -1; }
+.form-grid label.wide, .form-grid .wide { grid-column: 1 / -1; }
 input, select { border: 1px solid rgba(255,255,255,.12); background: rgba(0,0,0,.22); color: #fff; border-radius: 10px; padding: 9px 10px; outline: none; }
 .checks { display: flex; gap: 18px; margin: 12px 0; }
 .actions { display: flex; gap: 8px; }
@@ -435,5 +589,26 @@ table { width: 100%; border-collapse: collapse; min-width: 760px; }
 th, td { text-align: right; padding: 10px; border-bottom: 1px solid rgba(255,255,255,.07); white-space: nowrap; }
 th { color: #93c5fd; font-weight: 800; }
 .row-actions { display: flex; gap: 6px; }
-@media (max-width: 980px) { .grid-layout { grid-template-columns: 1fr; } }
+.product-select-box { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px; border: 1px dashed rgba(255,255,255,.18); border-radius: 14px; background: rgba(0,0,0,.16); }
+.product-select-box.disabled { opacity: .55; }
+.product-select-box div { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.product-select-box span { color: #cbd5e1; }
+.product-select-box small { color: #93c5fd; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 250px; }
+.modal-backdrop { position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,.72); display: flex; align-items: center; justify-content: center; padding: 24px; }
+.product-modal { width: min(920px, 96vw); max-height: 88vh; display: flex; flex-direction: column; border-radius: 20px; background: #111827; border: 1px solid rgba(255,255,255,.12); box-shadow: 0 24px 80px rgba(0,0,0,.5); overflow: hidden; }
+.modal-head, .modal-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,.08); }
+.modal-footer { border-bottom: 0; border-top: 1px solid rgba(255,255,255,.08); justify-content: flex-start; }
+.modal-head h3 { margin: 0 0 4px; }
+.modal-head p { margin: 0; color: #9ca3af; }
+.icon-btn { width: 38px; height: 38px; border-radius: 999px; border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.06); color: #fff; font-size: 24px; cursor: pointer; }
+.modal-toolbar { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,.08); }
+.product-list { overflow: auto; padding: 8px 12px; }
+.product-row { display: grid; grid-template-columns: 34px 1fr 120px 130px; align-items: center; gap: 10px; padding: 10px; border-bottom: 1px solid rgba(255,255,255,.07); cursor: pointer; }
+.product-row:hover { background: rgba(255,255,255,.04); }
+.product-row input { width: 18px; height: 18px; }
+.product-main { font-weight: 800; }
+.product-meta { color: #9ca3af; }
+.product-price { color: #bbf7d0; text-align: left; }
+.modal-state { padding: 40px; text-align: center; color: #9ca3af; }
+@media (max-width: 980px) { .grid-layout { grid-template-columns: 1fr; } .modal-toolbar { grid-template-columns: 1fr; } .product-row { grid-template-columns: 30px 1fr; } .product-meta, .product-price { grid-column: 2; text-align: right; } }
 </style>
