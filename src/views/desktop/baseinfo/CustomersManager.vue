@@ -21,6 +21,18 @@ const originalCredit = ref(0);
 
 useDesktopToastMessage(message);
 
+const canEditCustomer = computed(() => can("manage.customers") || can("customers.edit"));
+const canDeleteCustomer = computed(() => can("manage.customers"));
+const canAddCredit = computed(() => can("manage.customers") || can("customers.credit.add"));
+const canSubtractCredit = computed(() => can("manage.customers") || can("customers.credit.subtract"));
+const canEditCredit = computed(() => canAddCredit.value || canSubtractCredit.value);
+const creditHelpText = computed(() => {
+  if (canAddCredit.value && canSubtractCredit.value) return "افزایش و کاهش اعتبار مجاز است";
+  if (canAddCredit.value) return "فقط افزایش اعتبار مجاز است";
+  if (canSubtractCredit.value) return "فقط کاهش اعتبار مجاز است";
+  return "دسترسی تغییر اعتبار ندارید";
+});
+
 const filtered = computed(() => {
   const s = q.value.trim();
   if (!s) return rows.value;
@@ -71,6 +83,7 @@ async function loadRows() {
 }
 
 function add() {
+  if (!canEditCustomer.value) return;
   originalCredit.value = 0;
   editor.value = {
     CustomerId: 0,
@@ -83,6 +96,7 @@ function add() {
 }
 
 function edit(id: number | string | undefined) {
+  if (!canEditCustomer.value) return;
   const row = rows.value.find((item) => String(item.CustomerId) === String(id));
   if (row) {
     originalCredit.value = amount(row.CreditBalance);
@@ -90,18 +104,41 @@ function edit(id: number | string | undefined) {
   }
 }
 
+function normalizeCreditByPermission(nextCredit: number) {
+  if (!canEditCredit.value) return originalCredit.value;
+  if (!canAddCredit.value && nextCredit > originalCredit.value) return originalCredit.value;
+  if (!canSubtractCredit.value && nextCredit < originalCredit.value) return originalCredit.value;
+  return nextCredit;
+}
+
 async function save() {
-  if (!editor.value) return;
+  if (!editor.value || !canEditCustomer.value) return;
   saving.value = true;
   message.value = "";
   try {
     const customer = { ...editor.value, CreditBalance: amount(editor.value.CreditBalance) };
     const customerId = customer.CustomerId ?? customer.UserId ?? 0;
     const isExistingCustomer = Number(customerId) > 0;
-    const nextCredit = amount(customer.CreditBalance);
+    const requestedCredit = amount(customer.CreditBalance);
+    const nextCredit = normalizeCreditByPermission(requestedCredit);
+    const creditIncrease = nextCredit - originalCredit.value;
     const creditDecrease = originalCredit.value - nextCredit;
 
-    if (isExistingCustomer && creditDecrease > 0) {
+    if (requestedCredit !== nextCredit) {
+      if (requestedCredit > originalCredit.value && !canAddCredit.value) {
+        throw new Error("دسترسی افزایش اعتبار مشتری را ندارید");
+      }
+      if (requestedCredit < originalCredit.value && !canSubtractCredit.value) {
+        throw new Error("دسترسی کاهش اعتبار مشتری را ندارید");
+      }
+      throw new Error("دسترسی تغییر اعتبار مشتری را ندارید");
+    }
+
+    if (!isExistingCustomer && nextCredit > 0 && !canAddCredit.value) {
+      throw new Error("برای ثبت اعتبار اولیه، دسترسی افزایش اعتبار لازم است");
+    }
+
+    if (isExistingCustomer && (creditIncrease > 0 || creditDecrease > 0)) {
       const detailResult = await saveDesktopCustomer({ ...customer, CreditBalance: originalCredit.value });
       if (!responseIsOk(detailResult)) {
         throw new Error(responseMessage(detailResult, "خطا در ذخیره مشتری"));
@@ -109,15 +146,15 @@ async function save() {
 
       const creditResult = await manageDesktopCredit({
         CustomerId: customerId,
-        TransactionType: 2,
-        Amount: creditDecrease,
-        Description: "کاهش اعتبار در هنگام ویرایش مشتری",
+        TransactionType: creditIncrease > 0 ? 1 : 2,
+        Amount: Math.abs(creditIncrease || creditDecrease),
+        Description: creditIncrease > 0 ? "افزایش اعتبار در هنگام ویرایش مشتری" : "کاهش اعتبار در هنگام ویرایش مشتری",
       });
       if (!responseIsOk(creditResult)) {
-        throw new Error(responseMessage(creditResult, "خطا در کاهش اعتبار مشتری"));
+        throw new Error(responseMessage(creditResult, "خطا در تغییر اعتبار مشتری"));
       }
     } else {
-      const result = await saveDesktopCustomer(customer);
+      const result = await saveDesktopCustomer({ ...customer, CreditBalance: nextCredit });
       if (!responseIsOk(result)) {
         throw new Error(responseMessage(result, "خطا در ذخیره مشتری"));
       }
@@ -134,6 +171,7 @@ async function save() {
 }
 
 async function remove(customer: DesktopCustomer) {
+  if (!canDeleteCustomer.value) return;
   const customerId = customerIdOf(customer);
   if (!customerId) return;
 
@@ -172,7 +210,7 @@ async function remove(customer: DesktopCustomer) {
       <div class="m-tools">
         <input class="m-input" v-model="q" placeholder="جستجوی نام یا موبایل..." @keyup.enter="loadRows" />
         <button class="m-btn" :disabled="loading" @click="loadRows">جستجو/بازخوانی</button>
-        <button v-if="can('manage.customers')" class="m-btn primary" @click="add">+ افزودن مشتری</button>
+        <button v-if="canEditCustomer" class="m-btn primary" @click="add">+ افزودن مشتری</button>
       </div>
     </div>
 
@@ -200,9 +238,10 @@ async function remove(customer: DesktopCustomer) {
         <div>
           <span class="status" :class="{ off: r.IsActive === false }">{{ r.IsActive === false ? "غیرفعال" : "فعال" }}</span>
         </div>
-        <div class="row-actions" v-if="can('manage.customers')">
-          <button class="m-btn small" @click="edit(r.CustomerId)">ویرایش</button>
+        <div class="row-actions" v-if="canEditCustomer || canDeleteCustomer">
+          <button v-if="canEditCustomer" class="m-btn small" @click="edit(r.CustomerId)">ویرایش</button>
           <button
+            v-if="canDeleteCustomer"
             class="m-btn small danger"
             :disabled="deletingCustomerId === (r.CustomerId ?? r.UserId) || hasInvoices(r)"
             :title="hasInvoices(r) ? 'این مشتری فاکتور دارد و قابل حذف نیست' : 'حذف مشتری'"
@@ -233,7 +272,14 @@ async function remove(customer: DesktopCustomer) {
           </label>
           <label class="form-group">
             <span>مانده اعتبار</span>
-            <input v-model.number="editor.CreditBalance" type="number" />
+            <input
+              v-model.number="editor.CreditBalance"
+              type="number"
+              :disabled="!canEditCredit"
+              :min="canSubtractCredit ? undefined : originalCredit"
+              :max="canAddCredit ? undefined : originalCredit"
+            />
+            <small>{{ creditHelpText }}</small>
           </label>
           <label class="form-group">
             <span>یادداشت</span>
@@ -255,195 +301,33 @@ async function remove(customer: DesktopCustomer) {
 </template>
 
 <style scoped>
-.m-shell {
-  height: 100%;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.m-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.m-title {
-  font-weight: 900;
-  font-size: 18px;
-}
-
-.m-sub {
-  margin-top: 4px;
-  font-size: 12px;
-  color: #a7b0c3;
-}
-
-.m-tools {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  width: min(680px, 100%);
-}
-
-.m-input,
-.m-btn,
-.form-group input,
-.form-group textarea {
-  min-height: 46px;
-  border-radius: 8px;
-  padding: 9px 11px;
-  font-size: 14px;
-  color: #eef2ff;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.m-input {
-  width: 100%;
-}
-
-.m-btn {
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.m-btn.small {
-  min-height: 36px;
-  padding: 7px 9px;
-}
-
-.m-btn.primary {
-  font-weight: 900;
-  background: rgba(20, 184, 166, 0.18);
-  border-color: rgba(20, 184, 166, 0.34);
-}
-
-.m-btn.danger {
-  color: #fecaca;
-  background: rgba(239, 68, 68, 0.12);
-  border-color: rgba(239, 68, 68, 0.28);
-}
-
-.m-btn:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
-}
-
-.row-actions {
-  display: flex;
-  gap: 7px;
-  align-items: center;
-}
-
-.m-table {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.02);
-}
-
-.m-tr {
-  display: grid;
-  grid-template-columns: 80px 1.4fr 1fr 1fr 110px 170px;
-  gap: 10px;
-  align-items: center;
-  padding: 11px 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.m-th {
-  font-weight: 900;
-  color: #a7b0c3;
-  background: rgba(16, 19, 26, 0.96);
-  position: sticky;
-  top: 0;
-  z-index: 2;
-}
-
-.m-message,
-.m-empty {
-  border-radius: 8px;
-  padding: 10px 12px;
-  color: #fde68a;
-  background: rgba(245, 158, 11, 0.12);
-  border: 1px solid rgba(245, 158, 11, 0.22);
-}
-
-.bold {
-  font-weight: 800;
-}
-
-.status {
-  display: inline-flex;
-  border-radius: 8px;
-  padding: 5px 9px;
-  color: #bbf7d0;
-  background: rgba(34, 197, 94, 0.1);
-  border: 1px solid rgba(34, 197, 94, 0.22);
-}
-
-.status.off {
-  color: #fecaca;
-  background: rgba(239, 68, 68, 0.1);
-  border-color: rgba(239, 68, 68, 0.22);
-}
-
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  display: grid;
-  place-items: center;
-  background: rgba(0, 0, 0, 0.58);
-}
-
-.modal-content {
-  width: min(520px, calc(100vw - 32px));
-  border-radius: 8px;
-  padding: 14px;
-  background: #171b24;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.modal-header,
-.modal-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.close-btn {
-  min-width: 38px;
-  min-height: 38px;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #eef2ff;
-  background: rgba(255, 255, 255, 0.04);
-  cursor: pointer;
-}
-
-.modal-body {
-  display: grid;
-  gap: 12px;
-  padding: 14px 0;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  color: #a7b0c3;
-}
-
-.check-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
+.m-shell { height: 100%; min-height: 0; display: flex; flex-direction: column; gap: 12px; }
+.m-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.m-title { font-weight: 900; font-size: 18px; }
+.m-sub { margin-top: 4px; font-size: 12px; color: #a7b0c3; }
+.m-tools { display: flex; gap: 10px; align-items: center; width: min(680px, 100%); }
+.m-input, .m-btn, .form-group input, .form-group textarea { min-height: 46px; border-radius: 8px; padding: 9px 11px; font-size: 14px; color: #eef2ff; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.1); }
+.m-input { width: 100%; }
+.m-btn { cursor: pointer; white-space: nowrap; }
+.m-btn.small { min-height: 36px; padding: 7px 9px; }
+.m-btn.primary { font-weight: 900; background: rgba(20,184,166,.18); border-color: rgba(20,184,166,.34); }
+.m-btn.danger { color: #fecaca; background: rgba(239,68,68,.12); border-color: rgba(239,68,68,.28); }
+.m-btn:disabled { cursor: not-allowed; opacity: .5; }
+.row-actions { display: flex; gap: 7px; align-items: center; }
+.m-table { flex: 1; min-height: 0; overflow: auto; border-radius: 8px; border: 1px solid rgba(255,255,255,.08); background: rgba(255,255,255,.02); }
+.m-tr { display: grid; grid-template-columns: 80px 1.4fr 1fr 1fr 110px 170px; gap: 10px; align-items: center; padding: 11px 12px; border-bottom: 1px solid rgba(255,255,255,.06); }
+.m-th { position: sticky; top: 0; z-index: 2; font-weight: 900; color: #a7b0c3; background: rgba(16,19,26,.96); }
+.bold { font-weight: 900; }
+.status { color: #bbf7d0; }
+.status.off { color: #fca5a5; }
+.m-message { border-radius: 8px; padding: 10px 12px; color: #fde68a; background: rgba(245,158,11,.12); border: 1px solid rgba(245,158,11,.22); }
+.m-empty { padding: 24px; opacity: .75; }
+.modal-overlay { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; background: rgba(0,0,0,.58); }
+.modal-content { width: min(520px, calc(100vw - 32px)); border-radius: 8px; padding: 14px; background: #171b24; border: 1px solid rgba(255,255,255,.1); }
+.modal-header, .modal-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.modal-body { display: grid; gap: 12px; padding: 14px 0; }
+.form-group { display: grid; gap: 7px; color: #a7b0c3; }
+.form-group small { color: #93c5fd; }
+.close-btn { min-width: 38px; min-height: 38px; border-radius: 8px; color: #eef2ff; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.1); cursor: pointer; }
+.check-row { display: flex; justify-content: space-between; }
 </style>
