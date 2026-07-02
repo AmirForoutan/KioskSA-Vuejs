@@ -6,8 +6,20 @@ import { createDbBackup, getDbBackupPath, saveDbBackupPath, selectDbBackupPath }
 const backupPath = ref("");
 const loading = ref(false);
 const message = ref("");
+const errorMessage = ref(false);
 
 onMounted(loadSavedPath);
+
+function friendlyError(error: unknown, fallback: string) {
+  const text = error instanceof Error ? error.message : fallback;
+  if (text.includes("HTTP 404")) {
+    return "سرویس هنوز endpoint بکاپ را نمی‌شناسد. routeهای بکاپ باید داخل Program.cs اضافه شوند و سرویس دوباره اجرا شود.";
+  }
+  if (text.includes("Failed to fetch") || text.includes("NetworkError")) {
+    return "ارتباط با سرویس برقرار نشد. سرویس را اجرا کنید و آدرس API مدیریت را بررسی کنید.";
+  }
+  return text || fallback;
+}
 
 async function loadSavedPath() {
   if (!can("backup.database")) return;
@@ -22,7 +34,8 @@ async function loadSavedPath() {
 async function choosePathAndBackup() {
   if (!can("backup.database")) return;
   loading.value = true;
-  message.value = "";
+  errorMessage.value = false;
+  message.value = "در حال باز کردن انتخاب مسیر روی سیستم سرویس...";
   try {
     const selected = await selectDbBackupPath();
     backupPath.value = String(selected.path || selected.backupPath || backupPath.value || "");
@@ -31,10 +44,12 @@ async function choosePathAndBackup() {
       return;
     }
 
+    message.value = "مسیر انتخاب شد؛ در حال گرفتن بکاپ...";
     const result = await createDbBackup(backupPath.value.trim());
     message.value = `${result.message || "بکاپ ساخته شد"}${result.path ? ` - ${result.path}` : ""}`;
   } catch (error) {
-    message.value = error instanceof Error ? error.message : "خطا در انتخاب مسیر یا گرفتن بکاپ";
+    errorMessage.value = true;
+    message.value = friendlyError(error, "خطا در انتخاب مسیر یا گرفتن بکاپ");
   } finally {
     loading.value = false;
   }
@@ -43,18 +58,21 @@ async function choosePathAndBackup() {
 async function savePathOnly() {
   if (!can("backup.database")) return;
   if (!backupPath.value.trim()) {
+    errorMessage.value = true;
     message.value = "مسیر را وارد یا انتخاب کنید";
     return;
   }
 
   loading.value = true;
-  message.value = "";
+  errorMessage.value = false;
+  message.value = "در حال ذخیره مسیر...";
   try {
     const result = await saveDbBackupPath(backupPath.value.trim());
     backupPath.value = String(result.path || result.backupPath || backupPath.value);
     message.value = result.message || "مسیر ذخیره شد";
   } catch (error) {
-    message.value = error instanceof Error ? error.message : "خطا در ذخیره مسیر";
+    errorMessage.value = true;
+    message.value = friendlyError(error, "خطا در ذخیره مسیر");
   } finally {
     loading.value = false;
   }
@@ -63,18 +81,21 @@ async function savePathOnly() {
 async function runBackup() {
   if (!can("backup.database")) return;
   if (!backupPath.value.trim()) {
+    errorMessage.value = true;
     message.value = "مسیر را وارد یا انتخاب کنید";
     return;
   }
 
   loading.value = true;
-  message.value = "";
+  errorMessage.value = false;
+  message.value = "در حال گرفتن بکاپ...";
   try {
     const result = await createDbBackup(backupPath.value.trim());
     backupPath.value = String(result.backupPath || backupPath.value);
     message.value = `${result.message || "بکاپ ساخته شد"}${result.path ? ` - ${result.path}` : ""}`;
   } catch (error) {
-    message.value = error instanceof Error ? error.message : "خطا در گرفتن بکاپ";
+    errorMessage.value = true;
+    message.value = friendlyError(error, "خطا در گرفتن بکاپ");
   } finally {
     loading.value = false;
   }
@@ -93,7 +114,7 @@ async function runBackup() {
       <div class="path-row">
         <input v-model="backupPath" :disabled="!can('backup.database') || loading" placeholder="مسیر پوشه ذخیره‌سازی" />
         <button class="s-btn" type="button" :disabled="!can('backup.database') || loading" @click="choosePathAndBackup">
-          انتخاب مسیر و بکاپ
+          {{ loading ? "در حال انجام" : "انتخاب مسیر و بکاپ" }}
         </button>
       </div>
     </label>
@@ -106,7 +127,7 @@ async function runBackup() {
     </div>
 
     <div v-if="!can('backup.database')" class="backup-message warn">دسترسی گرفتن بکاپ برای این کاربر فعال نیست.</div>
-    <div v-if="message" class="backup-message">{{ message }}</div>
+    <div v-if="message" class="backup-message" :class="{ error: errorMessage }">{{ message }}</div>
   </section>
 </template>
 
@@ -123,5 +144,6 @@ async function runBackup() {
 .s-btn:disabled { cursor: not-allowed; opacity: .55; }
 .backup-message { border-radius: 10px; padding: 10px 12px; background: rgba(20,184,166,.1); border: 1px solid rgba(20,184,166,.22); color: #bbf7d0; }
 .backup-message.warn { color: #fde68a; background: rgba(245,158,11,.12); border-color: rgba(245,158,11,.22); }
+.backup-message.error { color: #fecaca; background: rgba(239,68,68,.12); border-color: rgba(239,68,68,.28); }
 @media (max-width: 760px) { .path-row { grid-template-columns: 1fr; } }
 </style>
