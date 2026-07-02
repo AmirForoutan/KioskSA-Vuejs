@@ -1,6 +1,7 @@
 import { computed, onMounted, ref } from "vue";
 import { can } from "../../../components/acl/can";
 import { useDesktopToastMessage } from "../useDesktopToastMessage";
+import DatabaseBackupPanel from "../settings/DatabaseBackupPanel.vue";
 import { deleteDesktopPosSetting, deleteDesktopPrinterSetting, fetchRuntimeConfig, loadDesktopDeviceSettings, saveDesktopSettings, saveDesktopPosSetting, saveDesktopPrinterSetting, testDesktopService, } from "../../../services/desktopApi";
 const defaults = {
     Currency: false,
@@ -166,8 +167,7 @@ async function testService() {
 async function saveSettings() {
     if (!canManage.value)
         return;
-    if (settings.value.ShowKioskOrderTypeSelector !== true &&
-        settings.value.IsSalon === settings.value.IsTakeAway) {
+    if (settings.value.ShowKioskOrderTypeSelector !== true && settings.value.IsSalon === settings.value.IsTakeAway) {
         message.value = "نوع سفارش را اصلاح کنید";
         return;
     }
@@ -179,10 +179,7 @@ async function saveSettings() {
         settings.value = { ...defaults, ...(await fetchRuntimeConfig()) };
     }
     catch (error) {
-        message.value =
-            error instanceof Error
-                ? `${error.message} - endpoint ذخیره تنظیمات در سرویس فعال نیست`
-                : "خطا در ذخیره تنظیمات";
+        message.value = error instanceof Error ? `${error.message} - endpoint ذخیره تنظیمات در سرویس فعال نیست` : "خطا در ذخیره تنظیمات";
     }
     finally {
         saving.value = false;
@@ -299,25 +296,15 @@ debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
 let __VLS_components;
 let __VLS_directives;
-/** @type {__VLS_StyleScopedClasses['s-btn']} */ ;
-/** @type {__VLS_StyleScopedClasses['s-btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['settings-head']} */ ;
 /** @type {__VLS_StyleScopedClasses['device-head']} */ ;
 /** @type {__VLS_StyleScopedClasses['device-title']} */ ;
 /** @type {__VLS_StyleScopedClasses['form-actions']} */ ;
-/** @type {__VLS_StyleScopedClasses['device-title']} */ ;
 /** @type {__VLS_StyleScopedClasses['s-btn']} */ ;
-/** @type {__VLS_StyleScopedClasses['device-form']} */ ;
-/** @type {__VLS_StyleScopedClasses['windows-printers']} */ ;
-/** @type {__VLS_StyleScopedClasses['windows-printers']} */ ;
-/** @type {__VLS_StyleScopedClasses['windows-printers']} */ ;
-/** @type {__VLS_StyleScopedClasses['windows-printers']} */ ;
-/** @type {__VLS_StyleScopedClasses['device-tr']} */ ;
-/** @type {__VLS_StyleScopedClasses['device-tr']} */ ;
-/** @type {__VLS_StyleScopedClasses['device-tr']} */ ;
-/** @type {__VLS_StyleScopedClasses['device-tr']} */ ;
-/** @type {__VLS_StyleScopedClasses['row-actions']} */ ;
-/** @type {__VLS_StyleScopedClasses['row-actions']} */ ;
-/** @type {__VLS_StyleScopedClasses['field']} */ ;
+/** @type {__VLS_StyleScopedClasses['s-btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['s-btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['backup-panel-grid']} */ ;
+/** @type {__VLS_StyleScopedClasses['device-title']} */ ;
 /** @type {__VLS_StyleScopedClasses['field']} */ ;
 /** @type {__VLS_StyleScopedClasses['field']} */ ;
 /** @type {__VLS_StyleScopedClasses['field']} */ ;
@@ -325,7 +312,11 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['toggle-row']} */ ;
 /** @type {__VLS_StyleScopedClasses['service-status']} */ ;
 /** @type {__VLS_StyleScopedClasses['service-status']} */ ;
-/** @type {__VLS_StyleScopedClasses['settings-message']} */ ;
+/** @type {__VLS_StyleScopedClasses['device-tr']} */ ;
+/** @type {__VLS_StyleScopedClasses['device-tr']} */ ;
+/** @type {__VLS_StyleScopedClasses['device-tr']} */ ;
+/** @type {__VLS_StyleScopedClasses['row-actions']} */ ;
+/** @type {__VLS_StyleScopedClasses['row-actions']} */ ;
 /** @type {__VLS_StyleScopedClasses['device-layout']} */ ;
 /** @type {__VLS_StyleScopedClasses['printer-form']} */ ;
 /** @type {__VLS_StyleScopedClasses['pos-form']} */ ;
@@ -334,25 +325,10 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['timer-panel']} */ ;
 /** @type {__VLS_StyleScopedClasses['settings-grid']} */ ;
 /** @type {__VLS_StyleScopedClasses['settings-head']} */ ;
-/** @type {__VLS_StyleScopedClasses['settings-actions']} */ ;
-/** @type {__VLS_StyleScopedClasses['s-btn']} */ ;
-/** @type {__VLS_StyleScopedClasses['device-head']} */ ;
-/** @type {__VLS_StyleScopedClasses['device-title']} */ ;
-/** @type {__VLS_StyleScopedClasses['form-actions']} */ ;
 /** @type {__VLS_StyleScopedClasses['device-form']} */ ;
 /** @type {__VLS_StyleScopedClasses['printer-form']} */ ;
 /** @type {__VLS_StyleScopedClasses['pos-form']} */ ;
-/** @type {__VLS_StyleScopedClasses['toggle-row']} */ ;
-/** @type {__VLS_StyleScopedClasses['inline']} */ ;
-/** @type {__VLS_StyleScopedClasses['device-table']} */ ;
-/** @type {__VLS_StyleScopedClasses['row-actions']} */ ;
-/** @type {__VLS_StyleScopedClasses['row-actions']} */ ;
 /** @type {__VLS_StyleScopedClasses['timer-grid']} */ ;
-/** @type {__VLS_StyleScopedClasses['settings-panel']} */ ;
-/** @type {__VLS_StyleScopedClasses['device-box']} */ ;
-/** @type {__VLS_StyleScopedClasses['windows-printers']} */ ;
-/** @type {__VLS_StyleScopedClasses['windows-printers']} */ ;
-/** @type {__VLS_StyleScopedClasses['windows-printers']} */ ;
 // CSS variable injection 
 // CSS variable injection end 
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
@@ -464,6 +440,14 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
     disabled: (!__VLS_ctx.canManage),
 });
 (__VLS_ctx.settings.ResetTimer);
+/** @type {[typeof DatabaseBackupPanel, ]} */ ;
+// @ts-ignore
+const __VLS_0 = __VLS_asFunctionalComponent(DatabaseBackupPanel, new DatabaseBackupPanel({
+    ...{ class: "backup-panel-grid" },
+}));
+const __VLS_1 = __VLS_0({
+    ...{ class: "backup-panel-grid" },
+}, ...__VLS_functionalComponentArgsRest(__VLS_0));
 __VLS_asFunctionalElement(__VLS_intrinsicElements.section, __VLS_intrinsicElements.section)({
     ...{ class: "settings-panel device-panel" },
 });
@@ -600,20 +584,6 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElement
 });
 (__VLS_ctx.printerForm.PrinterId ? "ویرایش جایگاه" : "ثبت جایگاه");
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "windows-printers" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
-for (const [printer] of __VLS_getVForSourceType((__VLS_ctx.devices.windowsPrinters))) {
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.b, __VLS_intrinsicElements.b)({
-        key: (printer),
-    });
-    (printer);
-}
-if (!__VLS_ctx.devices.windowsPrinters.length) {
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.small, __VLS_intrinsicElements.small)({});
-}
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "device-table" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
@@ -633,33 +603,21 @@ for (const [row] of __VLS_getVForSourceType((__VLS_ctx.devices.printerSettings))
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "bold" },
-        'data-label': "جایگاه",
     });
     (row.PrinterTitle);
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        'data-label': "سیستم",
-    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
     (row.ComputerName || __VLS_ctx.computerName(row.ComputerId));
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        'data-label': "پرینتر",
-    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
     (row.PrinterName);
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        'data-label': "قالب",
-    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
     (row.PrintTemplateName);
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        'data-label': "مقصد",
-    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
     (row.PrintUsageTypeName);
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        'data-label': "چاپ",
-    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
     (row.Copies);
     (row.IsActive ? "فعال" : "غیرفعال");
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "row-actions" },
-        'data-label': "عملیات",
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
         ...{ onClick: (...[$event]) => {
@@ -788,29 +746,19 @@ for (const [row] of __VLS_getVForSourceType((__VLS_ctx.devices.posSettings))) {
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "bold" },
-        'data-label': "سیستم",
     });
     (row.ComputerName || __VLS_ctx.computerName(row.ComputerId));
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        'data-label': "نوع",
-    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
     (row.PosTypeName || row.PosType);
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        'data-label': "IP",
-    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
     (row.IpAddress);
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        'data-label': "پورت",
-    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
     (row.Port);
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        'data-label': "وضعیت",
-    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
     (row.IsActive ? "فعال" : "غیرفعال");
     (row.IsTestMode ? "تست" : "عملیاتی");
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "row-actions" },
-        'data-label': "عملیات",
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
         ...{ onClick: (...[$event]) => {
@@ -882,6 +830,7 @@ if (__VLS_ctx.message) {
 /** @type {__VLS_StyleScopedClasses['timer-grid']} */ ;
 /** @type {__VLS_StyleScopedClasses['field']} */ ;
 /** @type {__VLS_StyleScopedClasses['field']} */ ;
+/** @type {__VLS_StyleScopedClasses['backup-panel-grid']} */ ;
 /** @type {__VLS_StyleScopedClasses['settings-panel']} */ ;
 /** @type {__VLS_StyleScopedClasses['device-panel']} */ ;
 /** @type {__VLS_StyleScopedClasses['device-head']} */ ;
@@ -906,7 +855,6 @@ if (__VLS_ctx.message) {
 /** @type {__VLS_StyleScopedClasses['form-actions']} */ ;
 /** @type {__VLS_StyleScopedClasses['s-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['primary']} */ ;
-/** @type {__VLS_StyleScopedClasses['windows-printers']} */ ;
 /** @type {__VLS_StyleScopedClasses['device-table']} */ ;
 /** @type {__VLS_StyleScopedClasses['device-tr']} */ ;
 /** @type {__VLS_StyleScopedClasses['printer']} */ ;
@@ -950,6 +898,7 @@ var __VLS_dollars;
 const __VLS_self = (await import('vue')).defineComponent({
     setup() {
         return {
+            DatabaseBackupPanel: DatabaseBackupPanel,
             settings: settings,
             devices: devices,
             printerForm: printerForm,

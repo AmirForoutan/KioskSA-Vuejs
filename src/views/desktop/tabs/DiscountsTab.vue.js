@@ -1,10 +1,16 @@
 import { computed, onMounted, reactive, ref } from "vue";
+import { loadDesktopCatalog } from "../../../services/desktopApi";
 import { disableLocalDiscount, disableLocalDiscountCard, listLocalDiscountCardTransactions, listLocalDiscountCards, listLocalDiscounts, saveLocalDiscount, saveLocalDiscountCard, } from "../../../services/localDiscountApi";
 const loading = ref(false);
+const productLoading = ref(false);
+const productPickerOpen = ref(false);
+const productSearch = ref("");
 const message = ref("");
 const discounts = ref([]);
 const cards = ref([]);
 const transactions = ref([]);
+const products = ref([]);
+const selectedProductIds = ref([]);
 const activeTab = ref("discounts");
 const discountForm = reactive({
     DiscountId: 0,
@@ -38,6 +44,26 @@ const cardForm = reactive({
     IsActive: true,
 });
 const hasMessage = computed(() => message.value.trim().length > 0);
+const selectedProductIdSet = computed(() => new Set(selectedProductIds.value));
+const selectedGoodsCount = computed(() => parseGoodsIds(discountForm.GoodsIdsText).length);
+const selectedGoodsSummary = computed(() => {
+    const ids = parseGoodsIds(discountForm.GoodsIdsText);
+    if (!ids.length)
+        return "کالایی انتخاب نشده";
+    if (ids.length <= 4)
+        return ids.join(", ");
+    return `${ids.slice(0, 4).join(", ")} و ${ids.length - 4} مورد دیگر`;
+});
+const filteredProducts = computed(() => {
+    const q = productSearch.value.trim().toLowerCase();
+    const rows = products.value.filter((item) => item && item.IsActive !== false);
+    if (!q)
+        return rows;
+    return rows.filter((item) => {
+        const haystack = `${item.GoodsId ?? ""} ${item.GoodsCode ?? ""} ${item.GoodsName ?? ""}`.toLowerCase();
+        return haystack.includes(q);
+    });
+});
 onMounted(() => {
     void refreshAll();
 });
@@ -61,6 +87,21 @@ async function refreshAll() {
         loading.value = false;
     }
 }
+async function loadProducts() {
+    if (products.value.length)
+        return;
+    productLoading.value = true;
+    try {
+        const catalog = await loadDesktopCatalog(0);
+        products.value = catalog.goods || [];
+    }
+    catch (error) {
+        message.value = error instanceof Error ? error.message : "خطا در دریافت لیست کالاها";
+    }
+    finally {
+        productLoading.value = false;
+    }
+}
 function toNumber(value) {
     const numberValue = Number(value);
     return Number.isFinite(numberValue) ? numberValue : 0;
@@ -70,11 +111,36 @@ function nullableText(value) {
     return normalized.length ? normalized : null;
 }
 function parseGoodsIds(value) {
+    if (Array.isArray(value)) {
+        return value
+            .map((item) => Number(item))
+            .filter((item) => Number.isFinite(item) && item > 0)
+            .filter((item, index, array) => array.indexOf(item) === index);
+    }
     return String(value || "")
         .split(/[,،\n\s]+/)
         .map((item) => Number(item.trim()))
         .filter((item) => Number.isFinite(item) && item > 0)
         .filter((item, index, array) => array.indexOf(item) === index);
+}
+function rowGoodsIds(row) {
+    const record = row;
+    if (Array.isArray(row.GoodsIds))
+        return parseGoodsIds(row.GoodsIds);
+    if (Array.isArray(record.goodsIds))
+        return parseGoodsIds(record.goodsIds);
+    if (typeof row.GoodsIds === "string")
+        return parseGoodsIds(row.GoodsIds);
+    if (typeof record.GoodsIdsText === "string")
+        return parseGoodsIds(record.GoodsIdsText);
+    return [];
+}
+function productId(product) {
+    return Number(product.GoodsId ?? product.ProductId ?? 0);
+}
+function productTitle(product) {
+    const code = product.GoodsCode ? `کد ${product.GoodsCode} - ` : "";
+    return `${code}${product.GoodsName ?? "کالا"}`;
 }
 function resetDiscountForm() {
     Object.assign(discountForm, {
@@ -95,8 +161,10 @@ function resetDiscountForm() {
         IsActive: true,
         GoodsIdsText: "",
     });
+    selectedProductIds.value = [];
 }
 function editDiscount(row) {
+    const goodsIds = rowGoodsIds(row);
     Object.assign(discountForm, {
         DiscountId: toNumber(row.DiscountId),
         DiscountCode: String(row.DiscountCode ?? ""),
@@ -113,9 +181,51 @@ function editDiscount(row) {
         ToTime: String(row.ToTime ?? ""),
         ApplyToAllGoods: row.ApplyToAllGoods !== false,
         IsActive: row.IsActive !== false,
-        GoodsIdsText: Array.isArray(row.GoodsIds) ? row.GoodsIds.join(",") : String(row.GoodsIds ?? ""),
+        GoodsIdsText: goodsIds.join(","),
     });
+    selectedProductIds.value = goodsIds;
     activeTab.value = "discounts";
+}
+async function openProductPicker() {
+    selectedProductIds.value = parseGoodsIds(discountForm.GoodsIdsText);
+    productSearch.value = "";
+    productPickerOpen.value = true;
+    await loadProducts();
+}
+function closeProductPicker() {
+    productPickerOpen.value = false;
+}
+function isProductSelected(product) {
+    const id = productId(product);
+    return id > 0 && selectedProductIdSet.value.has(id);
+}
+function toggleProduct(product) {
+    const id = productId(product);
+    if (id <= 0)
+        return;
+    const current = new Set(selectedProductIds.value);
+    if (current.has(id))
+        current.delete(id);
+    else
+        current.add(id);
+    selectedProductIds.value = Array.from(current).sort((a, b) => a - b);
+}
+function selectFilteredProducts() {
+    const current = new Set(selectedProductIds.value);
+    for (const product of filteredProducts.value) {
+        const id = productId(product);
+        if (id > 0)
+            current.add(id);
+    }
+    selectedProductIds.value = Array.from(current).sort((a, b) => a - b);
+}
+function clearProductSelection() {
+    selectedProductIds.value = [];
+}
+function confirmProductSelection() {
+    discountForm.GoodsIdsText = selectedProductIds.value.join(",");
+    discountForm.ApplyToAllGoods = selectedProductIds.value.length === 0 ? discountForm.ApplyToAllGoods : false;
+    productPickerOpen.value = false;
 }
 async function submitDiscount() {
     if (!discountForm.Title.trim()) {
@@ -266,11 +376,27 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['tabs']} */ ;
 /** @type {__VLS_StyleScopedClasses['btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['form-grid']} */ ;
 /** @type {__VLS_StyleScopedClasses['form-grid']} */ ;
+/** @type {__VLS_StyleScopedClasses['form-grid']} */ ;
+/** @type {__VLS_StyleScopedClasses['wide']} */ ;
 /** @type {__VLS_StyleScopedClasses['table-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['row-actions']} */ ;
+/** @type {__VLS_StyleScopedClasses['product-select-box']} */ ;
+/** @type {__VLS_StyleScopedClasses['product-select-box']} */ ;
+/** @type {__VLS_StyleScopedClasses['product-select-box']} */ ;
+/** @type {__VLS_StyleScopedClasses['product-select-box']} */ ;
+/** @type {__VLS_StyleScopedClasses['modal-footer']} */ ;
+/** @type {__VLS_StyleScopedClasses['modal-head']} */ ;
+/** @type {__VLS_StyleScopedClasses['modal-head']} */ ;
+/** @type {__VLS_StyleScopedClasses['product-row']} */ ;
+/** @type {__VLS_StyleScopedClasses['product-row']} */ ;
 /** @type {__VLS_StyleScopedClasses['grid-layout']} */ ;
+/** @type {__VLS_StyleScopedClasses['modal-toolbar']} */ ;
+/** @type {__VLS_StyleScopedClasses['product-row']} */ ;
+/** @type {__VLS_StyleScopedClasses['product-meta']} */ ;
+/** @type {__VLS_StyleScopedClasses['product-price']} */ ;
 // CSS variable injection 
 // CSS variable injection end 
 __VLS_asFunctionalElement(__VLS_intrinsicElements.section, __VLS_intrinsicElements.section)({
@@ -395,13 +521,24 @@ if (__VLS_ctx.activeTab === 'discounts') {
         placeholder: "23:59",
     });
     (__VLS_ctx.discountForm.ToTime);
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({
-        ...{ class: "wide" },
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "product-select-box wide" },
+        ...{ class: ({ disabled: __VLS_ctx.discountForm.ApplyToAllGoods }) },
     });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.strong, __VLS_intrinsicElements.strong)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+    (__VLS_ctx.discountForm.ApplyToAllGoods ? 'همه کالاها' : `${__VLS_ctx.selectedGoodsCount} کالا انتخاب شده`);
+    if (!__VLS_ctx.discountForm.ApplyToAllGoods) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.small, __VLS_intrinsicElements.small)({});
+        (__VLS_ctx.selectedGoodsSummary);
+    }
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (__VLS_ctx.openProductPicker) },
+        ...{ class: "btn" },
+        type: "button",
         disabled: (__VLS_ctx.discountForm.ApplyToAllGoods),
     });
-    (__VLS_ctx.discountForm.GoodsIdsText);
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "checks" },
     });
@@ -454,7 +591,7 @@ if (__VLS_ctx.activeTab === 'discounts') {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
         (Number(row.DiscountType) === 1 ? row.DiscountPercent + '%' : Number(row.DiscountAmount).toLocaleString());
         __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
-        (row.ApplyToAllGoods ? 'همه' : (row.GoodsIds || []).join(','));
+        (row.ApplyToAllGoods ? 'همه' : __VLS_ctx.rowGoodsIds(row).join(','));
         __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
         (row.IsActive ? 'بله' : 'خیر');
         __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({
@@ -638,6 +775,103 @@ if (__VLS_ctx.activeTab === 'transactions') {
         (row.Description);
     }
 }
+if (__VLS_ctx.productPickerOpen) {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ onClick: (__VLS_ctx.closeProductPicker) },
+        ...{ class: "modal-backdrop" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "product-modal" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.header, __VLS_intrinsicElements.header)({
+        ...{ class: "modal-head" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.h3, __VLS_intrinsicElements.h3)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({});
+    (__VLS_ctx.selectedProductIds.length);
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (__VLS_ctx.closeProductPicker) },
+        ...{ class: "icon-btn" },
+        type: "button",
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "modal-toolbar" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+        placeholder: "جستجو بر اساس نام، کد یا شناسه کالا",
+    });
+    (__VLS_ctx.productSearch);
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (__VLS_ctx.selectFilteredProducts) },
+        ...{ class: "btn" },
+        type: "button",
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (__VLS_ctx.clearProductSelection) },
+        ...{ class: "btn" },
+        type: "button",
+    });
+    if (__VLS_ctx.productLoading) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "modal-state" },
+        });
+    }
+    else if (!__VLS_ctx.filteredProducts.length) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "modal-state" },
+        });
+    }
+    else {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "product-list" },
+        });
+        for (const [product] of __VLS_getVForSourceType((__VLS_ctx.filteredProducts))) {
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({
+                key: (__VLS_ctx.productId(product)),
+                ...{ class: "product-row" },
+            });
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+                ...{ onChange: (...[$event]) => {
+                        if (!(__VLS_ctx.productPickerOpen))
+                            return;
+                        if (!!(__VLS_ctx.productLoading))
+                            return;
+                        if (!!(!__VLS_ctx.filteredProducts.length))
+                            return;
+                        __VLS_ctx.toggleProduct(product);
+                    } },
+                type: "checkbox",
+                checked: (__VLS_ctx.isProductSelected(product)),
+            });
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+                ...{ class: "product-main" },
+            });
+            (__VLS_ctx.productTitle(product));
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+                ...{ class: "product-meta" },
+            });
+            (__VLS_ctx.productId(product));
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+                ...{ class: "product-price" },
+            });
+            (Number(product.GoodsPrice || 0).toLocaleString());
+        }
+    }
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.footer, __VLS_intrinsicElements.footer)({
+        ...{ class: "modal-footer" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (__VLS_ctx.confirmProductSelection) },
+        ...{ class: "btn primary" },
+        type: "button",
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (__VLS_ctx.closeProductPicker) },
+        ...{ class: "btn" },
+        type: "button",
+    });
+}
 /** @type {__VLS_StyleScopedClasses['discounts-tab']} */ ;
 /** @type {__VLS_StyleScopedClasses['page-head']} */ ;
 /** @type {__VLS_StyleScopedClasses['btn']} */ ;
@@ -652,7 +886,10 @@ if (__VLS_ctx.activeTab === 'transactions') {
 /** @type {__VLS_StyleScopedClasses['form']} */ ;
 /** @type {__VLS_StyleScopedClasses['form-grid']} */ ;
 /** @type {__VLS_StyleScopedClasses['wide']} */ ;
+/** @type {__VLS_StyleScopedClasses['product-select-box']} */ ;
 /** @type {__VLS_StyleScopedClasses['wide']} */ ;
+/** @type {__VLS_StyleScopedClasses['disabled']} */ ;
+/** @type {__VLS_StyleScopedClasses['btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['checks']} */ ;
 /** @type {__VLS_StyleScopedClasses['actions']} */ ;
 /** @type {__VLS_StyleScopedClasses['btn']} */ ;
@@ -676,22 +913,57 @@ if (__VLS_ctx.activeTab === 'transactions') {
 /** @type {__VLS_StyleScopedClasses['card']} */ ;
 /** @type {__VLS_StyleScopedClasses['table-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['full']} */ ;
+/** @type {__VLS_StyleScopedClasses['modal-backdrop']} */ ;
+/** @type {__VLS_StyleScopedClasses['product-modal']} */ ;
+/** @type {__VLS_StyleScopedClasses['modal-head']} */ ;
+/** @type {__VLS_StyleScopedClasses['icon-btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['modal-toolbar']} */ ;
+/** @type {__VLS_StyleScopedClasses['btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['modal-state']} */ ;
+/** @type {__VLS_StyleScopedClasses['modal-state']} */ ;
+/** @type {__VLS_StyleScopedClasses['product-list']} */ ;
+/** @type {__VLS_StyleScopedClasses['product-row']} */ ;
+/** @type {__VLS_StyleScopedClasses['product-main']} */ ;
+/** @type {__VLS_StyleScopedClasses['product-meta']} */ ;
+/** @type {__VLS_StyleScopedClasses['product-price']} */ ;
+/** @type {__VLS_StyleScopedClasses['modal-footer']} */ ;
+/** @type {__VLS_StyleScopedClasses['btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['primary']} */ ;
+/** @type {__VLS_StyleScopedClasses['btn']} */ ;
 var __VLS_dollars;
 const __VLS_self = (await import('vue')).defineComponent({
     setup() {
         return {
             loading: loading,
+            productLoading: productLoading,
+            productPickerOpen: productPickerOpen,
+            productSearch: productSearch,
             message: message,
             discounts: discounts,
             cards: cards,
             transactions: transactions,
+            selectedProductIds: selectedProductIds,
             activeTab: activeTab,
             discountForm: discountForm,
             cardForm: cardForm,
             hasMessage: hasMessage,
+            selectedGoodsCount: selectedGoodsCount,
+            selectedGoodsSummary: selectedGoodsSummary,
+            filteredProducts: filteredProducts,
             refreshAll: refreshAll,
+            rowGoodsIds: rowGoodsIds,
+            productId: productId,
+            productTitle: productTitle,
             resetDiscountForm: resetDiscountForm,
             editDiscount: editDiscount,
+            openProductPicker: openProductPicker,
+            closeProductPicker: closeProductPicker,
+            isProductSelected: isProductSelected,
+            toggleProduct: toggleProduct,
+            selectFilteredProducts: selectFilteredProducts,
+            clearProductSelection: clearProductSelection,
+            confirmProductSelection: confirmProductSelection,
             submitDiscount: submitDiscount,
             removeDiscount: removeDiscount,
             resetCardForm: resetCardForm,
