@@ -72,18 +72,47 @@ function isGoodsSaleWindowOpen(goods, now = new Date()) {
   return isTimeInRange(now, from, to);
 }
 
+function normalizeDiscountId(discount) {
+  return Number(
+    discount?.GoodsDiscountId ??
+    discount?.DiscountId ??
+    discount?.DiscountCodeId ??
+    discount?.id ??
+    0
+  );
+}
+
+function normalizeDiscountPercent(discount) {
+  return Number(
+    discount?.Percent ??
+    discount?.DiscountPercent ??
+    discount?.DiscountValue ??
+    0
+  );
+}
+
 export function getActiveGoodsDiscount(goods, discounts, now = new Date()) {
-  if (!goods?.GoodsDiscountId || !Array.isArray(discounts)) return null;
+  if (!goods || !Array.isArray(discounts)) return null;
   if (!isGoodsSaleWindowOpen(goods, now)) return null;
 
+  const goodsDiscountId = Number(goods.GoodsDiscountId ?? goods.DiscountId ?? 0);
+  const goodsId = Number(goods.GoodsId ?? goods.ProductId ?? 0);
+  const goodsCode = String(goods.GoodsCode ?? goods.ProductCode ?? '');
   const today = getTodayPersianDate();
+
   return discounts.find((discount) => {
-    const sameDiscount = Number(discount.GoodsDiscountId) === Number(goods.GoodsDiscountId);
-    if (!sameDiscount) return false;
+    const discountId = normalizeDiscountId(discount);
+    const explicitGoodsDiscount = goodsDiscountId > 0 && discountId === goodsDiscountId;
+    const applyToAll = discount?.UseForAll === true || discount?.ApplyToAllGoods === true;
+    const goodsIds = Array.isArray(discount?.GoodsIds) ? discount.GoodsIds.map(Number) : [];
+    const productCodes = Array.isArray(discount?.ProductCodes) ? discount.ProductCodes.map(String) : [];
+    const linkedToGoods = goodsIds.includes(goodsId) || productCodes.includes(goodsCode);
+
+    if (!explicitGoodsDiscount && !applyToAll && !linkedToGoods) return false;
 
     return (
-      isDateInRange(today, discount.FromDate, discount.ToDate) &&
-      isTimeInRange(now, discount.FromTime, discount.ToTime)
+      isDateInRange(today, discount.FromDate ?? discount.StartDate, discount.ToDate ?? discount.EndDate) &&
+      isTimeInRange(now, discount.FromTime ?? discount.StartTime, discount.ToTime ?? discount.EndTime)
     );
   }) || null;
 }
@@ -111,29 +140,61 @@ export function applyGoodsDiscounts(goodsList, discounts, now = new Date()) {
     }
 
     const originalPrice = Number(goods.OriginalGoodsPrice ?? goods.GoodsPrice ?? 0);
-    const discountAmount = calculatePercentDiscount(originalPrice, activeDiscount.Percent);
+    const percent = normalizeDiscountPercent(activeDiscount);
+    const discountAmount = calculatePercentDiscount(originalPrice, percent);
 
     return {
       ...goods,
       OriginalGoodsPrice: originalPrice,
       GoodsPrice: Math.max(originalPrice - discountAmount, 0),
-      GoodsDiscountPercent: Number(activeDiscount.Percent || 0),
+      GoodsDiscountPercent: percent,
       GoodsDiscountAmount: discountAmount,
       ActiveGoodsDiscount: activeDiscount,
     };
   });
 }
 
+function isPercentDiscount(discount) {
+  const type = discount?.DiscountType ?? discount?.Type;
+  if (type === true || type === 1 || type === '1' || type === 'percent' || type === 'percentage') return true;
+  if (type === false || type === 2 || type === '2' || type === 'amount' || type === 'price') return false;
+  return Number(discount?.Percent ?? discount?.DiscountPercent ?? 0) > 0;
+}
+
 export function calculateCustomerDiscountAmount(discount, price) {
   const safePrice = Number(price || 0);
   if (!discount || safePrice <= 0) return 0;
 
-  const value = Number(discount.DiscountValue || discount.Percent || discount.Price || 0);
-  if (value <= 0) return 0;
+  const percentValue = Number(discount.DiscountPercent ?? discount.Percent ?? discount.DiscountValue ?? 0);
+  const amountValue = Number(discount.DiscountAmount ?? discount.Price ?? discount.Amount ?? 0);
+  const maxAmount = Number(discount.DiscountMax ?? discount.MaxDiscountAmount ?? 0);
+  const minBuy = Number(discount.MinBuy ?? discount.MinInvoiceAmount ?? 0);
 
-  if (discount.DiscountType === false || discount.DiscountType === 0 || discount.Type === 'percent') {
-    return Math.round(safePrice * value / 100);
+  if (minBuy > 0 && safePrice < minBuy) return 0;
+
+  let calculated = 0;
+  if (isPercentDiscount(discount)) {
+    calculated = Math.round((safePrice * percentValue) / 100);
+  } else {
+    calculated = amountValue || Number(discount.DiscountValue || 0);
   }
 
-  return Math.min(value, safePrice);
+  if (maxAmount > 0) calculated = Math.min(calculated, maxAmount);
+  return Math.min(Math.max(calculated, 0), safePrice);
+}
+
+export function normalizeDiscountCardPayload(payload) {
+  const data = payload?.data ?? payload?.Data ?? payload?.card ?? payload?.Card ?? payload;
+  if (!data || typeof data !== 'object') return null;
+
+  return {
+    DiscountCardId: Number(data.DiscountCardId ?? data.discountCardId ?? 0),
+    CardNumber: String(data.CardNumber ?? data.cardNumber ?? data.DiscountCart ?? ''),
+    Percent: Number(data.Percent ?? data.DiscountPercent ?? 0),
+    Price: Number(data.Price ?? data.DiscountAmount ?? data.Balance ?? 0),
+    MinBuy: Number(data.MinBuy ?? data.MinInvoiceAmount ?? 0),
+    IsActive: data.IsActive !== false,
+    Goods: Array.isArray(data.Goods) ? data.Goods : [],
+    raw: data,
+  };
 }
