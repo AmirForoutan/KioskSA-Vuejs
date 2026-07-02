@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="fa">
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="./src/assets/Logo.png" />
+  <link rel="stylesheet" href="/assest/css/font-awesome.min.css" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script type="module" src="/src/main.ts"></script>
+  <link rel="stylesheet" href="/assest/css/all.min.css">
+  <title>Kiosk App</title>
+</head>
+
+<body>
+  <main>
+    <div id="app"></div>
+  </main>
+
+  <script>
+    (function () {
+      function installKioskRestrictions() {
+        history.pushState(null, null, window.location.href);
+
+        window.addEventListener('popstate', function (e) {
+          history.pushState(null, null, window.location.href);
+          e.preventDefault();
+        });
+
+        document.addEventListener('contextmenu', function (e) {
+          e.preventDefault();
+        });
+
+        document.addEventListener('selectstart', function (e) {
+          e.preventDefault();
+        });
+
+        document.addEventListener('keydown', function (e) {
+          if (e.keyCode === 8 || (e.altKey && e.keyCode === 37)) {
+            e.preventDefault();
+          }
+        });
+
+        document.addEventListener('dragstart', function (e) {
+          e.preventDefault();
+        });
+      }
+
+      fetch('./config.json', { cache: 'no-store' })
+        .then(function (response) {
+          return response.ok ? response.json() : null;
+        })
+        .then(function (config) {
+          if (config && Number(config.viewMode) === 3) return;
+          installKioskRestrictions();
+        })
+        .catch(installKioskRestrictions);
+    })();
+  </script>
+</body>
+<!-- Made By Amirreza Foroutan For HamiPOS +989120496824 -->
+
+</html>
