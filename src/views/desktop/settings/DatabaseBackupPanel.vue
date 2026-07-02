@@ -5,6 +5,8 @@ import { createDbBackup, getDbBackupPath, saveDbBackupPath, selectDbBackupPath }
 
 const backupPath = ref("");
 const loading = ref(false);
+const selecting = ref(false);
+const backingUp = ref(false);
 const message = ref("");
 const errorMessage = ref(false);
 
@@ -31,26 +33,21 @@ async function loadSavedPath() {
   }
 }
 
-async function choosePathAndBackup() {
+async function choosePathOnly() {
   if (!can("backup.database")) return;
   loading.value = true;
+  selecting.value = true;
   errorMessage.value = false;
-  message.value = "در حال باز کردن انتخاب مسیر روی سیستم سرویس...";
+  message.value = "پنجره انتخاب مسیر روی سیستم سرویس باز می‌شود؛ بعد از انتخاب مسیر فقط ذخیره می‌شود.";
   try {
     const selected = await selectDbBackupPath();
     backupPath.value = String(selected.path || selected.backupPath || backupPath.value || "");
-    if (!backupPath.value.trim()) {
-      message.value = selected.message || "انتخاب مسیر لغو شد";
-      return;
-    }
-
-    message.value = "مسیر انتخاب شد؛ در حال گرفتن بکاپ...";
-    const result = await createDbBackup(backupPath.value.trim());
-    message.value = `${result.message || "بکاپ ساخته شد"}${result.path ? ` - ${result.path}` : ""}`;
+    message.value = backupPath.value.trim() ? selected.message || "مسیر انتخاب و ذخیره شد" : selected.message || "انتخاب مسیر لغو شد";
   } catch (error) {
     errorMessage.value = true;
-    message.value = friendlyError(error, "خطا در انتخاب مسیر یا گرفتن بکاپ");
+    message.value = friendlyError(error, "خطا در انتخاب مسیر");
   } finally {
+    selecting.value = false;
     loading.value = false;
   }
 }
@@ -87,8 +84,9 @@ async function runBackup() {
   }
 
   loading.value = true;
+  backingUp.value = true;
   errorMessage.value = false;
-  message.value = "در حال گرفتن بکاپ...";
+  message.value = "در حال گرفتن بکاپ؛ بسته به حجم دیتابیس ممکن است چند دقیقه طول بکشد...";
   try {
     const result = await createDbBackup(backupPath.value.trim());
     backupPath.value = String(result.backupPath || backupPath.value);
@@ -97,6 +95,7 @@ async function runBackup() {
     errorMessage.value = true;
     message.value = friendlyError(error, "خطا در گرفتن بکاپ");
   } finally {
+    backingUp.value = false;
     loading.value = false;
   }
 }
@@ -106,15 +105,15 @@ async function runBackup() {
   <section class="backup-panel">
     <div class="panel-title">بکاپ دیتابیس</div>
     <p class="panel-note">
-      مسیر در دیتابیس ذخیره می‌شود. با انتخاب مسیر، پنجره انتخاب پوشه روی سیستم سرویس باز می‌شود و سپس فایل با نامی شبیه Pargas_1405-04-10-195010.bak ساخته می‌شود.
+      اول مسیر را انتخاب یا ذخیره کنید، بعد جداگانه بکاپ بگیرید. نام فایل بکاپ شبیه Pargas_1405-04-10-195010.bak ساخته می‌شود.
     </p>
 
     <label class="field">
       <span>مسیر ذخیره</span>
       <div class="path-row">
         <input v-model="backupPath" :disabled="!can('backup.database') || loading" placeholder="مسیر پوشه ذخیره‌سازی" />
-        <button class="s-btn" type="button" :disabled="!can('backup.database') || loading" @click="choosePathAndBackup">
-          {{ loading ? "در حال انجام" : "انتخاب مسیر و بکاپ" }}
+        <button class="s-btn" type="button" :disabled="!can('backup.database') || loading" @click="choosePathOnly">
+          {{ selecting ? "در انتظار انتخاب" : "انتخاب مسیر" }}
         </button>
       </div>
     </label>
@@ -122,7 +121,7 @@ async function runBackup() {
     <div class="backup-actions">
       <button class="s-btn" :disabled="!can('backup.database') || loading || !backupPath.trim()" @click="savePathOnly">ذخیره مسیر</button>
       <button class="s-btn primary" :disabled="!can('backup.database') || loading || !backupPath.trim()" @click="runBackup">
-        {{ loading ? "در حال عملیات" : "بکاپ با مسیر فعلی" }}
+        {{ backingUp ? "در حال بکاپ" : "گرفتن بکاپ" }}
       </button>
     </div>
 
