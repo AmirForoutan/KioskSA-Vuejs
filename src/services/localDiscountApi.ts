@@ -17,12 +17,14 @@ export type LocalDiscount = {
   ApplyToAllGoods: boolean;
   IsActive: boolean;
   GoodsIds?: number[];
+  CustomerIds?: number[];
   [key: string]: unknown;
 };
 
 export type LocalDiscountSaveRequest = Omit<LocalDiscount, "DiscountId"> & {
   DiscountId?: number;
   GoodsIds?: number[];
+  CustomerIds?: number[];
 };
 
 export type LocalDiscountCard = {
@@ -62,6 +64,41 @@ type ApiEnvelope<T> = {
   data?: T;
   [key: string]: unknown;
 };
+
+const CUSTOMER_META_PREFIX = "[CUSTOMER_DISCOUNT_IDS:";
+const CUSTOMER_META_SUFFIX = "]";
+
+function packCustomerIds(description: string | undefined | null, customerIds?: number[]) {
+  const clean = unpackCustomerIds(description).description;
+  const ids = Array.from(new Set((customerIds || []).map(Number).filter((id) => Number.isFinite(id) && id > 0)));
+  if (!ids.length) return clean || undefined;
+  const meta = `${CUSTOMER_META_PREFIX}${ids.join(",")}${CUSTOMER_META_SUFFIX}`;
+  return `${clean ? `${clean}\n` : ""}${meta}`;
+}
+
+export function unpackCustomerIds(description: unknown) {
+  const text = String(description ?? "");
+  const start = text.indexOf(CUSTOMER_META_PREFIX);
+  if (start < 0) return { description: text, customerIds: [] as number[] };
+  const end = text.indexOf(CUSTOMER_META_SUFFIX, start + CUSTOMER_META_PREFIX.length);
+  if (end < 0) return { description: text, customerIds: [] as number[] };
+  const raw = text.slice(start + CUSTOMER_META_PREFIX.length, end);
+  const customerIds = raw
+    .split(",")
+    .map((item) => Number(item.trim()))
+    .filter((item) => Number.isFinite(item) && item > 0);
+  const descriptionOnly = `${text.slice(0, start)}${text.slice(end + CUSTOMER_META_SUFFIX.length)}`.trim();
+  return { description: descriptionOnly, customerIds };
+}
+
+function normalizeDiscount(row: LocalDiscount) {
+  const unpacked = unpackCustomerIds(row.Description);
+  return {
+    ...row,
+    Description: unpacked.description,
+    CustomerIds: Array.isArray(row.CustomerIds) && row.CustomerIds.length ? row.CustomerIds : unpacked.customerIds,
+  };
+}
 
 async function postAt<T>(baseUrl: string, endpoint: string, body: unknown): Promise<T> {
   const base = baseUrl.replace(/\/$/, "");
@@ -106,11 +143,14 @@ function unwrapData<T>(response: ApiEnvelope<T[]>, keys: string[] = []): T[] {
 export async function listLocalDiscounts() {
   const response = await postApi<ApiEnvelope<LocalDiscount[]>>("/pc/discounts/list", {});
   assertOk(response, "خطا در دریافت تخفیف‌ها");
-  return unwrapData<LocalDiscount>(response, ["discounts", "Discounts"]);
+  return unwrapData<LocalDiscount>(response, ["discounts", "Discounts"]).map(normalizeDiscount);
 }
 
 export async function saveLocalDiscount(payload: LocalDiscountSaveRequest) {
-  const response = await postApi<ApiEnvelope<{ DiscountId: number }>>("/pc/discounts/save", payload);
+  const response = await postApi<ApiEnvelope<{ DiscountId: number }>>("/pc/discounts/save", {
+    ...payload,
+    Description: packCustomerIds(payload.Description, payload.CustomerIds),
+  });
   return assertOk(response, "خطا در ذخیره تخفیف");
 }
 
@@ -132,7 +172,7 @@ export async function saveLocalDiscountCard(payload: LocalDiscountCardSaveReques
 
 export async function disableLocalDiscountCard(discountCardId: number) {
   const response = await postApi<ApiEnvelope<unknown>>("/pc/discount-cards/delete", { DiscountCardId: discountCardId });
-  return assertOk(response, "خطا در غیرفعال کردن کارت تخفیف");
+  return assertOk(response, "خطا در غیرفعال کردن کارت");
 }
 
 export async function listLocalDiscountCardTransactions(params: { DiscountCardId?: number; CardNumber?: string; Take?: number } = {}) {
