@@ -4,6 +4,7 @@ import TablesTab from "./tabs/TablesTab.vue";
 import BaseInfoTab from "./tabs/BaseInfoTab.vue";
 import ReportsTab from "./tabs/ReportsTab.vue";
 import SettingsTab from "./tabs/SettingsTab.vue";
+import DiscountsTab from "./tabs/DiscountsTab.vue";
 import { can } from "../../components/acl/can";
 import { INVOICE_EDIT_REQUEST_EVENT } from "../../components/stores/invoice-edit.store";
 import { TABLE_ORDER_REQUEST_EVENT } from "../../components/stores/table-order.store";
@@ -17,6 +18,8 @@ const availableTabs = computed(() => {
         t.push({ key: "tables", title: "میزها" });
     if (can("view.baseInfo"))
         t.push({ key: "base", title: "کالاها و پایه" });
+    if (can("view.settings") || can("sales.discount.percent") || can("sales.discount.amount"))
+        t.push({ key: "discounts", title: "تخفیف‌ها" });
     if (can("view.reports"))
         t.push({ key: "reports", title: "گزارشگیری" });
     if (can("view.settings"))
@@ -28,6 +31,8 @@ const activeComponent = computed(() => {
     switch (activeKey.value) {
         case "base":
             return BaseInfoTab;
+        case "discounts":
+            return DiscountsTab;
         case "reports":
             return ReportsTab;
         case "settings":
