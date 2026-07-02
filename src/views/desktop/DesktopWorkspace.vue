@@ -14,12 +14,16 @@ import { logoutDesktopUser, useAuthState } from "../../components/stores/auth.st
 
 type Tab = { key: string; title: string; icon?: string };
 
+function canOpenDiscounts() {
+    return can("view.discounts") || can("manage.discounts") || can("manage.discountCards") || can("sales.discount.percent") || can("sales.discount.amount");
+}
+
 const availableTabs = computed<Tab[]>(() => {
     const t: Tab[] = [];
     if (can("view.sales")) t.push({ key: "sales", title: "سفارشگیری" });
     if (can("view.sales")) t.push({ key: "tables", title: "میزها" });
     if (can("view.baseInfo")) t.push({ key: "base", title: "کالاها و پایه" });
-    if (can("view.settings") || can("sales.discount.percent") || can("sales.discount.amount")) t.push({ key: "discounts", title: "تخفیف‌ها" });
+    if (canOpenDiscounts()) t.push({ key: "discounts", title: "تخفیف‌ها" });
     if (can("view.reports")) t.push({ key: "reports", title: "گزارشگیری" });
     if (can("view.settings")) t.push({ key: "settings", title: "تنظیمات" });
     return t.length ? t : [{ key: "sales", title: "سفارشگیری" }]; // fallback
