@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from "vue";
-import { loadDesktopCatalog, type DesktopProduct } from "../../../services/desktopApi";
+import { loadDesktopCatalog, searchDesktopCustomers, type DesktopCustomer, type DesktopProduct } from "../../../services/desktopApi";
 import {
   disableLocalDiscount,
   disableLocalDiscountCard,
@@ -18,6 +18,9 @@ const loading = ref(false);
 const productLoading = ref(false);
 const productPickerOpen = ref(false);
 const productSearch = ref("");
+const customerSearch = ref("");
+const customerLoading = ref(false);
+const customers = ref<DesktopCustomer[]>([]);
 const message = ref("");
 const discounts = ref<LocalDiscount[]>([]);
 const cards = ref<LocalDiscountCard[]>([]);
@@ -43,6 +46,7 @@ const discountForm = reactive({
   ApplyToAllGoods: true,
   IsActive: true,
   GoodsIdsText: "",
+  CustomerIdsText: "",
 });
 
 const cardForm = reactive({
@@ -61,9 +65,11 @@ const cardForm = reactive({
 
 const hasMessage = computed(() => message.value.trim().length > 0);
 const selectedProductIdSet = computed(() => new Set(selectedProductIds.value));
-const selectedGoodsCount = computed(() => parseGoodsIds(discountForm.GoodsIdsText).length);
+const selectedGoodsCount = computed(() => parseNumberIds(discountForm.GoodsIdsText).length);
+const selectedCustomerIds = computed(() => parseNumberIds(discountForm.CustomerIdsText));
+const selectedCustomerCount = computed(() => selectedCustomerIds.value.length);
 const selectedGoodsSummary = computed(() => {
-  const ids = parseGoodsIds(discountForm.GoodsIdsText);
+  const ids = parseNumberIds(discountForm.GoodsIdsText);
   if (!ids.length) return "کالایی انتخاب نشده";
   if (ids.length <= 4) return ids.join(", ");
   return `${ids.slice(0, 4).join(", ")} و ${ids.length - 4} مورد دیگر`;
@@ -125,7 +131,7 @@ function nullableText(value: string) {
   return normalized.length ? normalized : null;
 }
 
-function parseGoodsIds(value: unknown) {
+function parseNumberIds(value: unknown) {
   if (Array.isArray(value)) {
     return value
       .map((item) => Number(item))
@@ -142,10 +148,19 @@ function parseGoodsIds(value: unknown) {
 
 function rowGoodsIds(row: LocalDiscount) {
   const record = row as Record<string, unknown>;
-  if (Array.isArray(row.GoodsIds)) return parseGoodsIds(row.GoodsIds);
-  if (Array.isArray(record.goodsIds)) return parseGoodsIds(record.goodsIds);
-  if (typeof row.GoodsIds === "string") return parseGoodsIds(row.GoodsIds);
-  if (typeof record.GoodsIdsText === "string") return parseGoodsIds(record.GoodsIdsText);
+  if (Array.isArray(row.GoodsIds)) return parseNumberIds(row.GoodsIds);
+  if (Array.isArray(record.goodsIds)) return parseNumberIds(record.goodsIds);
+  if (typeof row.GoodsIds === "string") return parseNumberIds(row.GoodsIds);
+  if (typeof record.GoodsIdsText === "string") return parseNumberIds(record.GoodsIdsText);
+  return [];
+}
+
+function rowCustomerIds(row: LocalDiscount) {
+  const record = row as Record<string, unknown>;
+  if (Array.isArray(row.CustomerIds)) return parseNumberIds(row.CustomerIds);
+  if (Array.isArray(record.customerIds)) return parseNumberIds(record.customerIds);
+  if (typeof row.CustomerIds === "string") return parseNumberIds(row.CustomerIds);
+  if (typeof record.CustomerIdsText === "string") return parseNumberIds(record.CustomerIdsText);
   return [];
 }
 
@@ -156,6 +171,17 @@ function productId(product: DesktopProduct) {
 function productTitle(product: DesktopProduct) {
   const code = product.GoodsCode ? `کد ${product.GoodsCode} - ` : "";
   return `${code}${product.GoodsName ?? "کالا"}`;
+}
+
+function customerId(customer: DesktopCustomer) {
+  return Number(customer.CustomerId ?? customer.UserId ?? 0);
+}
+
+function customerTitle(customer: DesktopCustomer) {
+  const id = customerId(customer);
+  const name = customer.FullName || customer.Name || `${customer.Firstname || ""} ${customer.Lastname || ""}`.trim() || "مشتری";
+  const phone = customer.PhoneNumber || customer.Mobile || "";
+  return `${id ? `#${id} - ` : ""}${name}${phone ? ` - ${phone}` : ""}`;
 }
 
 function resetDiscountForm() {
@@ -176,12 +202,14 @@ function resetDiscountForm() {
     ApplyToAllGoods: true,
     IsActive: true,
     GoodsIdsText: "",
+    CustomerIdsText: "",
   });
   selectedProductIds.value = [];
 }
 
 function editDiscount(row: LocalDiscount) {
   const goodsIds = rowGoodsIds(row);
+  const customerIds = rowCustomerIds(row);
   Object.assign(discountForm, {
     DiscountId: toNumber(row.DiscountId),
     DiscountCode: String(row.DiscountCode ?? ""),
@@ -199,13 +227,14 @@ function editDiscount(row: LocalDiscount) {
     ApplyToAllGoods: row.ApplyToAllGoods !== false,
     IsActive: row.IsActive !== false,
     GoodsIdsText: goodsIds.join(","),
+    CustomerIdsText: customerIds.join(","),
   });
   selectedProductIds.value = goodsIds;
   activeTab.value = "discounts";
 }
 
 async function openProductPicker() {
-  selectedProductIds.value = parseGoodsIds(discountForm.GoodsIdsText);
+  selectedProductIds.value = parseNumberIds(discountForm.GoodsIdsText);
   productSearch.value = "";
   productPickerOpen.value = true;
   await loadProducts();
@@ -248,6 +277,35 @@ function confirmProductSelection() {
   productPickerOpen.value = false;
 }
 
+async function findCustomers() {
+  const q = customerSearch.value.trim();
+  if (!q) {
+    message.value = "برای جستجوی مشتری، نام یا موبایل را وارد کنید";
+    return;
+  }
+  customerLoading.value = true;
+  try {
+    customers.value = await searchDesktopCustomers(q);
+    if (!customers.value.length) message.value = "مشتری‌ای یافت نشد";
+  } catch (error) {
+    message.value = error instanceof Error ? error.message : "خطا در جستجوی مشتری";
+  } finally {
+    customerLoading.value = false;
+  }
+}
+
+function addCustomerToDiscount(customer: DesktopCustomer) {
+  const id = customerId(customer);
+  if (id <= 0) return;
+  const current = new Set(parseNumberIds(discountForm.CustomerIdsText));
+  current.add(id);
+  discountForm.CustomerIdsText = Array.from(current).sort((a, b) => a - b).join(",");
+}
+
+function removeCustomerId(id: number) {
+  discountForm.CustomerIdsText = parseNumberIds(discountForm.CustomerIdsText).filter((item) => item !== id).join(",");
+}
+
 async function submitDiscount() {
   if (!discountForm.Title.trim()) {
     message.value = "عنوان تخفیف الزامی است";
@@ -264,7 +322,7 @@ async function submitDiscount() {
 
   loading.value = true;
   try {
-    const goodsIds = discountForm.ApplyToAllGoods ? [] : parseGoodsIds(discountForm.GoodsIdsText);
+    const goodsIds = discountForm.ApplyToAllGoods ? [] : parseNumberIds(discountForm.GoodsIdsText);
     await saveLocalDiscount({
       DiscountId: discountForm.DiscountId,
       DiscountCode: nullableText(discountForm.DiscountCode) ?? undefined,
@@ -282,6 +340,7 @@ async function submitDiscount() {
       ApplyToAllGoods: discountForm.ApplyToAllGoods,
       IsActive: discountForm.IsActive,
       GoodsIds: goodsIds,
+      CustomerIds: parseNumberIds(discountForm.CustomerIdsText),
     });
     message.value = "تخفیف ذخیره شد";
     resetDiscountForm();
@@ -390,7 +449,7 @@ async function removeCard(row: LocalDiscountCard) {
     <header class="page-head">
       <div>
         <h2>مدیریت تخفیف‌ها</h2>
-        <p>تعریف، ویرایش و غیرفعال‌سازی تخفیف‌های داخلی و کارت‌های تخفیف</p>
+        <p>تعریف تخفیف عمومی یا تخفیف مخصوص چند مشتری؛ با انتخاب مشتری در فاکتور، تخفیف مخصوص او خودکار قابل اعمال می‌شود.</p>
       </div>
       <button class="btn ghost" :disabled="loading" @click="refreshAll">بروزرسانی</button>
     </header>
@@ -431,9 +490,28 @@ async function removeCard(row: LocalDiscountCard) {
               <span>{{ discountForm.ApplyToAllGoods ? 'همه کالاها' : `${selectedGoodsCount} کالا انتخاب شده` }}</span>
               <small v-if="!discountForm.ApplyToAllGoods">{{ selectedGoodsSummary }}</small>
             </div>
-            <button class="btn" type="button" :disabled="discountForm.ApplyToAllGoods" @click="openProductPicker">
-              انتخاب از لیست کالاها
-            </button>
+            <button class="btn" type="button" :disabled="discountForm.ApplyToAllGoods" @click="openProductPicker">انتخاب از لیست کالاها</button>
+          </div>
+
+          <div class="customer-select-box wide">
+            <div>
+              <strong>مشتریان مجاز برای این تخفیف</strong>
+              <span>{{ selectedCustomerCount ? `${selectedCustomerCount} مشتری انتخاب شده` : 'عمومی؛ برای همه مشتری‌ها' }}</span>
+              <small>برای تخفیف پرسنلی، شناسه همه پرسنل را اینجا اضافه کنید.</small>
+            </div>
+            <input v-model="discountForm.CustomerIdsText" placeholder="مثلا 12,18,25 - خالی یعنی عمومی" />
+            <div class="customer-search-row">
+              <input v-model="customerSearch" placeholder="جستجوی مشتری با نام یا موبایل" @keyup.enter.prevent="findCustomers" />
+              <button class="btn" type="button" :disabled="customerLoading" @click="findCustomers">جستجو</button>
+            </div>
+            <div v-if="selectedCustomerIds.length" class="chip-list">
+              <button v-for="id in selectedCustomerIds" :key="id" class="chip" type="button" @click="removeCustomerId(id)">#{{ id }} ×</button>
+            </div>
+            <div v-if="customers.length" class="customer-results">
+              <button v-for="customer in customers" :key="customerId(customer)" type="button" @click="addCustomerToDiscount(customer)">
+                {{ customerTitle(customer) }}
+              </button>
+            </div>
           </div>
         </div>
         <div class="checks">
@@ -449,9 +527,7 @@ async function removeCard(row: LocalDiscountCard) {
       <div class="card table-card">
         <table>
           <thead>
-            <tr>
-              <th>شناسه</th><th>عنوان</th><th>نوع</th><th>مقدار</th><th>کالاها</th><th>فعال</th><th></th>
-            </tr>
+            <tr><th>شناسه</th><th>عنوان</th><th>نوع</th><th>مقدار</th><th>کالاها</th><th>مشتری‌ها</th><th>فعال</th><th></th></tr>
           </thead>
           <tbody>
             <tr v-for="row in discounts" :key="row.DiscountId">
@@ -460,6 +536,7 @@ async function removeCard(row: LocalDiscountCard) {
               <td>{{ Number(row.DiscountType) === 1 ? 'درصدی' : 'مبلغی' }}</td>
               <td>{{ Number(row.DiscountType) === 1 ? row.DiscountPercent + '%' : Number(row.DiscountAmount).toLocaleString() }}</td>
               <td>{{ row.ApplyToAllGoods ? 'همه' : rowGoodsIds(row).join(',') }}</td>
+              <td>{{ rowCustomerIds(row).length ? rowCustomerIds(row).join(',') : 'عمومی' }}</td>
               <td>{{ row.IsActive ? 'بله' : 'خیر' }}</td>
               <td class="row-actions"><button @click="editDiscount(row)">ویرایش</button><button @click="removeDiscount(row)">غیرفعال</button></td>
             </tr>
@@ -483,27 +560,15 @@ async function removeCard(row: LocalDiscountCard) {
           <label>تا تاریخ<input v-model="cardForm.EndDate" /></label>
         </div>
         <div class="checks"><label><input v-model="cardForm.IsActive" type="checkbox" /> فعال</label></div>
-        <div class="actions">
-          <button class="btn primary" :disabled="loading">ذخیره</button>
-          <button class="btn" type="button" @click="resetCardForm">جدید</button>
-        </div>
+        <div class="actions"><button class="btn primary" :disabled="loading">ذخیره</button><button class="btn" type="button" @click="resetCardForm">جدید</button></div>
       </form>
 
       <div class="card table-card">
         <table>
-          <thead>
-            <tr><th>شناسه</th><th>شماره</th><th>مشتری</th><th>درصد</th><th>مبلغ</th><th>مانده</th><th>فعال</th><th></th></tr>
-          </thead>
+          <thead><tr><th>شناسه</th><th>شماره</th><th>مشتری</th><th>درصد</th><th>مبلغ</th><th>مانده</th><th>فعال</th><th></th></tr></thead>
           <tbody>
             <tr v-for="row in cards" :key="row.DiscountCardId">
-              <td>{{ row.DiscountCardId }}</td>
-              <td>{{ row.CardNumber }}</td>
-              <td>{{ row.CustomerName || row.CustomerPhone || '-' }}</td>
-              <td>{{ row.DiscountPercent }}%</td>
-              <td>{{ Number(row.DiscountAmount || 0).toLocaleString() }}</td>
-              <td>{{ Number(row.Balance || 0).toLocaleString() }}</td>
-              <td>{{ row.IsActive ? 'بله' : 'خیر' }}</td>
-              <td class="row-actions"><button @click="editCard(row)">ویرایش</button><button @click="removeCard(row)">غیرفعال</button></td>
+              <td>{{ row.DiscountCardId }}</td><td>{{ row.CardNumber }}</td><td>{{ row.CustomerName || row.CustomerPhone || '-' }}</td><td>{{ row.DiscountPercent }}%</td><td>{{ Number(row.DiscountAmount || 0).toLocaleString() }}</td><td>{{ Number(row.Balance || 0).toLocaleString() }}</td><td>{{ row.IsActive ? 'بله' : 'خیر' }}</td><td class="row-actions"><button @click="editCard(row)">ویرایش</button><button @click="removeCard(row)">غیرفعال</button></td>
             </tr>
           </tbody>
         </table>
@@ -514,50 +579,19 @@ async function removeCard(row: LocalDiscountCard) {
       <table>
         <thead><tr><th>شناسه</th><th>کارت</th><th>فاکتور</th><th>نوع</th><th>مبلغ</th><th>تاریخ</th><th>شرح</th></tr></thead>
         <tbody>
-          <tr v-for="row in transactions" :key="row.DiscountCardTransactionId">
-            <td>{{ row.DiscountCardTransactionId }}</td>
-            <td>{{ row.CardNumber || row.DiscountCardId }}</td>
-            <td>{{ row.SaleInvoiceId || '-' }}</td>
-            <td>{{ row.TransactionType }}</td>
-            <td>{{ Number(row.Amount || 0).toLocaleString() }}</td>
-            <td>{{ row.TransactionDate }}</td>
-            <td>{{ row.Description }}</td>
-          </tr>
+          <tr v-for="row in transactions" :key="row.DiscountCardTransactionId"><td>{{ row.DiscountCardTransactionId }}</td><td>{{ row.CardNumber || row.DiscountCardId }}</td><td>{{ row.SaleInvoiceId || '-' }}</td><td>{{ row.TransactionType }}</td><td>{{ Number(row.Amount || 0).toLocaleString() }}</td><td>{{ row.TransactionDate }}</td><td>{{ row.Description }}</td></tr>
         </tbody>
       </table>
     </div>
 
     <div v-if="productPickerOpen" class="modal-backdrop" @click.self="closeProductPicker">
       <div class="product-modal">
-        <header class="modal-head">
-          <div>
-            <h3>انتخاب کالاهای شامل تخفیف</h3>
-            <p>{{ selectedProductIds.length }} کالا انتخاب شده است</p>
-          </div>
-          <button class="icon-btn" type="button" @click="closeProductPicker">×</button>
-        </header>
-
-        <div class="modal-toolbar">
-          <input v-model="productSearch" placeholder="جستجو بر اساس نام، کد یا شناسه کالا" />
-          <button class="btn" type="button" @click="selectFilteredProducts">انتخاب همه نتایج</button>
-          <button class="btn" type="button" @click="clearProductSelection">پاک کردن انتخاب</button>
-        </div>
-
+        <header class="modal-head"><div><h3>انتخاب کالاهای شامل تخفیف</h3><p>{{ selectedProductIds.length }} کالا انتخاب شده است</p></div><button class="icon-btn" type="button" @click="closeProductPicker">×</button></header>
+        <div class="modal-toolbar"><input v-model="productSearch" placeholder="جستجو بر اساس نام، کد یا شناسه کالا" /><button class="btn" type="button" @click="selectFilteredProducts">انتخاب همه نتایج</button><button class="btn" type="button" @click="clearProductSelection">پاک کردن انتخاب</button></div>
         <div v-if="productLoading" class="modal-state">در حال دریافت کالاها...</div>
         <div v-else-if="!filteredProducts.length" class="modal-state">کالایی یافت نشد</div>
-        <div v-else class="product-list">
-          <label v-for="product in filteredProducts" :key="productId(product)" class="product-row">
-            <input type="checkbox" :checked="isProductSelected(product)" @change="toggleProduct(product)" />
-            <span class="product-main">{{ productTitle(product) }}</span>
-            <span class="product-meta">شناسه: {{ productId(product) }}</span>
-            <span class="product-price">{{ Number(product.GoodsPrice || 0).toLocaleString() }}</span>
-          </label>
-        </div>
-
-        <footer class="modal-footer">
-          <button class="btn primary" type="button" @click="confirmProductSelection">تأیید انتخاب</button>
-          <button class="btn" type="button" @click="closeProductPicker">انصراف</button>
-        </footer>
+        <div v-else class="product-list"><label v-for="product in filteredProducts" :key="productId(product)" class="product-row"><input type="checkbox" :checked="isProductSelected(product)" @change="toggleProduct(product)" /><span class="product-main">{{ productTitle(product) }}</span><span class="product-meta">شناسه: {{ productId(product) }}</span><span class="product-price">{{ Number(product.GoodsPrice || 0).toLocaleString() }}</span></label></div>
+        <footer class="modal-footer"><button class="btn primary" type="button" @click="confirmProductSelection">تأیید انتخاب</button><button class="btn" type="button" @click="closeProductPicker">انصراف</button></footer>
       </div>
     </div>
   </section>
@@ -570,11 +604,11 @@ async function removeCard(row: LocalDiscountCard) {
 .page-head p { margin: 0; color: #9ca3af; }
 .message { padding: 10px 12px; border-radius: 12px; margin-bottom: 12px; background: rgba(20, 184, 166, .12); border: 1px solid rgba(20, 184, 166, .25); }
 .tabs { display: flex; gap: 8px; margin-bottom: 12px; }
-.tabs button, .btn, .row-actions button { border: 1px solid rgba(255,255,255,.1); color: #e5e7eb; background: rgba(255,255,255,.05); border-radius: 10px; padding: 9px 14px; cursor: pointer; }
+.tabs button, .btn, .row-actions button, .customer-results button, .chip { border: 1px solid rgba(255,255,255,.1); color: #e5e7eb; background: rgba(255,255,255,.05); border-radius: 10px; padding: 9px 14px; cursor: pointer; }
 .tabs button.active, .btn.primary { background: rgba(20,184,166,.22); border-color: rgba(20,184,166,.45); font-weight: 800; }
 .btn.ghost { background: transparent; }
 .btn:disabled { opacity: .55; cursor: not-allowed; }
-.grid-layout { display: grid; grid-template-columns: minmax(330px, 420px) 1fr; gap: 12px; align-items: start; }
+.grid-layout { display: grid; grid-template-columns: minmax(330px, 460px) 1fr; gap: 12px; align-items: start; }
 .card { background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); border-radius: 16px; padding: 14px; }
 .form h3 { margin: 0 0 12px; }
 .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
@@ -585,15 +619,21 @@ input, select { border: 1px solid rgba(255,255,255,.12); background: rgba(0,0,0,
 .actions { display: flex; gap: 8px; }
 .table-card { overflow: auto; }
 .table-card.full { height: calc(100vh - 230px); }
-table { width: 100%; border-collapse: collapse; min-width: 760px; }
+table { width: 100%; border-collapse: collapse; min-width: 820px; }
 th, td { text-align: right; padding: 10px; border-bottom: 1px solid rgba(255,255,255,.07); white-space: nowrap; }
 th { color: #93c5fd; font-weight: 800; }
 .row-actions { display: flex; gap: 6px; }
-.product-select-box { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px; border: 1px dashed rgba(255,255,255,.18); border-radius: 14px; background: rgba(0,0,0,.16); }
+.product-select-box, .customer-select-box { display: grid; gap: 10px; padding: 12px; border: 1px dashed rgba(255,255,255,.18); border-radius: 14px; background: rgba(0,0,0,.16); }
+.product-select-box { display: flex; justify-content: space-between; align-items: center; }
 .product-select-box.disabled { opacity: .55; }
-.product-select-box div { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.product-select-box span { color: #cbd5e1; }
-.product-select-box small { color: #93c5fd; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 250px; }
+.product-select-box div, .customer-select-box > div:first-child { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.product-select-box span, .customer-select-box span { color: #cbd5e1; }
+.product-select-box small, .customer-select-box small { color: #93c5fd; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 330px; }
+.customer-search-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+.customer-results { display: grid; gap: 6px; max-height: 150px; overflow: auto; }
+.customer-results button { text-align: right; }
+.chip-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { padding: 6px 9px; background: rgba(59,130,246,.18); }
 .modal-backdrop { position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,.72); display: flex; align-items: center; justify-content: center; padding: 24px; }
 .product-modal { width: min(920px, 96vw); max-height: 88vh; display: flex; flex-direction: column; border-radius: 20px; background: #111827; border: 1px solid rgba(255,255,255,.12); box-shadow: 0 24px 80px rgba(0,0,0,.5); overflow: hidden; }
 .modal-head, .modal-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,.08); }
@@ -610,5 +650,5 @@ th { color: #93c5fd; font-weight: 800; }
 .product-meta { color: #9ca3af; }
 .product-price { color: #bbf7d0; text-align: left; }
 .modal-state { padding: 40px; text-align: center; color: #9ca3af; }
-@media (max-width: 980px) { .grid-layout { grid-template-columns: 1fr; } .modal-toolbar { grid-template-columns: 1fr; } .product-row { grid-template-columns: 30px 1fr; } .product-meta, .product-price { grid-column: 2; text-align: right; } }
+@media (max-width: 980px) { .grid-layout { grid-template-columns: 1fr; } .modal-toolbar, .customer-search-row { grid-template-columns: 1fr; } .product-row { grid-template-columns: 30px 1fr; } .product-meta, .product-price { grid-column: 2; text-align: right; } }
 </style>
