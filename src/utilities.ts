@@ -22,7 +22,6 @@ interface AppConfig {
   ShowStandByVideo?: boolean;
   showDiscountCart?: boolean;
   ShowKeyBoard?: boolean;
-  checkStockLicense?: boolean;
 }
 
 let appConfig: AppConfig = {};
@@ -170,7 +169,16 @@ export function setupJalaliDateInputs(selector = "input[data-jdp]") {
   const picker = (window as unknown as { jalaliDatepicker?: any }).jalaliDatepicker;
   if (!picker) return false;
 
-  const options = { autoHide: true, hideAfterChange: true, zIndex: 3000 };
+  const options = {
+    autoHide: true,
+    hideAfterChange: true,
+    zIndex: 3000,
+    date: true,
+    time: true,
+    hasSecond: false,
+    persianDigits: false,
+    selector,
+  };
   picker.startWatch(options);
 
   const bindInputs = () => {
