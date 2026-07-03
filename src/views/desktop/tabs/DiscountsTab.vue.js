@@ -1,4 +1,7 @@
-import { computed, onMounted, reactive, ref } from "vue";
+import "@majidh1/jalalidatepicker";
+import "@majidh1/jalalidatepicker/dist/jalalidatepicker.min.css";
+import { computed, nextTick, onMounted, reactive, ref } from "vue";
+import { loadDesktopCatalog, searchDesktopCustomers } from "../../../services/desktopApi";
 import { disableLocalDiscount, disableLocalDiscountCard, listLocalDiscountCardTransactions, listLocalDiscountCards, listLocalDiscounts, saveLocalDiscount, saveLocalDiscountCard, } from "../../../services/localDiscountApi";
 const loading = ref(false);
 const productLoading = ref(false);
@@ -64,17 +67,17 @@ const filteredProducts = computed(() => {
     const rows = products.value.filter((item) => item && item.IsActive !== false);
     if (!q)
         return rows;
-    return rows.filter((item) => {
-        const haystack = `${item.GoodsId ?? ""} ${item.GoodsCode ?? ""} ${item.GoodsName ?? ""}`.toLowerCase();
-        return haystack.includes(q);
-    });
+    return rows.filter((item) => `${item.GoodsId ?? ""} ${item.GoodsCode ?? ""} ${item.GoodsName ?? ""}`.toLowerCase().includes(q));
 });
 onMounted(() => {
     setupDatePicker();
     void refreshAll();
 });
 function setupDatePicker() {
-    setupJalaliDateInputs();
+    void nextTick(() => {
+        const picker = window.jalaliDatepicker;
+        picker?.startWatch?.({ autoHide: true, persianDigits: false });
+    });
 }
 async function refreshAll() {
     loading.value = true;
@@ -121,10 +124,7 @@ function nullableText(value) {
 }
 function parseNumberIds(value) {
     if (Array.isArray(value)) {
-        return value
-            .map((item) => Number(item))
-            .filter((item) => Number.isFinite(item) && item > 0)
-            .filter((item, index, array) => array.indexOf(item) === index);
+        return value.map(Number).filter((item) => Number.isFinite(item) && item > 0).filter((item, index, array) => array.indexOf(item) === index);
     }
     return String(value || "")
         .split(/[,،\n\s]+/)
@@ -134,30 +134,31 @@ function parseNumberIds(value) {
 }
 function rowGoodsIds(row) {
     const record = row;
-    if (Array.isArray(row.GoodsIds))
-        return parseNumberIds(row.GoodsIds);
+    if (Array.isArray(record.GoodsIds))
+        return parseNumberIds(record.GoodsIds);
     if (Array.isArray(record.goodsIds))
         return parseNumberIds(record.goodsIds);
-    if (typeof row.GoodsIds === "string")
-        return parseNumberIds(row.GoodsIds);
+    if (typeof record.GoodsIds === "string")
+        return parseNumberIds(record.GoodsIds);
     if (typeof record.GoodsIdsText === "string")
         return parseNumberIds(record.GoodsIdsText);
     return [];
 }
 function rowCustomerIds(row) {
     const record = row;
-    if (Array.isArray(row.CustomerIds))
-        return parseNumberIds(row.CustomerIds);
+    if (Array.isArray(record.CustomerIds))
+        return parseNumberIds(record.CustomerIds);
     if (Array.isArray(record.customerIds))
         return parseNumberIds(record.customerIds);
-    if (typeof row.CustomerIds === "string")
-        return parseNumberIds(row.CustomerIds);
+    if (typeof record.CustomerIds === "string")
+        return parseNumberIds(record.CustomerIds);
     if (typeof record.CustomerIdsText === "string")
         return parseNumberIds(record.CustomerIdsText);
     return [];
 }
 function productId(product) {
-    return Number(product.GoodsId ?? product.ProductId ?? 0);
+    const record = product;
+    return Number(product.GoodsId ?? record.ProductId ?? 0);
 }
 function productTitle(product) {
     const code = product.GoodsCode ? `کد ${product.GoodsCode} - ` : "";
@@ -450,7 +451,14 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['product-select-box']} */ ;
 /** @type {__VLS_StyleScopedClasses['product-select-box']} */ ;
 /** @type {__VLS_StyleScopedClasses['product-select-box']} */ ;
+/** @type {__VLS_StyleScopedClasses['customer-select-box']} */ ;
 /** @type {__VLS_StyleScopedClasses['product-select-box']} */ ;
+/** @type {__VLS_StyleScopedClasses['customer-select-box']} */ ;
+/** @type {__VLS_StyleScopedClasses['product-select-box']} */ ;
+/** @type {__VLS_StyleScopedClasses['customer-select-box']} */ ;
+/** @type {__VLS_StyleScopedClasses['customer-results']} */ ;
+/** @type {__VLS_StyleScopedClasses['customer-results']} */ ;
+/** @type {__VLS_StyleScopedClasses['chip']} */ ;
 /** @type {__VLS_StyleScopedClasses['modal-footer']} */ ;
 /** @type {__VLS_StyleScopedClasses['modal-head']} */ ;
 /** @type {__VLS_StyleScopedClasses['modal-head']} */ ;
@@ -458,6 +466,7 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['product-row']} */ ;
 /** @type {__VLS_StyleScopedClasses['grid-layout']} */ ;
 /** @type {__VLS_StyleScopedClasses['modal-toolbar']} */ ;
+/** @type {__VLS_StyleScopedClasses['customer-search-row']} */ ;
 /** @type {__VLS_StyleScopedClasses['product-row']} */ ;
 /** @type {__VLS_StyleScopedClasses['product-meta']} */ ;
 /** @type {__VLS_StyleScopedClasses['product-price']} */ ;
@@ -570,7 +579,6 @@ if (__VLS_ctx.activeTab === 'discounts') {
         readonly: true,
         placeholder: "1405/01/01",
         'data-jdp': true,
-        'data-jdp-bound': true,
     });
     (__VLS_ctx.discountForm.StartDate);
     __VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({});
@@ -578,7 +586,6 @@ if (__VLS_ctx.activeTab === 'discounts') {
         readonly: true,
         placeholder: "1405/12/29",
         'data-jdp': true,
-        'data-jdp-bound': true,
     });
     (__VLS_ctx.discountForm.EndDate);
     __VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({});
@@ -712,14 +719,6 @@ if (__VLS_ctx.activeTab === 'discounts') {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
     __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
     __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.tr, __VLS_intrinsicElements.tr)({});
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
     __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
     __VLS_asFunctionalElement(__VLS_intrinsicElements.tbody, __VLS_intrinsicElements.tbody)({});
     for (const [row] of __VLS_getVForSourceType((__VLS_ctx.discounts))) {
@@ -733,8 +732,7 @@ if (__VLS_ctx.activeTab === 'discounts') {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
         (Number(row.DiscountType) === 1 ? 'درصدی' : 'مبلغی');
         __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
-        (Number(row.DiscountType) === 1 ? row.DiscountPercent + '%' :
-            Number(row.DiscountAmount).toLocaleString());
+        (Number(row.DiscountType) === 1 ? row.DiscountPercent + '%' : Number(row.DiscountAmount).toLocaleString());
         __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
         (row.ApplyToAllGoods ? 'همه' : __VLS_ctx.rowGoodsIds(row).join(','));
         __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
@@ -810,10 +808,16 @@ if (__VLS_ctx.activeTab === 'cards') {
     });
     (__VLS_ctx.cardForm.Balance);
     __VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({});
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+        readonly: true,
+        'data-jdp': true,
+    });
     (__VLS_ctx.cardForm.StartDate);
     __VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({});
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+        readonly: true,
+        'data-jdp': true,
+    });
     (__VLS_ctx.cardForm.EndDate);
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "checks" },
@@ -885,53 +889,6 @@ if (__VLS_ctx.activeTab === 'cards') {
                     __VLS_ctx.removeCard(row);
                 } },
         });
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.thead, __VLS_intrinsicElements.thead)({});
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.tr, __VLS_intrinsicElements.tr)({});
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.tbody, __VLS_intrinsicElements.tbody)({});
-        for (const [row] of __VLS_getVForSourceType((__VLS_ctx.cards))) {
-            __VLS_asFunctionalElement(__VLS_intrinsicElements.tr, __VLS_intrinsicElements.tr)({
-                key: (row.DiscountCardId),
-            });
-            __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
-            (row.DiscountCardId);
-            __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
-            (row.CardNumber);
-            __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
-            (row.CustomerName || row.CustomerPhone || '-');
-            __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
-            (row.DiscountPercent);
-            __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
-            (Number(row.DiscountAmount || 0).toLocaleString());
-            __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
-            (Number(row.Balance || 0).toLocaleString());
-            __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
-            (row.IsActive ? 'بله' : 'خیر');
-            __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({
-                ...{ class: "row-actions" },
-            });
-            __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-                ...{ onClick: (...[$event]) => {
-                        if (!(__VLS_ctx.activeTab === 'cards'))
-                            return;
-                        __VLS_ctx.editCard(row);
-                    } },
-            });
-            __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-                ...{ onClick: (...[$event]) => {
-                        if (!(__VLS_ctx.activeTab === 'cards'))
-                            return;
-                        __VLS_ctx.removeCard(row);
-                    } },
-            });
-        }
     }
 }
 if (__VLS_ctx.activeTab === 'transactions') {
@@ -1110,7 +1067,6 @@ if (__VLS_ctx.productPickerOpen) {
 /** @type {__VLS_StyleScopedClasses['btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['card']} */ ;
 /** @type {__VLS_StyleScopedClasses['table-card']} */ ;
-/** @type {__VLS_StyleScopedClasses['row-actions']} */ ;
 /** @type {__VLS_StyleScopedClasses['row-actions']} */ ;
 /** @type {__VLS_StyleScopedClasses['card']} */ ;
 /** @type {__VLS_StyleScopedClasses['table-card']} */ ;
