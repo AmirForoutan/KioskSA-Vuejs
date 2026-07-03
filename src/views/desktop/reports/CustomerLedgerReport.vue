@@ -1,38 +1,17 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
-import "@majidh1/jalalidatepicker";
-import "@majidh1/jalalidatepicker/dist/jalalidatepicker.min.css";
+import { computed, onMounted, ref, watch } from "vue";
 import { can } from "../../../components/acl/can";
 import { loadDesktopInvoiceItems, loadDesktopInvoices, type DesktopInvoice, type DesktopInvoiceItem } from "../../../services/desktopApi";
 import { exportToExcel } from "../../utils/exportExcel";
-import { setupJalaliDateInputs } from "../../../utilities";
 import { useDesktopToastMessage } from "../useDesktopToastMessage";
 import { escapeHtml, formatMoney, money, moneyPair, printReceipt, reportRange } from "./receiptPrint";
 
 type ViewMode = "summary" | "detail";
-type CustomerRow = {
-  key: string;
-  customerCode: number;
-  customer: string;
-  phone: string;
-  invoiceCount: number;
-  totalSales: number;
-  totalDiscount: number;
-  totalTax: number;
-  totalPacking: number;
-  totalCash: number;
-  totalPos: number;
-  totalCredit: number;
-  lastDate: string;
-  lastTime: string;
-  invoices: DesktopInvoice[];
-};
-
+type CustomerRow = { key: string; customerCode: number; customer: string; phone: string; invoiceCount: number; totalSales: number; totalDiscount: number; totalTax: number; totalPacking: number; totalCash: number; totalPos: number; totalCredit: number; lastDate: string; lastTime: string; invoices: DesktopInvoice[] };
 type DetailLine = { invoiceNo: number; date: string; goodsKey: string; goodsName: string; quantity: number; total: number };
 
-const from = ref("");
-const to = ref("");
-const q = ref("");
+const props = defineProps<{ fromDate?: string; toDate?: string; query?: string; refreshKey?: number }>();
+
 const loading = ref(false);
 const detailLoading = ref(false);
 const message = ref("");
@@ -46,11 +25,10 @@ useDesktopToastMessage(message);
 useDesktopToastMessage(detailMessage);
 
 const filtered = computed(() => {
-  const s = q.value.trim();
+  const s = String(props.query || "").trim();
   if (!s) return rows.value;
-  return rows.value.filter((row) => `${row.customer} ${row.phone}`.includes(s));
+  return rows.value.filter((row) => `${row.customerCode} ${row.customer} ${row.phone}`.includes(s));
 });
-
 const selectedCustomer = computed(() => rows.value.find((row) => row.key === selectedKey.value) || null);
 const totalSales = computed(() => filtered.value.reduce((sum, row) => sum + row.totalSales, 0));
 const totalDiscount = computed(() => filtered.value.reduce((sum, row) => sum + row.totalDiscount, 0));
@@ -68,10 +46,8 @@ const itemSummary = computed(() => {
   return Array.from(map.values()).sort((a, b) => b.total - a.total);
 });
 
-onMounted(() => {
-  setupJalaliDateInputs();
-  loadReport();
-});
+onMounted(loadReport);
+watch(() => props.refreshKey, loadReport);
 
 async function loadReport() {
   loading.value = true;
@@ -80,7 +56,7 @@ async function loadReport() {
   activeView.value = "summary";
   detailLines.value = [];
   try {
-    const invoices = await loadDesktopInvoices({ FromDate: from.value.trim(), ToDate: to.value.trim() });
+    const invoices = await loadDesktopInvoices({ FromDate: String(props.fromDate || "").trim(), ToDate: String(props.toDate || "").trim() });
     rows.value = groupByCustomer(invoices);
     if (!rows.value.length) message.value = "داده‌ای برای این بازه پیدا نشد";
   } catch (error) {
@@ -99,7 +75,6 @@ function customerKey(invoice: DesktopInvoice) {
   const name = String(invoice.CustomerName || "unknown").trim().toLowerCase();
   return `name-${name || "unknown"}`;
 }
-
 function optionalAmount(row: DesktopInvoice, ...keys: string[]) {
   for (const key of keys) {
     const value = row[key];
@@ -107,11 +82,9 @@ function optionalAmount(row: DesktopInvoice, ...keys: string[]) {
   }
   return null;
 }
-
 function invoiceDiscount(row: DesktopInvoice) {
   return optionalAmount(row, "Discount", "InvoiceDiscount", "TotalDiscount", "discount", "invoiceDiscount", "totalDiscount") ?? 0;
 }
-
 function paymentPart(row: DesktopInvoice, key: "pos" | "cash" | "credit") {
   const pos = money(row.PosPrice);
   const cash = money(row.CashPrice);
@@ -121,7 +94,6 @@ function paymentPart(row: DesktopInvoice, key: "pos" | "cash" | "credit") {
   if (key === "credit") return credit;
   return pos;
 }
-
 function groupByCustomer(invoices: DesktopInvoice[]) {
   const map = new Map<string, CustomerRow>();
   invoices.forEach((invoice) => {
@@ -144,40 +116,24 @@ function groupByCustomer(invoices: DesktopInvoice[]) {
   });
   return Array.from(map.values()).sort((a, b) => b.totalSales - a.totalSales);
 }
-
 async function toggleCustomer(row: CustomerRow) {
-  if (selectedKey.value === row.key) {
-    selectedKey.value = "";
-    activeView.value = "summary";
-    detailLines.value = [];
-    detailMessage.value = "";
-    return;
-  }
+  if (selectedKey.value === row.key) { selectedKey.value = ""; activeView.value = "summary"; detailLines.value = []; detailMessage.value = ""; return; }
   selectedKey.value = row.key;
   activeView.value = "detail";
   await loadCustomerDetail(row);
 }
-
 async function loadCustomerDetail(row: CustomerRow) {
   detailLoading.value = true;
   detailMessage.value = "";
   detailLines.value = [];
   try {
     const results = await Promise.all(row.invoices.map(async (invoice) => {
-      try {
-        const items = await loadDesktopInvoiceItems(invoice.SaleInvoiceId);
-        return items.map((item) => normalizeItem(invoice, item));
-      } catch {
-        return [] as DetailLine[];
-      }
+      try { const items = await loadDesktopInvoiceItems(invoice.SaleInvoiceId); return items.map((item) => normalizeItem(invoice, item)); } catch { return [] as DetailLine[]; }
     }));
     detailLines.value = results.flat();
     if (!detailLines.value.length) detailMessage.value = "سرویس اقلام فاکتور برای این مشتری داده‌ای برنگرداند؛ فهرست فاکتورها پایین نمایش داده شده است";
-  } finally {
-    detailLoading.value = false;
-  }
+  } finally { detailLoading.value = false; }
 }
-
 function normalizeItem(invoice: DesktopInvoice, item: DesktopInvoiceItem): DetailLine {
   const quantity = money(item.Quantity ?? item.Count ?? item.GoodsCount ?? 1);
   const unitPrice = money(item.Price ?? item.GoodsPrice ?? item.ProductPrice);
@@ -185,65 +141,35 @@ function normalizeItem(invoice: DesktopInvoice, item: DesktopInvoiceItem): Detai
   const goodsName = String(item.GoodsName || item.ProductTitle || item.ProductName || item.GoodsCode || item.ProductCode || item.GoodsId || "کالای نامشخص");
   return { invoiceNo: invoice.SaleInvoiceNumberDay, date: invoice.OrderDate, goodsKey: String(item.GoodsId || item.ProductId || item.GoodsCode || item.ProductCode || goodsName), goodsName, quantity, total };
 }
-
 function exportExcel() {
   if (!can("reports.export.excel")) return;
   if (activeView.value === "detail" && selectedCustomer.value) {
-    exportToExcel(detailLines.value, [{ key: "invoiceNo", title: "شماره فاکتور" }, { key: "date", title: "تاریخ" }, { key: "goodsName", title: "کالا" }, { key: "quantity", title: "تعداد" }, { key: "total", title: "مبلغ" }], `customer-detail-${selectedCustomer.value.customerCode || selectedCustomer.value.phone || "selected"}`);
-    return;
+    exportToExcel(detailLines.value, [{ key: "invoiceNo", title: "شماره فاکتور" }, { key: "date", title: "تاریخ" }, { key: "goodsName", title: "کالا" }, { key: "quantity", title: "تعداد" }, { key: "total", title: "مبلغ" }], `customer-detail-${selectedCustomer.value.customerCode || selectedCustomer.value.phone || "selected"}`); return;
   }
   exportToExcel(filtered.value, [{ key: "customer", title: "مشتری" }, { key: "phone", title: "موبایل" }, { key: "invoiceCount", title: "تعداد فاکتور" }, { key: "totalSales", title: "جمع فروش" }, { key: "totalDiscount", title: "جمع تخفیف" }, { key: "totalCash", title: "نقدی" }, { key: "totalPos", title: "کارتخوان" }, { key: "totalCredit", title: "اعتباری" }, { key: "totalTax", title: "جمع مالیات" }, { key: "totalPacking", title: "جمع بسته بندی" }, { key: "lastDate", title: "آخرین تاریخ" }, { key: "lastTime", title: "آخرین ساعت" }], "customer-ledger");
 }
-
 function printCustomerReport() {
   const rowsHtml = filtered.value.map((row) => `<tr><td>${escapeHtml(row.customer)}</td><td class="num">${row.invoiceCount.toLocaleString("fa-IR")}</td><td class="num">${formatMoney(row.totalSales)}</td><td class="num">${formatMoney(row.totalDiscount)}</td></tr>`).join("");
-  printReceipt(
-    "گزارش مشتریان",
-    reportRange(from.value, to.value),
-    `<div class="section"><div class="section-title">سرجمع مشتریان</div>${moneyPair("تعداد مشتری", filtered.value.length)}${moneyPair("جمع فروش", totalSales.value)}${moneyPair("جمع تخفیف", totalDiscount.value)}${moneyPair("جمع اعتباری", totalCredit.value)}</div><div class="section"><div class="section-title">مشتریان</div><table><thead><tr><th>مشتری</th><th class="num">فاکتور</th><th class="num">فروش</th><th class="num">تخفیف</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>`
-  );
+  printReceipt("گزارش مشتریان", reportRange(props.fromDate || "", props.toDate || ""), `<div class="section"><div class="section-title">سرجمع مشتریان</div>${moneyPair("تعداد مشتری", filtered.value.length)}${moneyPair("جمع فروش", totalSales.value)}${moneyPair("جمع تخفیف", totalDiscount.value)}${moneyPair("جمع اعتباری", totalCredit.value)}</div><div class="section"><div class="section-title">مشتریان</div><table><thead><tr><th>مشتری</th><th class="num">فاکتور</th><th class="num">فروش</th><th class="num">تخفیف</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>`);
 }
 </script>
 
 <template>
   <div class="cl-shell">
-    <div class="cl-toolbar">
-      <input class="cl-input" v-model="q" placeholder="جستجوی مشتری یا موبایل..." />
-      <input class="cl-input" v-model="from" placeholder="از تاریخ" readonly data-jdp />
-      <input class="cl-input" v-model="to" placeholder="تا تاریخ" readonly data-jdp />
-      <button class="cl-btn primary" :disabled="loading" @click="loadReport">{{ loading ? "در حال دریافت" : "اعمال فیلتر" }}</button>
-      <button v-if="can('reports.export.excel')" class="cl-btn" :disabled="!filtered.length" @click="exportExcel">خروجی اکسل</button>
-      <button class="cl-btn" :disabled="!filtered.length" @click="printCustomerReport">چاپ گزارش</button>
-    </div>
+    <div class="cl-actions"><button v-if="can('reports.export.excel')" class="cl-btn" :disabled="!filtered.length" @click="exportExcel">خروجی اکسل</button><button class="cl-btn" :disabled="!filtered.length" @click="printCustomerReport">چاپ گزارش</button></div>
     <div class="cl-tabs"><button :class="{ active: activeView === 'summary' }" @click="activeView = 'summary'">سرجمع مشتریان</button><button v-if="selectedCustomer" :class="{ active: activeView === 'detail' }" @click="activeView = 'detail'">تفکیکی {{ selectedCustomer.customer }}</button></div>
     <div class="cl-summary"><div><span>تعداد مشتری</span><b>{{ filtered.length.toLocaleString() }}</b></div><div><span>جمع فروش</span><b>{{ totalSales.toLocaleString() }}</b></div><div><span>جمع تخفیف</span><b>{{ totalDiscount.toLocaleString() }}</b></div><div><span>جمع اعتباری</span><b>{{ totalCredit.toLocaleString() }}</b></div><div v-if="selectedCustomer"><span>مشتری انتخابی</span><b>{{ selectedCustomer.customer }}</b></div></div>
     <div v-if="message" class="cl-message">{{ message }}</div>
-    <template v-if="activeView === 'summary'">
-      <div class="cl-table"><div class="cl-tr summary cl-th"><div>انتخاب</div><div>مشتری</div><div>موبایل</div><div>فاکتور</div><div>جمع فروش</div><div>تخفیف</div><div>نقدی</div><div>کارتخوان</div><div>اعتباری</div><div>آخرین خرید</div></div><div v-if="loading" class="cl-empty">در حال بارگذاری...</div><div class="cl-tr summary" v-for="row in filtered" :key="row.key"><div><input type="checkbox" :checked="selectedKey === row.key" @change="toggleCustomer(row)" /></div><div class="bold">{{ row.customer }}</div><div>{{ row.phone || "-" }}</div><div>{{ row.invoiceCount.toLocaleString() }}</div><div class="bold">{{ row.totalSales.toLocaleString() }}</div><div class="pay discount">{{ row.totalDiscount.toLocaleString() }}</div><div class="pay cash">{{ row.totalCash.toLocaleString() }}</div><div class="pay pos">{{ row.totalPos.toLocaleString() }}</div><div class="pay credit">{{ row.totalCredit.toLocaleString() }}</div><div>{{ row.lastDate }} - {{ row.lastTime }}</div></div></div>
-    </template>
-    <template v-else-if="selectedCustomer">
-      <div class="detail-grid"><section class="detail-panel"><div class="detail-head"><div><div class="detail-title">{{ selectedCustomer.customer }}</div><div class="detail-sub">{{ selectedCustomer.invoiceCount.toLocaleString() }} فاکتور، {{ selectedCustomer.totalSales.toLocaleString() }} فروش، {{ selectedCustomer.totalDiscount.toLocaleString() }} تخفیف</div></div><button class="cl-btn" @click="activeView = 'summary'">برگشت به سرجمع</button></div><div v-if="detailMessage" class="cl-message">{{ detailMessage }}</div><div class="item-summary"><div v-for="item in itemSummary" :key="item.goodsName"><span>{{ item.goodsName }}</span><b>{{ item.quantity.toLocaleString() }} عدد</b><strong>{{ item.total.toLocaleString() }}</strong></div></div></section><section class="detail-panel"><div class="detail-title">فاکتورهای مشتری</div><div class="mini-table"><div class="mini-tr mini-th"><div>#</div><div>تاریخ</div><div>نوع</div><div>تخفیف</div><div>نقدی</div><div>کارتخوان</div><div>اعتباری</div><div>مبلغ</div></div><div v-for="invoice in selectedCustomer.invoices" :key="invoice.SaleInvoiceId" class="mini-tr"><div class="bold">{{ invoice.SaleInvoiceNumberDay }}</div><div>{{ invoice.OrderDate }}</div><div>{{ invoice.InvoiceTypeName }}</div><div>{{ invoiceDiscount(invoice).toLocaleString() }}</div><div>{{ paymentPart(invoice, "cash").toLocaleString() }}</div><div>{{ paymentPart(invoice, "pos").toLocaleString() }}</div><div>{{ paymentPart(invoice, "credit").toLocaleString() }}</div><div class="bold">{{ money(invoice.Payable).toLocaleString() }}</div></div></div></section></div>
-      <div class="cl-table"><div class="cl-tr detail cl-th"><div>فاکتور</div><div>تاریخ</div><div>کالا</div><div>تعداد</div><div>مبلغ</div></div><div v-if="detailLoading" class="cl-empty">در حال دریافت اقلام...</div><div class="cl-tr detail" v-for="line in detailLines" :key="`${line.invoiceNo}-${line.goodsName}`"><div class="bold">{{ line.invoiceNo }}</div><div>{{ line.date }}</div><div class="bold">{{ line.goodsName }}</div><div>{{ line.quantity.toLocaleString() }}</div><div class="bold">{{ line.total.toLocaleString() }}</div></div></div>
-    </template>
+    <template v-if="activeView === 'summary'"><div class="cl-table"><div class="cl-tr summary cl-th"><div>انتخاب</div><div>مشتری</div><div>موبایل</div><div>فاکتور</div><div>جمع فروش</div><div>تخفیف</div><div>نقدی</div><div>کارتخوان</div><div>اعتباری</div><div>آخرین خرید</div></div><div v-if="loading" class="cl-empty">در حال بارگذاری...</div><div class="cl-tr summary" v-for="row in filtered" :key="row.key"><div><input type="checkbox" :checked="selectedKey === row.key" @change="toggleCustomer(row)" /></div><div class="bold">{{ row.customer }}</div><div>{{ row.phone || "-" }}</div><div>{{ row.invoiceCount.toLocaleString() }}</div><div class="bold">{{ row.totalSales.toLocaleString() }}</div><div class="pay discount">{{ row.totalDiscount.toLocaleString() }}</div><div class="pay cash">{{ row.totalCash.toLocaleString() }}</div><div class="pay pos">{{ row.totalPos.toLocaleString() }}</div><div class="pay credit">{{ row.totalCredit.toLocaleString() }}</div><div>{{ row.lastDate }} - {{ row.lastTime }}</div></div></div></template>
+    <template v-else-if="selectedCustomer"><div class="detail-grid"><section class="detail-panel"><div class="detail-head"><div><div class="detail-title">{{ selectedCustomer.customer }}</div><div class="detail-sub">{{ selectedCustomer.invoiceCount.toLocaleString() }} فاکتور، {{ selectedCustomer.totalSales.toLocaleString() }} فروش، {{ selectedCustomer.totalDiscount.toLocaleString() }} تخفیف</div></div><button class="cl-btn" @click="activeView = 'summary'">برگشت به سرجمع</button></div><div v-if="detailMessage" class="cl-message">{{ detailMessage }}</div><div class="item-summary"><div v-for="item in itemSummary" :key="item.goodsName"><span>{{ item.goodsName }}</span><b>{{ item.quantity.toLocaleString() }} عدد</b><strong>{{ item.total.toLocaleString() }}</strong></div></div></section><section class="detail-panel"><div class="detail-title">فاکتورهای مشتری</div><div class="mini-table"><div class="mini-tr mini-th"><div>#</div><div>تاریخ</div><div>نوع</div><div>تخفیف</div><div>نقدی</div><div>کارتخوان</div><div>اعتباری</div><div>مبلغ</div></div><div v-for="invoice in selectedCustomer.invoices" :key="invoice.SaleInvoiceId" class="mini-tr"><div class="bold">{{ invoice.SaleInvoiceNumberDay }}</div><div>{{ invoice.OrderDate }}</div><div>{{ invoice.InvoiceTypeName }}</div><div>{{ invoiceDiscount(invoice).toLocaleString() }}</div><div>{{ paymentPart(invoice, "cash").toLocaleString() }}</div><div>{{ paymentPart(invoice, "pos").toLocaleString() }}</div><div>{{ paymentPart(invoice, "credit").toLocaleString() }}</div><div class="bold">{{ money(invoice.Payable).toLocaleString() }}</div></div></div></section></div><div class="cl-table"><div class="cl-tr detail cl-th"><div>فاکتور</div><div>تاریخ</div><div>کالا</div><div>تعداد</div><div>مبلغ</div></div><div v-if="detailLoading" class="cl-empty">در حال دریافت اقلام...</div><div class="cl-tr detail" v-for="line in detailLines" :key="`${line.invoiceNo}-${line.goodsName}`"><div class="bold">{{ line.invoiceNo }}</div><div>{{ line.date }}</div><div class="bold">{{ line.goodsName }}</div><div>{{ line.quantity.toLocaleString() }}</div><div class="bold">{{ line.total.toLocaleString() }}</div></div></div></template>
   </div>
 </template>
 
 <style scoped>
-.cl-shell { height: 100%; min-height: 0; display: flex; flex-direction: column; gap: 12px; }
-.cl-toolbar { display: grid; grid-template-columns: minmax(220px,1.2fr) minmax(150px,1fr) minmax(150px,1fr) auto auto auto; gap: 10px; }
-.cl-input, .cl-btn { min-height: 46px; border-radius: 8px; padding: 9px 11px; color: #eef2ff; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.1); }
-.cl-btn { cursor: pointer; white-space: nowrap; } .cl-btn.primary, .cl-tabs button.active { font-weight: 900; background: rgba(20,184,166,.18); border-color: rgba(20,184,166,.34); }
-.cl-tabs { display: flex; gap: 8px; } .cl-tabs button { min-height: 42px; border-radius: 8px; padding: 8px 12px; color: #eef2ff; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); cursor: pointer; }
-.cl-summary { display: grid; grid-template-columns: repeat(5,minmax(150px,1fr)); gap: 10px; }
-.cl-summary div, .cl-message, .cl-empty, .detail-panel { border-radius: 8px; padding: 10px 12px; background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.08); }
-.cl-summary span, .detail-sub { color: #a7b0c3; margin-left: 8px; } .cl-message { color: #fde68a; background: rgba(245,158,11,.12); border-color: rgba(245,158,11,.22); }
-.cl-table { flex: 1; min-height: 0; overflow: auto; border-radius: 8px; border: 1px solid rgba(255,255,255,.08); background: rgba(255,255,255,.02); }
-.cl-tr { display: grid; gap: 10px; align-items: center; padding: 11px 12px; border-bottom: 1px solid rgba(255,255,255,.06); }
-.cl-tr.summary { grid-template-columns: 70px minmax(170px,1.3fr) 120px 90px 125px 105px 105px 105px 105px 170px; min-width: 1230px; } .cl-tr.detail { grid-template-columns: 90px 120px minmax(220px,1.7fr) 110px 140px; min-width: 720px; }
-.cl-th, .mini-th { position: sticky; top: 0; z-index: 2; font-weight: 900; color: #a7b0c3; background: rgba(16,19,26,.96); }
-.cl-tr input[type="checkbox"] { width: 20px; height: 20px; accent-color: #14b8a6; } .bold, .pay { font-weight: 900; } .pay.cash { color: #fde68a; } .pay.pos { color: #bfdbfe; } .pay.credit { color: #ccfbf1; } .pay.discount { color: #fca5a5; }
-.detail-grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 12px; } .detail-panel { display: flex; flex-direction: column; gap: 12px; min-height: 180px; } .detail-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; } .detail-title { font-weight: 900; }
-.item-summary { display: grid; grid-template-columns: repeat(auto-fill,minmax(180px,1fr)); gap: 8px; } .item-summary div { min-height: 58px; border-radius: 8px; padding: 8px 10px; display: grid; gap: 3px; background: rgba(20,184,166,.08); border: 1px solid rgba(20,184,166,.18); } .item-summary span { color: #eef2ff; font-weight: 900; } .item-summary b, .item-summary strong { color: #a7b0c3; font-size: 12px; }
-.mini-table { min-height: 0; overflow: auto; } .mini-tr { display: grid; grid-template-columns: 60px 95px 80px 95px 95px 95px 95px 110px; min-width: 780px; gap: 8px; padding: 9px 8px; border-bottom: 1px solid rgba(255,255,255,.06); }
-@media (max-width:1180px) { .cl-toolbar, .cl-summary, .detail-grid { grid-template-columns: 1fr; } }
+.cl-shell { height: 100%; min-height: 0; display: flex; flex-direction: column; gap: 12px; } .cl-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; } .cl-btn { min-height: 42px; border-radius: 8px; padding: 8px 12px; color: #eef2ff; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.1); cursor: pointer; white-space: nowrap; } .cl-btn:disabled { opacity: .55; cursor: not-allowed; }
+.cl-tabs { display: flex; gap: 8px; } .cl-tabs button { min-height: 42px; border-radius: 8px; padding: 8px 12px; color: #eef2ff; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); cursor: pointer; } .cl-btn.primary, .cl-tabs button.active { font-weight: 900; background: rgba(20,184,166,.18); border-color: rgba(20,184,166,.34); }
+.cl-summary { display: grid; grid-template-columns: repeat(5,minmax(150px,1fr)); gap: 10px; } .cl-summary div, .cl-message, .cl-empty, .detail-panel { border-radius: 8px; padding: 10px 12px; background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.08); } .cl-summary span, .detail-sub { color: #a7b0c3; margin-left: 8px; } .cl-message { color: #fde68a; background: rgba(245,158,11,.12); border-color: rgba(245,158,11,.22); }
+.cl-table { flex: 1; min-height: 0; overflow: auto; border-radius: 8px; border: 1px solid rgba(255,255,255,.08); background: rgba(255,255,255,.02); } .cl-tr { display: grid; gap: 10px; align-items: center; padding: 11px 12px; border-bottom: 1px solid rgba(255,255,255,.06); } .cl-tr.summary { grid-template-columns: 70px minmax(170px,1.3fr) 120px 90px 125px 105px 105px 105px 105px 170px; min-width: 1230px; } .cl-tr.detail { grid-template-columns: 90px 120px minmax(220px,1.7fr) 110px 140px; min-width: 720px; } .cl-th, .mini-th { position: sticky; top: 0; z-index: 2; font-weight: 900; color: #a7b0c3; background: rgba(16,19,26,.96); } .cl-tr input[type="checkbox"] { width: 20px; height: 20px; accent-color: #14b8a6; } .bold, .pay { font-weight: 900; } .pay.cash { color: #fde68a; } .pay.pos { color: #bfdbfe; } .pay.credit { color: #ccfbf1; } .pay.discount { color: #fca5a5; }
+.detail-grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 12px; } .detail-panel { display: flex; flex-direction: column; gap: 12px; min-height: 180px; } .detail-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; } .detail-title { font-weight: 900; } .item-summary { display: grid; grid-template-columns: repeat(auto-fill,minmax(180px,1fr)); gap: 8px; } .item-summary div { min-height: 58px; border-radius: 8px; padding: 8px 10px; display: grid; gap: 3px; background: rgba(20,184,166,.08); border: 1px solid rgba(20,184,166,.18); } .item-summary span { color: #eef2ff; font-weight: 900; } .item-summary b, .item-summary strong { color: #a7b0c3; font-size: 12px; } .mini-table { min-height: 0; overflow: auto; } .mini-tr { display: grid; grid-template-columns: 60px 95px 80px 95px 95px 95px 95px 110px; min-width: 780px; gap: 8px; padding: 9px 8px; border-bottom: 1px solid rgba(255,255,255,.06); }
+@media (max-width:1180px) { .cl-summary, .detail-grid { grid-template-columns: 1fr; } }
 </style>
