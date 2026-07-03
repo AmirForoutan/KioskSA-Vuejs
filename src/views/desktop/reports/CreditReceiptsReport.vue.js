@@ -2,10 +2,11 @@ import { computed, onMounted, ref } from "vue";
 import "@majidh1/jalalidatepicker";
 import "@majidh1/jalalidatepicker/dist/jalalidatepicker.min.css";
 import { can } from "../../../components/acl/can";
-import { loadDesktopCreditTransactions, } from "../../../services/desktopApi";
+import { loadDesktopCreditTransactions } from "../../../services/desktopApi";
 import { exportToExcel } from "../../utils/exportExcel";
 import { setupJalaliDateInputs } from "../../../utilities";
 import { useDesktopToastMessage } from "../useDesktopToastMessage";
+import { escapeHtml, formatMoney, money, moneyPair, printReceipt, reportRange } from "./receiptPrint";
 const from = ref("");
 const to = ref("");
 const q = ref("");
@@ -24,20 +25,14 @@ const creditUseTotal = computed(() => sumByType([2]));
 const cashReceiptTotal = computed(() => sumByType([3]));
 const refundTotal = computed(() => sumByType([4]));
 onMounted(() => {
-    setupDatePicker();
+    setupJalaliDateInputs();
     loadReport();
 });
-function setupDatePicker() {
-    setupJalaliDateInputs();
-}
 async function loadReport() {
     loading.value = true;
     message.value = "";
     try {
-        rows.value = await loadDesktopCreditTransactions({
-            FromDate: from.value.trim(),
-            ToDate: to.value.trim(),
-        });
+        rows.value = await loadDesktopCreditTransactions({ FromDate: from.value.trim(), ToDate: to.value.trim() });
         if (!rows.value.length)
             message.value = "رسید مالی برای این بازه پیدا نشد";
     }
@@ -49,29 +44,17 @@ async function loadReport() {
         loading.value = false;
     }
 }
-function amount(value) {
-    const n = Number(value);
-    return Number.isFinite(n) ? n : 0;
-}
 function sumByType(types) {
-    return filtered.value
-        .filter((row) => types.includes(Number(row.TransactionType)))
-        .reduce((sum, row) => sum + amount(row.Amount), 0);
+    return filtered.value.filter((row) => types.includes(Number(row.TransactionType))).reduce((sum, row) => sum + money(row.Amount), 0);
 }
 function exportExcel() {
     if (!can("reports.export.excel"))
         return;
-    exportToExcel(filtered.value, [
-        { key: "TransactionId", title: "شماره رسید" },
-        { key: "TransactionDate", title: "تاریخ رسید" },
-        { key: "CustomerName", title: "مشتری" },
-        { key: "Phone", title: "موبایل" },
-        { key: "TransactionTypeName", title: "نوع رسید" },
-        { key: "Amount", title: "مبلغ" },
-        { key: "InvoiceNumber", title: "فاکتور" },
-        { key: "InvoiceDate", title: "تاریخ فاکتور" },
-        { key: "Description", title: "توضیحات" },
-    ], "credit-receipts");
+    exportToExcel(filtered.value, [{ key: "TransactionId", title: "شماره رسید" }, { key: "TransactionDate", title: "تاریخ رسید" }, { key: "CustomerName", title: "مشتری" }, { key: "Phone", title: "موبایل" }, { key: "TransactionTypeName", title: "نوع رسید" }, { key: "Amount", title: "مبلغ" }, { key: "InvoiceNumber", title: "فاکتور" }, { key: "InvoiceDate", title: "تاریخ فاکتور" }, { key: "Description", title: "توضیحات" }], "credit-receipts");
+}
+function printCreditReceiptsReport() {
+    const rowsHtml = filtered.value.map((row) => `<tr><td>${escapeHtml(row.TransactionId)}</td><td>${escapeHtml(row.TransactionTypeName)}</td><td>${escapeHtml(row.CustomerName || "-")}</td><td class="num">${formatMoney(row.Amount)}</td></tr>`).join("");
+    printReceipt("رسیدهای اعتبار", reportRange(from.value, to.value), `<div class="section"><div class="section-title">سرجمع رسیدها</div>${moneyPair("افزایش اعتبار", increaseTotal.value)}${moneyPair("مصرف اعتبار", creditUseTotal.value)}${moneyPair("پرداخت نقدی", cashReceiptTotal.value)}${moneyPair("عودت", refundTotal.value)}${moneyPair("تعداد رسید", filtered.value.length)}</div><div class="section"><div class="section-title">رسیدها</div><table><thead><tr><th>#</th><th>نوع</th><th>مشتری</th><th class="num">مبلغ</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>`);
 }
 debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
@@ -135,6 +118,11 @@ if (__VLS_ctx.can('reports.export.excel')) {
         disabled: (!__VLS_ctx.filtered.length),
     });
 }
+__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+    ...{ onClick: (__VLS_ctx.printCreditReceiptsReport) },
+    ...{ class: "cr-btn" },
+    disabled: (!__VLS_ctx.filtered.length),
+});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "cr-summary" },
 });
@@ -213,7 +201,7 @@ for (const [row] of __VLS_getVForSourceType((__VLS_ctx.filtered))) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "bold" },
     });
-    (__VLS_ctx.amount(row.Amount).toLocaleString());
+    (__VLS_ctx.money(row.Amount).toLocaleString());
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
     (row.InvoiceNumber || "-");
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
@@ -226,6 +214,7 @@ for (const [row] of __VLS_getVForSourceType((__VLS_ctx.filtered))) {
 /** @type {__VLS_StyleScopedClasses['cr-input']} */ ;
 /** @type {__VLS_StyleScopedClasses['cr-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['primary']} */ ;
+/** @type {__VLS_StyleScopedClasses['cr-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['cr-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['cr-summary']} */ ;
 /** @type {__VLS_StyleScopedClasses['green']} */ ;
@@ -247,6 +236,7 @@ const __VLS_self = (await import('vue')).defineComponent({
     setup() {
         return {
             can: can,
+            money: money,
             from: from,
             to: to,
             q: q,
@@ -258,8 +248,8 @@ const __VLS_self = (await import('vue')).defineComponent({
             cashReceiptTotal: cashReceiptTotal,
             refundTotal: refundTotal,
             loadReport: loadReport,
-            amount: amount,
             exportExcel: exportExcel,
+            printCreditReceiptsReport: printCreditReceiptsReport,
         };
     },
 });

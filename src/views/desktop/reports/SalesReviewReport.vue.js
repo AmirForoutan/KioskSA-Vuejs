@@ -7,10 +7,12 @@ import { deleteDesktopInvoice, loadDesktopInvoices, loadDesktopInvoiceItems, pri
 import { exportToExcel } from "../../utils/exportExcel";
 import { setupJalaliDateInputs } from "../../../utilities";
 import { useDesktopToastMessage } from "../useDesktopToastMessage";
+import { escapeHtml, formatMoney, money, moneyPair, printReceipt, reportRange } from "./receiptPrint";
 const from = ref("");
 const to = ref("");
 const q = ref("");
 const loading = ref(false);
+const printLoading = ref(false);
 const message = ref("");
 const rows = ref([]);
 useDesktopToastMessage(message);
@@ -29,33 +31,29 @@ const filtered = computed(() => {
         return haystack.includes(s);
     });
 });
-const totalPayable = computed(() => filtered.value.reduce((sum, row) => sum + amount(row.Payable), 0));
+const totalRaw = computed(() => filtered.value.reduce((sum, row) => sum + money(row.Price), 0));
+const totalPayable = computed(() => filtered.value.reduce((sum, row) => sum + money(row.Payable), 0));
 const totalDiscount = computed(() => filtered.value.reduce((sum, row) => sum + invoiceDiscount(row), 0));
-const totalTax = computed(() => filtered.value.reduce((sum, row) => sum + amount(row.Tax), 0));
+const totalTax = computed(() => filtered.value.reduce((sum, row) => sum + money(row.Tax), 0));
+const totalPacking = computed(() => filtered.value.reduce((sum, row) => sum + money(row.PackingPrice), 0));
 const totalPos = computed(() => filtered.value.reduce((sum, row) => sum + paymentPart(row, "pos"), 0));
 const totalCash = computed(() => filtered.value.reduce((sum, row) => sum + paymentPart(row, "cash"), 0));
 const totalCredit = computed(() => filtered.value.reduce((sum, row) => sum + paymentPart(row, "credit"), 0));
 const totalRefund = computed(() => filtered.value.reduce((sum, row) => sum + refundAmount(row), 0));
 const totalNetPaid = computed(() => filtered.value.reduce((sum, row) => sum + netPaidAmount(row), 0));
 onMounted(() => {
-    setupDatePicker();
+    setupJalaliDateInputs();
     loadReport();
     window.addEventListener("click", closeContextMenu);
 });
 onBeforeUnmount(() => {
     window.removeEventListener("click", closeContextMenu);
 });
-function setupDatePicker() {
-    setupJalaliDateInputs();
-}
 async function loadReport() {
     loading.value = true;
     message.value = "";
     try {
-        rows.value = await loadDesktopInvoices({
-            FromDate: from.value.trim(),
-            ToDate: to.value.trim(),
-        });
+        rows.value = await loadDesktopInvoices({ FromDate: from.value.trim(), ToDate: to.value.trim() });
         if (!rows.value.length)
             message.value = "فاکتوری برای این بازه پیدا نشد";
     }
@@ -67,15 +65,11 @@ async function loadReport() {
         loading.value = false;
     }
 }
-function amount(value) {
-    const n = Number(value);
-    return Number.isFinite(n) ? n : 0;
-}
 function optionalAmount(row, ...keys) {
     for (const key of keys) {
         const value = row[key];
         if (value !== undefined && value !== null && value !== "")
-            return amount(value);
+            return money(value);
     }
     return null;
 }
@@ -83,15 +77,12 @@ function invoiceDiscount(row) {
     return optionalAmount(row, "Discount", "InvoiceDiscount", "TotalDiscount", "discount", "invoiceDiscount", "totalDiscount") ?? 0;
 }
 function paymentPart(row, key) {
-    const pos = amount(row.PosPrice);
-    const cash = amount(row.CashPrice);
-    const credit = amount(row.CreditPrice);
-    const hasReceiptData = Boolean(row.HasFinancialReceipts ?? row.hasFinancialReceipts) ||
-        optionalAmount(row, "ReceivedAmount", "receivedAmount") !== null ||
-        refundAmount(row) > 0;
-    if (pos + cash + credit === 0 && amount(row.Payable) > 0 && !hasReceiptData) {
-        return key === "pos" ? amount(row.Payable) : 0;
-    }
+    const pos = money(row.PosPrice);
+    const cash = money(row.CashPrice);
+    const credit = money(row.CreditPrice);
+    const hasReceiptData = Boolean(row.HasFinancialReceipts ?? row.hasFinancialReceipts) || optionalAmount(row, "ReceivedAmount", "receivedAmount") !== null || refundAmount(row) > 0;
+    if (pos + cash + credit === 0 && money(row.Payable) > 0 && !hasReceiptData)
+        return key === "pos" ? money(row.Payable) : 0;
     if (key === "cash")
         return cash;
     if (key === "credit")
@@ -178,32 +169,53 @@ async function printInvoice(row, usage) {
 function exportExcel() {
     if (!can("reports.export.excel"))
         return;
-    exportToExcel(filtered.value.map((row) => ({
-        ...row,
-        Discount: invoiceDiscount(row),
-        CashPrice: paymentPart(row, "cash"),
-        PosPrice: paymentPart(row, "pos"),
-        CreditPrice: paymentPart(row, "credit"),
-        RefundAmount: refundAmount(row),
-        NetPaidAmount: netPaidAmount(row),
-    })), [
-        { key: "SaleInvoiceNumberDay", title: "شماره روزانه" },
-        { key: "OrderDate", title: "تاریخ" },
-        { key: "OrderTime", title: "ساعت ثبت" },
-        { key: "CustomerName", title: "مشتری فاکتور" },
-        { key: "Phone", title: "موبایل" },
-        { key: "InvoiceTypeName", title: "نوع سفارش" },
-        { key: "Price", title: "جمع خام" },
-        { key: "Discount", title: "تخفیف" },
-        { key: "Tax", title: "مالیات" },
-        { key: "PackingPrice", title: "بسته‌بندی" },
-        { key: "CashPrice", title: "نقدی" },
-        { key: "PosPrice", title: "کارتخوان" },
-        { key: "CreditPrice", title: "اعتباری" },
-        { key: "RefundAmount", title: "عودت" },
-        { key: "NetPaidAmount", title: "خالص تسویه" },
-        { key: "Payable", title: "قابل پرداخت" },
+    exportToExcel(filtered.value.map((row) => ({ ...row, Discount: invoiceDiscount(row), CashPrice: paymentPart(row, "cash"), PosPrice: paymentPart(row, "pos"), CreditPrice: paymentPart(row, "credit"), RefundAmount: refundAmount(row), NetPaidAmount: netPaidAmount(row) })), [
+        { key: "SaleInvoiceNumberDay", title: "شماره روزانه" }, { key: "OrderDate", title: "تاریخ" }, { key: "OrderTime", title: "ساعت ثبت" }, { key: "CustomerName", title: "مشتری فاکتور" }, { key: "Phone", title: "موبایل" }, { key: "InvoiceTypeName", title: "نوع سفارش" }, { key: "Price", title: "جمع خام" }, { key: "Discount", title: "تخفیف" }, { key: "Tax", title: "مالیات" }, { key: "PackingPrice", title: "بسته‌بندی" }, { key: "CashPrice", title: "نقدی" }, { key: "PosPrice", title: "کارتخوان" }, { key: "CreditPrice", title: "اعتباری" }, { key: "RefundAmount", title: "عودت" }, { key: "NetPaidAmount", title: "خالص تسویه" }, { key: "Payable", title: "قابل پرداخت" },
     ], "sales-review");
+}
+function printSalesSummaryReport() {
+    const payments = [moneyPair("نقدی", totalCash.value), moneyPair("کارتخوان", totalPos.value), moneyPair("اعتباری", totalCredit.value), moneyPair("عودت", totalRefund.value), moneyPair("خالص تسویه", totalNetPaid.value)].join("");
+    printReceipt("سرجمع فروش و تسویه", reportRange(from.value, to.value), `<div class="section"><div class="section-title">سرجمع فروش</div>
+      ${moneyPair("تعداد فاکتور", filtered.value.length)}${moneyPair("جمع خام", totalRaw.value)}${moneyPair("جمع تخفیف", totalDiscount.value)}${moneyPair("مالیات", totalTax.value)}${moneyPair("بسته‌بندی", totalPacking.value)}${moneyPair("قابل پرداخت", totalPayable.value)}
+    </div><div class="section"><div class="section-title">نحوه تسویه</div>${payments}</div>`);
+}
+function normalizeItemForPrint(item) {
+    const quantity = money(item.Quantity ?? item.Count ?? item.GoodsCount ?? 1);
+    const unitPrice = money(item.Price ?? item.GoodsPrice ?? item.ProductPrice);
+    const goodsName = String(item.GoodsName || item.ProductTitle || item.ProductName || item.GoodsCode || item.ProductCode || item.GoodsId || "کالای نامشخص");
+    const total = money(item.TotalPrice ?? item.Payable ?? item.SumPrice ?? item.SumItem ?? item.GoodsSumItem) || unitPrice * quantity;
+    return { goodsKey: String(item.GoodsId || item.ProductId || item.GoodsCode || item.ProductCode || goodsName), goodsName, quantity, total };
+}
+async function printSalesItemsReport() {
+    if (!filtered.value.length || printLoading.value)
+        return;
+    printLoading.value = true;
+    message.value = "";
+    try {
+        const nested = await Promise.all(filtered.value.map(async (invoice) => {
+            try {
+                const items = await loadDesktopInvoiceItems(invoice.SaleInvoiceId);
+                return items.map(normalizeItemForPrint);
+            }
+            catch {
+                return [];
+            }
+        }));
+        const map = new Map();
+        nested.flat().forEach((line) => {
+            const current = map.get(line.goodsKey) || { goodsKey: line.goodsKey, goodsName: line.goodsName, quantity: 0, total: 0 };
+            current.quantity += line.quantity;
+            current.total += line.total;
+            map.set(line.goodsKey, current);
+        });
+        const items = Array.from(map.values()).sort((a, b) => b.total - a.total);
+        const itemRows = items.map((row) => `<tr><td>${escapeHtml(row.goodsName)}</td><td class="num">${formatMoney(row.quantity)}</td><td class="num">${formatMoney(row.total)}</td></tr>`).join("");
+        printReceipt("جمع فروش به همراه اقلام", reportRange(from.value, to.value), `<div class="section"><div class="section-title">سرجمع</div>${moneyPair("جمع فروش", totalPayable.value)}${moneyPair("جمع تخفیف", totalDiscount.value)}${moneyPair("تعداد فاکتور", filtered.value.length)}</div>
+      <div class="section"><div class="section-title">گزارش اقلام</div><table><thead><tr><th>کالا</th><th class="num">تعداد</th><th class="num">مبلغ</th></tr></thead><tbody>${itemRows}</tbody></table></div>`);
+    }
+    finally {
+        printLoading.value = false;
+    }
 }
 debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
@@ -229,14 +241,8 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['r-mini']} */ ;
 /** @type {__VLS_StyleScopedClasses['row-context-menu']} */ ;
 /** @type {__VLS_StyleScopedClasses['row-context-menu']} */ ;
-/** @type {__VLS_StyleScopedClasses['edit-actions']} */ ;
-/** @type {__VLS_StyleScopedClasses['edit-head']} */ ;
-/** @type {__VLS_StyleScopedClasses['edit-body']} */ ;
-/** @type {__VLS_StyleScopedClasses['edit-body']} */ ;
-/** @type {__VLS_StyleScopedClasses['r-input']} */ ;
 /** @type {__VLS_StyleScopedClasses['r-toolbar']} */ ;
 /** @type {__VLS_StyleScopedClasses['r-summary']} */ ;
-/** @type {__VLS_StyleScopedClasses['edit-body']} */ ;
 // CSS variable injection 
 // CSS variable injection end 
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
@@ -277,6 +283,17 @@ if (__VLS_ctx.can('reports.export.excel')) {
         disabled: (!__VLS_ctx.filtered.length),
     });
 }
+__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+    ...{ onClick: (__VLS_ctx.printSalesSummaryReport) },
+    ...{ class: "r-btn" },
+    disabled: (!__VLS_ctx.filtered.length),
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+    ...{ onClick: (__VLS_ctx.printSalesItemsReport) },
+    ...{ class: "r-btn" },
+    disabled: (!__VLS_ctx.filtered.length || __VLS_ctx.printLoading),
+});
+(__VLS_ctx.printLoading ? "آماده‌سازی" : "چاپ فروش اقلام");
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "r-summary" },
 });
@@ -384,15 +401,15 @@ for (const [row] of __VLS_getVForSourceType((__VLS_ctx.filtered))) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
     (row.InvoiceTypeName);
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
-    (__VLS_ctx.amount(row.Price).toLocaleString());
+    (__VLS_ctx.money(row.Price).toLocaleString());
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "pay discount" },
     });
     (__VLS_ctx.invoiceDiscount(row).toLocaleString());
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
-    (__VLS_ctx.amount(row.Tax).toLocaleString());
+    (__VLS_ctx.money(row.Tax).toLocaleString());
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
-    (__VLS_ctx.amount(row.PackingPrice).toLocaleString());
+    (__VLS_ctx.money(row.PackingPrice).toLocaleString());
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "pay cash" },
     });
@@ -418,7 +435,7 @@ for (const [row] of __VLS_getVForSourceType((__VLS_ctx.filtered))) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "bold" },
     });
-    (__VLS_ctx.amount(row.Payable).toLocaleString());
+    (__VLS_ctx.money(row.Payable).toLocaleString());
     if (__VLS_ctx.canManageInvoices) {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
             ...{ class: "row-actions" },
@@ -481,6 +498,8 @@ if (__VLS_ctx.contextMenu) {
 /** @type {__VLS_StyleScopedClasses['r-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['primary']} */ ;
 /** @type {__VLS_StyleScopedClasses['r-btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['r-btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['r-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['r-summary']} */ ;
 /** @type {__VLS_StyleScopedClasses['r-message']} */ ;
 /** @type {__VLS_StyleScopedClasses['r-table']} */ ;
@@ -516,10 +535,12 @@ const __VLS_self = (await import('vue')).defineComponent({
     setup() {
         return {
             can: can,
+            money: money,
             from: from,
             to: to,
             q: q,
             loading: loading,
+            printLoading: printLoading,
             message: message,
             editingInvoiceId: editingInvoiceId,
             deletingInvoiceId: deletingInvoiceId,
@@ -537,7 +558,6 @@ const __VLS_self = (await import('vue')).defineComponent({
             totalRefund: totalRefund,
             totalNetPaid: totalNetPaid,
             loadReport: loadReport,
-            amount: amount,
             invoiceDiscount: invoiceDiscount,
             paymentPart: paymentPart,
             refundAmount: refundAmount,
@@ -547,6 +567,8 @@ const __VLS_self = (await import('vue')).defineComponent({
             openContextMenu: openContextMenu,
             printInvoice: printInvoice,
             exportExcel: exportExcel,
+            printSalesSummaryReport: printSalesSummaryReport,
+            printSalesItemsReport: printSalesItemsReport,
         };
     },
 });

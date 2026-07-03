@@ -2,10 +2,11 @@ import { computed, onMounted, ref } from "vue";
 import "@majidh1/jalalidatepicker";
 import "@majidh1/jalalidatepicker/dist/jalalidatepicker.min.css";
 import { can } from "../../../components/acl/can";
-import { loadDesktopInvoiceItems, loadDesktopInvoices, } from "../../../services/desktopApi";
+import { loadDesktopInvoiceItems, loadDesktopInvoices } from "../../../services/desktopApi";
 import { exportToExcel } from "../../utils/exportExcel";
 import { setupJalaliDateInputs } from "../../../utilities";
 import { useDesktopToastMessage } from "../useDesktopToastMessage";
+import { escapeHtml, formatMoney, money, moneyPair, printReceipt, reportRange } from "./receiptPrint";
 const from = ref("");
 const to = ref("");
 const q = ref("");
@@ -14,11 +15,11 @@ const detailLoading = ref(false);
 const message = ref("");
 const detailMessage = ref("");
 const rows = ref([]);
-useDesktopToastMessage(message);
-useDesktopToastMessage(detailMessage);
 const selectedKey = ref("");
 const activeView = ref("summary");
 const detailLines = ref([]);
+useDesktopToastMessage(message);
+useDesktopToastMessage(detailMessage);
 const filtered = computed(() => {
     const s = q.value.trim();
     if (!s)
@@ -27,16 +28,12 @@ const filtered = computed(() => {
 });
 const selectedCustomer = computed(() => rows.value.find((row) => row.key === selectedKey.value) || null);
 const totalSales = computed(() => filtered.value.reduce((sum, row) => sum + row.totalSales, 0));
+const totalDiscount = computed(() => filtered.value.reduce((sum, row) => sum + row.totalDiscount, 0));
 const totalCredit = computed(() => filtered.value.reduce((sum, row) => sum + row.totalCredit, 0));
 const itemSummary = computed(() => {
     const map = new Map();
     detailLines.value.forEach((line) => {
-        const current = map.get(line.goodsKey) || {
-            goodsName: line.goodsName,
-            quantity: 0,
-            total: 0,
-            invoiceCount: 0,
-        };
+        const current = map.get(line.goodsKey) || { goodsName: line.goodsName, quantity: 0, total: 0, invoiceCount: 0 };
         current.quantity += line.quantity;
         current.total += line.total;
         current.invoiceCount += 1;
@@ -45,12 +42,9 @@ const itemSummary = computed(() => {
     return Array.from(map.values()).sort((a, b) => b.total - a.total);
 });
 onMounted(() => {
-    setupDatePicker();
+    setupJalaliDateInputs();
     loadReport();
 });
-function setupDatePicker() {
-    setupJalaliDateInputs();
-}
 async function loadReport() {
     loading.value = true;
     message.value = "";
@@ -58,10 +52,7 @@ async function loadReport() {
     activeView.value = "summary";
     detailLines.value = [];
     try {
-        const invoices = await loadDesktopInvoices({
-            FromDate: from.value.trim(),
-            ToDate: to.value.trim(),
-        });
+        const invoices = await loadDesktopInvoices({ FromDate: from.value.trim(), ToDate: to.value.trim() });
         rows.value = groupByCustomer(invoices);
         if (!rows.value.length)
             message.value = "داده‌ای برای این بازه پیدا نشد";
@@ -84,13 +75,23 @@ function customerKey(invoice) {
     const name = String(invoice.CustomerName || "unknown").trim().toLowerCase();
     return `name-${name || "unknown"}`;
 }
-function paymentPart(row, key) {
-    const pos = amount(row.PosPrice);
-    const cash = amount(row.CashPrice);
-    const credit = amount(row.CreditPrice);
-    if (pos + cash + credit === 0 && amount(row.Payable) > 0) {
-        return key === "pos" ? amount(row.Payable) : 0;
+function optionalAmount(row, ...keys) {
+    for (const key of keys) {
+        const value = row[key];
+        if (value !== undefined && value !== null && value !== "")
+            return money(value);
     }
+    return null;
+}
+function invoiceDiscount(row) {
+    return optionalAmount(row, "Discount", "InvoiceDiscount", "TotalDiscount", "discount", "invoiceDiscount", "totalDiscount") ?? 0;
+}
+function paymentPart(row, key) {
+    const pos = money(row.PosPrice);
+    const cash = money(row.CashPrice);
+    const credit = money(row.CreditPrice);
+    if (pos + cash + credit === 0 && money(row.Payable) > 0)
+        return key === "pos" ? money(row.Payable) : 0;
     if (key === "cash")
         return cash;
     if (key === "credit")
@@ -101,32 +102,16 @@ function groupByCustomer(invoices) {
     const map = new Map();
     invoices.forEach((invoice) => {
         const key = customerKey(invoice);
-        const current = map.get(key) ||
-            {
-                key,
-                customerCode: Number(invoice.CustomerCode || 0),
-                customer: invoice.CustomerName || "بدون مشتری",
-                phone: invoice.Phone || "",
-                invoiceCount: 0,
-                totalSales: 0,
-                totalTax: 0,
-                totalPacking: 0,
-                totalCash: 0,
-                totalPos: 0,
-                totalCredit: 0,
-                lastDate: invoice.OrderDate,
-                lastTime: invoice.OrderTime,
-                invoices: [],
-            };
-        if ((!current.customer || current.customer === "بدون مشتری") && invoice.CustomerName) {
+        const current = map.get(key) || { key, customerCode: Number(invoice.CustomerCode || 0), customer: invoice.CustomerName || "بدون مشتری", phone: invoice.Phone || "", invoiceCount: 0, totalSales: 0, totalDiscount: 0, totalTax: 0, totalPacking: 0, totalCash: 0, totalPos: 0, totalCredit: 0, lastDate: invoice.OrderDate, lastTime: invoice.OrderTime, invoices: [] };
+        if ((!current.customer || current.customer === "بدون مشتری") && invoice.CustomerName)
             current.customer = invoice.CustomerName;
-        }
         if (!current.phone && invoice.Phone)
             current.phone = invoice.Phone;
         current.invoiceCount += 1;
-        current.totalSales += amount(invoice.Payable);
-        current.totalTax += amount(invoice.Tax);
-        current.totalPacking += amount(invoice.PackingPrice);
+        current.totalSales += money(invoice.Payable);
+        current.totalDiscount += invoiceDiscount(invoice);
+        current.totalTax += money(invoice.Tax);
+        current.totalPacking += money(invoice.PackingPrice);
         current.totalCash += paymentPart(invoice, "cash");
         current.totalPos += paymentPart(invoice, "pos");
         current.totalCredit += paymentPart(invoice, "credit");
@@ -164,58 +149,32 @@ async function loadCustomerDetail(row) {
             }
         }));
         detailLines.value = results.flat();
-        if (!detailLines.value.length) {
+        if (!detailLines.value.length)
             detailMessage.value = "سرویس اقلام فاکتور برای این مشتری داده‌ای برنگرداند؛ فهرست فاکتورها پایین نمایش داده شده است";
-        }
     }
     finally {
         detailLoading.value = false;
     }
 }
 function normalizeItem(invoice, item) {
-    const quantity = amount(item.Quantity ?? item.Count ?? item.GoodsCount ?? 1);
-    const unitPrice = amount(item.Price ?? item.GoodsPrice ?? item.ProductPrice);
-    const total = amount(item.TotalPrice ?? item.Payable ?? item.SumPrice ?? item.SumItem ?? item.GoodsSumItem) || unitPrice * quantity;
+    const quantity = money(item.Quantity ?? item.Count ?? item.GoodsCount ?? 1);
+    const unitPrice = money(item.Price ?? item.GoodsPrice ?? item.ProductPrice);
+    const total = money(item.TotalPrice ?? item.Payable ?? item.SumPrice ?? item.SumItem ?? item.GoodsSumItem) || unitPrice * quantity;
     const goodsName = String(item.GoodsName || item.ProductTitle || item.ProductName || item.GoodsCode || item.ProductCode || item.GoodsId || "کالای نامشخص");
-    return {
-        invoiceNo: invoice.SaleInvoiceNumberDay,
-        date: invoice.OrderDate,
-        goodsKey: String(item.GoodsId || item.ProductId || item.GoodsCode || item.ProductCode || goodsName),
-        goodsName,
-        quantity,
-        total,
-    };
-}
-function amount(value) {
-    const n = Number(value);
-    return Number.isFinite(n) ? n : 0;
+    return { invoiceNo: invoice.SaleInvoiceNumberDay, date: invoice.OrderDate, goodsKey: String(item.GoodsId || item.ProductId || item.GoodsCode || item.ProductCode || goodsName), goodsName, quantity, total };
 }
 function exportExcel() {
     if (!can("reports.export.excel"))
         return;
     if (activeView.value === "detail" && selectedCustomer.value) {
-        exportToExcel(detailLines.value, [
-            { key: "invoiceNo", title: "شماره فاکتور" },
-            { key: "date", title: "تاریخ" },
-            { key: "goodsName", title: "کالا" },
-            { key: "quantity", title: "تعداد" },
-            { key: "total", title: "مبلغ" },
-        ], `customer-detail-${selectedCustomer.value.customerCode || selectedCustomer.value.phone || "selected"}`);
+        exportToExcel(detailLines.value, [{ key: "invoiceNo", title: "شماره فاکتور" }, { key: "date", title: "تاریخ" }, { key: "goodsName", title: "کالا" }, { key: "quantity", title: "تعداد" }, { key: "total", title: "مبلغ" }], `customer-detail-${selectedCustomer.value.customerCode || selectedCustomer.value.phone || "selected"}`);
         return;
     }
-    exportToExcel(filtered.value, [
-        { key: "customer", title: "مشتری" },
-        { key: "phone", title: "موبایل" },
-        { key: "invoiceCount", title: "تعداد فاکتور" },
-        { key: "totalSales", title: "جمع فروش" },
-        { key: "totalCash", title: "نقدی" },
-        { key: "totalPos", title: "کارتخوان" },
-        { key: "totalCredit", title: "اعتباری" },
-        { key: "totalTax", title: "جمع مالیات" },
-        { key: "totalPacking", title: "جمع بسته بندی" },
-        { key: "lastDate", title: "آخرین تاریخ" },
-        { key: "lastTime", title: "آخرین ساعت" },
-    ], "customer-ledger");
+    exportToExcel(filtered.value, [{ key: "customer", title: "مشتری" }, { key: "phone", title: "موبایل" }, { key: "invoiceCount", title: "تعداد فاکتور" }, { key: "totalSales", title: "جمع فروش" }, { key: "totalDiscount", title: "جمع تخفیف" }, { key: "totalCash", title: "نقدی" }, { key: "totalPos", title: "کارتخوان" }, { key: "totalCredit", title: "اعتباری" }, { key: "totalTax", title: "جمع مالیات" }, { key: "totalPacking", title: "جمع بسته بندی" }, { key: "lastDate", title: "آخرین تاریخ" }, { key: "lastTime", title: "آخرین ساعت" }], "customer-ledger");
+}
+function printCustomerReport() {
+    const rowsHtml = filtered.value.map((row) => `<tr><td>${escapeHtml(row.customer)}</td><td class="num">${row.invoiceCount.toLocaleString("fa-IR")}</td><td class="num">${formatMoney(row.totalSales)}</td><td class="num">${formatMoney(row.totalDiscount)}</td></tr>`).join("");
+    printReceipt("گزارش مشتریان", reportRange(from.value, to.value), `<div class="section"><div class="section-title">سرجمع مشتریان</div>${moneyPair("تعداد مشتری", filtered.value.length)}${moneyPair("جمع فروش", totalSales.value)}${moneyPair("جمع تخفیف", totalDiscount.value)}${moneyPair("جمع اعتباری", totalCredit.value)}</div><div class="section"><div class="section-title">مشتریان</div><table><thead><tr><th>مشتری</th><th class="num">فاکتور</th><th class="num">فروش</th><th class="num">تخفیف</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>`);
 }
 debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
@@ -231,6 +190,7 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['cl-tr']} */ ;
 /** @type {__VLS_StyleScopedClasses['cl-tr']} */ ;
 /** @type {__VLS_StyleScopedClasses['cl-tr']} */ ;
+/** @type {__VLS_StyleScopedClasses['pay']} */ ;
 /** @type {__VLS_StyleScopedClasses['pay']} */ ;
 /** @type {__VLS_StyleScopedClasses['pay']} */ ;
 /** @type {__VLS_StyleScopedClasses['pay']} */ ;
@@ -282,6 +242,11 @@ if (__VLS_ctx.can('reports.export.excel')) {
         disabled: (!__VLS_ctx.filtered.length),
     });
 }
+__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+    ...{ onClick: (__VLS_ctx.printCustomerReport) },
+    ...{ class: "cl-btn" },
+    disabled: (!__VLS_ctx.filtered.length),
+});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "cl-tabs" },
 });
@@ -316,6 +281,10 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.b, __VLS_intrinsicElements.b)(
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.b, __VLS_intrinsicElements.b)({});
+(__VLS_ctx.totalDiscount.toLocaleString());
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.b, __VLS_intrinsicElements.b)({});
 (__VLS_ctx.totalCredit.toLocaleString());
 if (__VLS_ctx.selectedCustomer) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
@@ -336,6 +305,7 @@ if (__VLS_ctx.activeView === 'summary') {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "cl-tr summary cl-th" },
     });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
@@ -378,6 +348,10 @@ if (__VLS_ctx.activeView === 'summary') {
         });
         (row.totalSales.toLocaleString());
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "pay discount" },
+        });
+        (row.totalDiscount.toLocaleString());
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
             ...{ class: "pay cash" },
         });
         (row.totalCash.toLocaleString());
@@ -414,6 +388,7 @@ else if (__VLS_ctx.selectedCustomer) {
     });
     (__VLS_ctx.selectedCustomer.invoiceCount.toLocaleString());
     (__VLS_ctx.selectedCustomer.totalSales.toLocaleString());
+    (__VLS_ctx.selectedCustomer.totalDiscount.toLocaleString());
     __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
         ...{ onClick: (...[$event]) => {
                 if (!!(__VLS_ctx.activeView === 'summary'))
@@ -463,6 +438,7 @@ else if (__VLS_ctx.selectedCustomer) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
     for (const [invoice] of __VLS_getVForSourceType((__VLS_ctx.selectedCustomer.invoices))) {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
             key: (invoice.SaleInvoiceId),
@@ -477,6 +453,8 @@ else if (__VLS_ctx.selectedCustomer) {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
         (invoice.InvoiceTypeName);
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
+        (__VLS_ctx.invoiceDiscount(invoice).toLocaleString());
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
         (__VLS_ctx.paymentPart(invoice, "cash").toLocaleString());
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
         (__VLS_ctx.paymentPart(invoice, "pos").toLocaleString());
@@ -485,7 +463,7 @@ else if (__VLS_ctx.selectedCustomer) {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
             ...{ class: "bold" },
         });
-        (__VLS_ctx.amount(invoice.Payable).toLocaleString());
+        (__VLS_ctx.money(invoice.Payable).toLocaleString());
     }
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "cl-table" },
@@ -534,6 +512,7 @@ else if (__VLS_ctx.selectedCustomer) {
 /** @type {__VLS_StyleScopedClasses['cl-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['primary']} */ ;
 /** @type {__VLS_StyleScopedClasses['cl-btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['cl-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['cl-tabs']} */ ;
 /** @type {__VLS_StyleScopedClasses['active']} */ ;
 /** @type {__VLS_StyleScopedClasses['active']} */ ;
@@ -548,6 +527,8 @@ else if (__VLS_ctx.selectedCustomer) {
 /** @type {__VLS_StyleScopedClasses['summary']} */ ;
 /** @type {__VLS_StyleScopedClasses['bold']} */ ;
 /** @type {__VLS_StyleScopedClasses['bold']} */ ;
+/** @type {__VLS_StyleScopedClasses['pay']} */ ;
+/** @type {__VLS_StyleScopedClasses['discount']} */ ;
 /** @type {__VLS_StyleScopedClasses['pay']} */ ;
 /** @type {__VLS_StyleScopedClasses['cash']} */ ;
 /** @type {__VLS_StyleScopedClasses['pay']} */ ;
@@ -585,6 +566,7 @@ const __VLS_self = (await import('vue')).defineComponent({
     setup() {
         return {
             can: can,
+            money: money,
             from: from,
             to: to,
             q: q,
@@ -598,13 +580,15 @@ const __VLS_self = (await import('vue')).defineComponent({
             filtered: filtered,
             selectedCustomer: selectedCustomer,
             totalSales: totalSales,
+            totalDiscount: totalDiscount,
             totalCredit: totalCredit,
             itemSummary: itemSummary,
             loadReport: loadReport,
+            invoiceDiscount: invoiceDiscount,
             paymentPart: paymentPart,
             toggleCustomer: toggleCustomer,
-            amount: amount,
             exportExcel: exportExcel,
+            printCustomerReport: printCustomerReport,
         };
     },
 });

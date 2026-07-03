@@ -2,10 +2,11 @@ import { computed, onMounted, ref } from "vue";
 import "@majidh1/jalalidatepicker";
 import "@majidh1/jalalidatepicker/dist/jalalidatepicker.min.css";
 import { can } from "../../../components/acl/can";
-import { loadDesktopInvoiceItems, loadDesktopInvoices, } from "../../../services/desktopApi";
+import { loadDesktopInvoiceItems, loadDesktopInvoices } from "../../../services/desktopApi";
 import { exportToExcel } from "../../utils/exportExcel";
 import { setupJalaliDateInputs } from "../../../utilities";
 import { useDesktopToastMessage } from "../useDesktopToastMessage";
+import { escapeHtml, formatMoney, money, moneyPair, printReceipt, reportRange } from "./receiptPrint";
 const modes = [
     { key: "summary", title: "سرجمع اقلام" },
     { key: "date", title: "تفکیک تاریخی" },
@@ -18,8 +19,8 @@ const q = ref("");
 const loading = ref(false);
 const message = ref("");
 const invoices = ref([]);
-useDesktopToastMessage(message);
 const lines = ref([]);
+useDesktopToastMessage(message);
 const filteredLines = computed(() => {
     const s = q.value.trim();
     if (!s)
@@ -29,12 +30,7 @@ const filteredLines = computed(() => {
 const summaryRows = computed(() => {
     const map = new Map();
     filteredLines.value.forEach((line) => {
-        const current = map.get(line.goodsKey) || {
-            goodsName: line.goodsName,
-            quantity: 0,
-            invoiceCount: 0,
-            total: 0,
-        };
+        const current = map.get(line.goodsKey) || { goodsName: line.goodsName, quantity: 0, invoiceCount: 0, total: 0 };
         current.quantity = Number(current.quantity) + line.quantity;
         current.total = Number(current.total) + line.total;
         current.invoiceCount = Number(current.invoiceCount) + 1;
@@ -46,13 +42,7 @@ const dateRows = computed(() => {
     const map = new Map();
     filteredLines.value.forEach((line) => {
         const key = `${line.date}-${line.goodsKey}`;
-        const current = map.get(key) || {
-            date: line.date,
-            goodsName: line.goodsName,
-            quantity: 0,
-            invoiceCount: 0,
-            total: 0,
-        };
+        const current = map.get(key) || { date: line.date, goodsName: line.goodsName, quantity: 0, invoiceCount: 0, total: 0 };
         current.quantity = Number(current.quantity) + line.quantity;
         current.total = Number(current.total) + line.total;
         current.invoiceCount = Number(current.invoiceCount) + 1;
@@ -60,32 +50,16 @@ const dateRows = computed(() => {
     });
     return Array.from(map.values()).sort((a, b) => String(b.date).localeCompare(String(a.date)));
 });
-const invoiceRows = computed(() => filteredLines.value.map((line) => ({
-    invoiceNo: line.invoiceNo,
-    date: line.date,
-    customer: line.customer || "بدون مشتری",
-    goodsName: line.goodsName,
-    quantity: line.quantity,
-    total: line.total,
-})));
-const activeRows = computed(() => {
-    if (activeMode.value === "date")
-        return dateRows.value;
-    if (activeMode.value === "invoice")
-        return invoiceRows.value;
-    return summaryRows.value;
-});
+const invoiceRows = computed(() => filteredLines.value.map((line) => ({ invoiceNo: line.invoiceNo, date: line.date, customer: line.customer || "بدون مشتری", goodsName: line.goodsName, quantity: line.quantity, total: line.total })));
+const activeRows = computed(() => activeMode.value === "date" ? dateRows.value : activeMode.value === "invoice" ? invoiceRows.value : summaryRows.value);
 const topItems = computed(() => summaryRows.value.slice(0, 8));
 const maxItemTotal = computed(() => Math.max(1, ...topItems.value.map((row) => Number(row.total))));
 const totalItemsSale = computed(() => filteredLines.value.reduce((sum, row) => sum + row.total, 0));
 const totalQuantity = computed(() => filteredLines.value.reduce((sum, row) => sum + row.quantity, 0));
 onMounted(() => {
-    setupDatePicker();
+    setupJalaliDateInputs();
     loadReport();
 });
-function setupDatePicker() {
-    setupJalaliDateInputs();
-}
 async function loadReport() {
     loading.value = true;
     message.value = "";
@@ -102,9 +76,8 @@ async function loadReport() {
             }
         }));
         lines.value = allItems.flat();
-        if (!lines.value.length) {
+        if (!lines.value.length)
             message.value = "سرویس اقلام فاکتور داده‌ای برنگرداند؛ برای این گزارش endpoint /getinvoiceitems باید آیتم‌های هر فاکتور را برگرداند";
-        }
     }
     catch (error) {
         message.value = error instanceof Error ? error.message : "خطا در دریافت گزارش فروش اقلام";
@@ -114,53 +87,32 @@ async function loadReport() {
     }
 }
 function normalizeItem(invoice, item) {
-    const quantity = amount(item.Quantity ?? item.Count ?? item.GoodsCount ?? 1);
-    const unitPrice = amount(item.Price ?? item.GoodsPrice ?? item.ProductPrice);
-    const total = amount(item.TotalPrice ?? item.Payable ?? item.SumPrice ?? item.SumItem ?? item.GoodsSumItem) || unitPrice * quantity;
+    const quantity = money(item.Quantity ?? item.Count ?? item.GoodsCount ?? 1);
+    const unitPrice = money(item.Price ?? item.GoodsPrice ?? item.ProductPrice);
+    const total = money(item.TotalPrice ?? item.Payable ?? item.SumPrice ?? item.SumItem ?? item.GoodsSumItem) || unitPrice * quantity;
     const goodsName = String(item.GoodsName || item.ProductTitle || item.ProductName || item.GoodsCode || item.ProductCode || item.GoodsId || "کالای نامشخص");
-    return {
-        invoiceId: invoice.SaleInvoiceId,
-        invoiceNo: invoice.SaleInvoiceNumberDay,
-        date: invoice.OrderDate,
-        customer: invoice.CustomerName || "",
-        phone: invoice.Phone || "",
-        goodsKey: String(item.GoodsId || item.ProductId || item.GoodsCode || item.ProductCode || goodsName),
-        goodsName,
-        quantity,
-        total,
-    };
-}
-function amount(value) {
-    const n = Number(value);
-    return Number.isFinite(n) ? n : 0;
+    return { invoiceId: invoice.SaleInvoiceId, invoiceNo: invoice.SaleInvoiceNumberDay, date: invoice.OrderDate, customer: invoice.CustomerName || "", phone: invoice.Phone || "", goodsKey: String(item.GoodsId || item.ProductId || item.GoodsCode || item.ProductCode || goodsName), goodsName, quantity, total };
 }
 function exportExcel() {
     if (!can("reports.export.excel"))
         return;
     const columns = activeMode.value === "invoice"
-        ? [
-            { key: "invoiceNo", title: "شماره فاکتور" },
-            { key: "date", title: "تاریخ" },
-            { key: "customer", title: "مشتری" },
-            { key: "goodsName", title: "کالا" },
-            { key: "quantity", title: "تعداد" },
-            { key: "total", title: "مبلغ" },
-        ]
+        ? [{ key: "invoiceNo", title: "شماره فاکتور" }, { key: "date", title: "تاریخ" }, { key: "customer", title: "مشتری" }, { key: "goodsName", title: "کالا" }, { key: "quantity", title: "تعداد" }, { key: "total", title: "مبلغ" }]
         : activeMode.value === "date"
-            ? [
-                { key: "date", title: "تاریخ" },
-                { key: "goodsName", title: "کالا" },
-                { key: "quantity", title: "تعداد" },
-                { key: "invoiceCount", title: "تعداد ردیف فاکتور" },
-                { key: "total", title: "مبلغ" },
-            ]
-            : [
-                { key: "goodsName", title: "کالا" },
-                { key: "quantity", title: "تعداد" },
-                { key: "invoiceCount", title: "تعداد ردیف فاکتور" },
-                { key: "total", title: "مبلغ" },
-            ];
+            ? [{ key: "date", title: "تاریخ" }, { key: "goodsName", title: "کالا" }, { key: "quantity", title: "تعداد" }, { key: "invoiceCount", title: "تعداد ردیف فاکتور" }, { key: "total", title: "مبلغ" }]
+            : [{ key: "goodsName", title: "کالا" }, { key: "quantity", title: "تعداد" }, { key: "invoiceCount", title: "تعداد ردیف فاکتور" }, { key: "total", title: "مبلغ" }];
     exportToExcel(activeRows.value, columns, `item-sales-${activeMode.value}`);
+}
+function printItemReport() {
+    const rowsHtml = activeRows.value.map((row) => {
+        if (activeMode.value === "invoice")
+            return `<tr><td>${escapeHtml(row.invoiceNo)}</td><td>${escapeHtml(row.goodsName)}</td><td class="num">${formatMoney(row.quantity)}</td><td class="num">${formatMoney(row.total)}</td></tr>`;
+        if (activeMode.value === "date")
+            return `<tr><td>${escapeHtml(row.date)}</td><td>${escapeHtml(row.goodsName)}</td><td class="num">${formatMoney(row.quantity)}</td><td class="num">${formatMoney(row.total)}</td></tr>`;
+        return `<tr><td>${escapeHtml(row.goodsName)}</td><td class="num">${formatMoney(row.quantity)}</td><td class="num">${formatMoney(row.total)}</td></tr>`;
+    }).join("");
+    const headers = activeMode.value === "invoice" ? "<tr><th>فاکتور</th><th>کالا</th><th class=\"num\">تعداد</th><th class=\"num\">مبلغ</th></tr>" : activeMode.value === "date" ? "<tr><th>تاریخ</th><th>کالا</th><th class=\"num\">تعداد</th><th class=\"num\">مبلغ</th></tr>" : "<tr><th>کالا</th><th class=\"num\">تعداد</th><th class=\"num\">مبلغ</th></tr>";
+    printReceipt("گزارش فروش اقلام", reportRange(from.value, to.value), `<div class="section"><div class="section-title">سرجمع</div>${moneyPair("جمع فروش اقلام", totalItemsSale.value)}${moneyPair("تعداد اقلام", totalQuantity.value)}${moneyPair("ردیف آیتم", filteredLines.value.length)}</div><div class="section"><div class="section-title">${escapeHtml(modes.find((m) => m.key === activeMode.value)?.title || "گزارش")}</div><table><thead>${headers}</thead><tbody>${rowsHtml}</tbody></table></div>`);
 }
 debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
@@ -220,6 +172,11 @@ if (__VLS_ctx.can('reports.export.excel')) {
         disabled: (!__VLS_ctx.activeRows.length),
     });
 }
+__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+    ...{ onClick: (__VLS_ctx.printItemReport) },
+    ...{ class: "ir-btn" },
+    disabled: (!__VLS_ctx.activeRows.length),
+});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "ir-tabs" },
 });
@@ -387,6 +344,7 @@ else {
 /** @type {__VLS_StyleScopedClasses['ir-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['primary']} */ ;
 /** @type {__VLS_StyleScopedClasses['ir-btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['ir-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['ir-tabs']} */ ;
 /** @type {__VLS_StyleScopedClasses['active']} */ ;
 /** @type {__VLS_StyleScopedClasses['ir-summary']} */ ;
@@ -440,6 +398,7 @@ const __VLS_self = (await import('vue')).defineComponent({
             totalQuantity: totalQuantity,
             loadReport: loadReport,
             exportExcel: exportExcel,
+            printItemReport: printItemReport,
         };
     },
 });
