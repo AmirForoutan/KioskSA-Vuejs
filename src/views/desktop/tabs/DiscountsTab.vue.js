@@ -7,9 +7,11 @@ const loading = ref(false);
 const productLoading = ref(false);
 const productPickerOpen = ref(false);
 const productSearch = ref("");
+const customerPickerOpen = ref(false);
 const customerSearch = ref("");
 const customerLoading = ref(false);
 const customers = ref([]);
+const selectedCustomerPickerIds = ref([]);
 const message = ref("");
 const discounts = ref([]);
 const cards = ref([]);
@@ -51,6 +53,7 @@ const cardForm = reactive({
 });
 const hasMessage = computed(() => message.value.trim().length > 0);
 const selectedProductIdSet = computed(() => new Set(selectedProductIds.value));
+const selectedCustomerPickerIdSet = computed(() => new Set(selectedCustomerPickerIds.value));
 const selectedGoodsCount = computed(() => parseNumberIds(discountForm.GoodsIdsText).length);
 const selectedCustomerIds = computed(() => parseNumberIds(discountForm.CustomerIdsText));
 const selectedCustomerCount = computed(() => selectedCustomerIds.value.length);
@@ -61,6 +64,14 @@ const selectedGoodsSummary = computed(() => {
     if (ids.length <= 4)
         return ids.join(", ");
     return `${ids.slice(0, 4).join(", ")} و ${ids.length - 4} مورد دیگر`;
+});
+const selectedCustomersSummary = computed(() => {
+    const ids = selectedCustomerIds.value;
+    if (!ids.length)
+        return "عمومی؛ برای همه مشتری‌ها";
+    if (ids.length <= 5)
+        return ids.map((id) => `#${id}`).join("، ");
+    return `${ids.slice(0, 5).map((id) => `#${id}`).join("، ")} و ${ids.length - 5} مشتری دیگر`;
 });
 const filteredProducts = computed(() => {
     const q = productSearch.value.trim().toLowerCase();
@@ -194,6 +205,7 @@ function resetDiscountForm() {
         CustomerIdsText: "",
     });
     selectedProductIds.value = [];
+    selectedCustomerPickerIds.value = [];
 }
 function editDiscount(row) {
     const goodsIds = rowGoodsIds(row);
@@ -218,6 +230,7 @@ function editDiscount(row) {
         CustomerIdsText: customerIds.join(","),
     });
     selectedProductIds.value = goodsIds;
+    selectedCustomerPickerIds.value = customerIds;
     activeTab.value = "discounts";
 }
 async function openProductPicker() {
@@ -261,6 +274,15 @@ function confirmProductSelection() {
     discountForm.ApplyToAllGoods = selectedProductIds.value.length === 0 ? discountForm.ApplyToAllGoods : false;
     productPickerOpen.value = false;
 }
+function openCustomerPicker() {
+    selectedCustomerPickerIds.value = parseNumberIds(discountForm.CustomerIdsText);
+    customerPickerOpen.value = true;
+    customers.value = [];
+    customerSearch.value = "";
+}
+function closeCustomerPicker() {
+    customerPickerOpen.value = false;
+}
 async function findCustomers() {
     const q = customerSearch.value.trim();
     if (!q) {
@@ -280,16 +302,41 @@ async function findCustomers() {
         customerLoading.value = false;
     }
 }
-function addCustomerToDiscount(customer) {
+function isCustomerSelected(customer) {
+    const id = customerId(customer);
+    return id > 0 && selectedCustomerPickerIdSet.value.has(id);
+}
+function toggleCustomer(customer) {
     const id = customerId(customer);
     if (id <= 0)
         return;
-    const current = new Set(parseNumberIds(discountForm.CustomerIdsText));
-    current.add(id);
-    discountForm.CustomerIdsText = Array.from(current).sort((a, b) => a - b).join(",");
+    const current = new Set(selectedCustomerPickerIds.value);
+    if (current.has(id))
+        current.delete(id);
+    else
+        current.add(id);
+    selectedCustomerPickerIds.value = Array.from(current).sort((a, b) => a - b);
+}
+function selectFoundCustomers() {
+    const current = new Set(selectedCustomerPickerIds.value);
+    for (const customer of customers.value) {
+        const id = customerId(customer);
+        if (id > 0)
+            current.add(id);
+    }
+    selectedCustomerPickerIds.value = Array.from(current).sort((a, b) => a - b);
+}
+function clearCustomerSelection() {
+    selectedCustomerPickerIds.value = [];
+}
+function confirmCustomerSelection() {
+    discountForm.CustomerIdsText = selectedCustomerPickerIds.value.join(",");
+    customerPickerOpen.value = false;
 }
 function removeCustomerId(id) {
-    discountForm.CustomerIdsText = parseNumberIds(discountForm.CustomerIdsText).filter((item) => item !== id).join(",");
+    const ids = parseNumberIds(discountForm.CustomerIdsText).filter((item) => item !== id);
+    discountForm.CustomerIdsText = ids.join(",");
+    selectedCustomerPickerIds.value = ids;
 }
 async function submitDiscount() {
     if (!discountForm.Title.trim()) {
@@ -456,20 +503,22 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['customer-select-box']} */ ;
 /** @type {__VLS_StyleScopedClasses['product-select-box']} */ ;
 /** @type {__VLS_StyleScopedClasses['customer-select-box']} */ ;
-/** @type {__VLS_StyleScopedClasses['customer-results']} */ ;
-/** @type {__VLS_StyleScopedClasses['customer-results']} */ ;
 /** @type {__VLS_StyleScopedClasses['chip']} */ ;
 /** @type {__VLS_StyleScopedClasses['modal-footer']} */ ;
 /** @type {__VLS_StyleScopedClasses['modal-head']} */ ;
 /** @type {__VLS_StyleScopedClasses['modal-head']} */ ;
 /** @type {__VLS_StyleScopedClasses['product-row']} */ ;
+/** @type {__VLS_StyleScopedClasses['customer-row']} */ ;
 /** @type {__VLS_StyleScopedClasses['product-row']} */ ;
+/** @type {__VLS_StyleScopedClasses['customer-row']} */ ;
 /** @type {__VLS_StyleScopedClasses['grid-layout']} */ ;
 /** @type {__VLS_StyleScopedClasses['modal-toolbar']} */ ;
-/** @type {__VLS_StyleScopedClasses['customer-search-row']} */ ;
+/** @type {__VLS_StyleScopedClasses['customer-modal-toolbar']} */ ;
 /** @type {__VLS_StyleScopedClasses['product-row']} */ ;
+/** @type {__VLS_StyleScopedClasses['customer-row']} */ ;
 /** @type {__VLS_StyleScopedClasses['product-meta']} */ ;
 /** @type {__VLS_StyleScopedClasses['product-price']} */ ;
+/** @type {__VLS_StyleScopedClasses['customer-meta']} */ ;
 // CSS variable injection 
 // CSS variable injection end 
 __VLS_asFunctionalElement(__VLS_intrinsicElements.section, __VLS_intrinsicElements.section)({
@@ -624,23 +673,20 @@ if (__VLS_ctx.activeTab === 'discounts') {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
     (__VLS_ctx.selectedCustomerCount ? `${__VLS_ctx.selectedCustomerCount} مشتری انتخاب شده` : 'عمومی؛ برای همه مشتری‌ها');
     __VLS_asFunctionalElement(__VLS_intrinsicElements.small, __VLS_intrinsicElements.small)({});
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
-        placeholder: "مثلا 12,18,25 - خالی یعنی عمومی",
-    });
-    (__VLS_ctx.discountForm.CustomerIdsText);
+    (__VLS_ctx.selectedCustomersSummary);
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "customer-search-row" },
+        ...{ class: "customer-selector-actions" },
     });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
-        ...{ onKeyup: (__VLS_ctx.findCustomers) },
-        placeholder: "جستجوی مشتری با نام یا موبایل",
-    });
-    (__VLS_ctx.customerSearch);
     __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-        ...{ onClick: (__VLS_ctx.findCustomers) },
+        ...{ onClick: (__VLS_ctx.openCustomerPicker) },
         ...{ class: "btn" },
         type: "button",
-        disabled: (__VLS_ctx.customerLoading),
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (__VLS_ctx.clearCustomerSelection) },
+        ...{ class: "btn" },
+        type: "button",
+        disabled: (!__VLS_ctx.selectedCustomerCount),
     });
     if (__VLS_ctx.selectedCustomerIds.length) {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
@@ -660,25 +706,6 @@ if (__VLS_ctx.activeTab === 'discounts') {
                 type: "button",
             });
             (id);
-        }
-    }
-    if (__VLS_ctx.customers.length) {
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-            ...{ class: "customer-results" },
-        });
-        for (const [customer] of __VLS_getVForSourceType((__VLS_ctx.customers))) {
-            __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-                ...{ onClick: (...[$event]) => {
-                        if (!(__VLS_ctx.activeTab === 'discounts'))
-                            return;
-                        if (!(__VLS_ctx.customers.length))
-                            return;
-                        __VLS_ctx.addCustomerToDiscount(customer);
-                    } },
-                key: (__VLS_ctx.customerId(customer)),
-                type: "button",
-            });
-            (__VLS_ctx.customerTitle(customer));
         }
     }
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
@@ -732,8 +759,7 @@ if (__VLS_ctx.activeTab === 'discounts') {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
         (Number(row.DiscountType) === 1 ? 'درصدی' : 'مبلغی');
         __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
-        (Number(row.DiscountType) === 1 ? row.DiscountPercent + '%' :
-            Number(row.DiscountAmount).toLocaleString());
+        (Number(row.DiscountType) === 1 ? row.DiscountPercent + '%' : Number(row.DiscountAmount).toLocaleString());
         __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
         (row.ApplyToAllGoods ? 'همه' : __VLS_ctx.rowGoodsIds(row).join(','));
         __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
@@ -1024,6 +1050,107 @@ if (__VLS_ctx.productPickerOpen) {
         type: "button",
     });
 }
+if (__VLS_ctx.customerPickerOpen) {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ onClick: (__VLS_ctx.closeCustomerPicker) },
+        ...{ class: "modal-backdrop" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "product-modal customer-modal" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.header, __VLS_intrinsicElements.header)({
+        ...{ class: "modal-head" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.h3, __VLS_intrinsicElements.h3)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({});
+    (__VLS_ctx.selectedCustomerPickerIds.length);
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (__VLS_ctx.closeCustomerPicker) },
+        ...{ class: "icon-btn" },
+        type: "button",
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "modal-toolbar customer-modal-toolbar" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+        ...{ onKeyup: (__VLS_ctx.findCustomers) },
+        placeholder: "نام، موبایل یا شناسه مشتری",
+    });
+    (__VLS_ctx.customerSearch);
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (__VLS_ctx.findCustomers) },
+        ...{ class: "btn" },
+        type: "button",
+        disabled: (__VLS_ctx.customerLoading),
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (__VLS_ctx.selectFoundCustomers) },
+        ...{ class: "btn" },
+        type: "button",
+        disabled: (!__VLS_ctx.customers.length),
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (__VLS_ctx.clearCustomerSelection) },
+        ...{ class: "btn" },
+        type: "button",
+    });
+    if (__VLS_ctx.customerLoading) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "modal-state" },
+        });
+    }
+    else if (!__VLS_ctx.customers.length) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "modal-state" },
+        });
+    }
+    else {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "customer-list" },
+        });
+        for (const [customer] of __VLS_getVForSourceType((__VLS_ctx.customers))) {
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({
+                key: (__VLS_ctx.customerId(customer)),
+                ...{ class: "customer-row" },
+            });
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+                ...{ onChange: (...[$event]) => {
+                        if (!(__VLS_ctx.customerPickerOpen))
+                            return;
+                        if (!!(__VLS_ctx.customerLoading))
+                            return;
+                        if (!!(!__VLS_ctx.customers.length))
+                            return;
+                        __VLS_ctx.toggleCustomer(customer);
+                    } },
+                type: "checkbox",
+                checked: (__VLS_ctx.isCustomerSelected(customer)),
+            });
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+                ...{ class: "customer-main" },
+            });
+            (__VLS_ctx.customerTitle(customer));
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+                ...{ class: "customer-meta" },
+            });
+            (__VLS_ctx.customerId(customer));
+        }
+    }
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.footer, __VLS_intrinsicElements.footer)({
+        ...{ class: "modal-footer" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (__VLS_ctx.confirmCustomerSelection) },
+        ...{ class: "btn primary" },
+        type: "button",
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (__VLS_ctx.closeCustomerPicker) },
+        ...{ class: "btn" },
+        type: "button",
+    });
+}
 /** @type {__VLS_StyleScopedClasses['discounts-tab']} */ ;
 /** @type {__VLS_StyleScopedClasses['page-head']} */ ;
 /** @type {__VLS_StyleScopedClasses['btn']} */ ;
@@ -1044,11 +1171,11 @@ if (__VLS_ctx.productPickerOpen) {
 /** @type {__VLS_StyleScopedClasses['btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['customer-select-box']} */ ;
 /** @type {__VLS_StyleScopedClasses['wide']} */ ;
-/** @type {__VLS_StyleScopedClasses['customer-search-row']} */ ;
+/** @type {__VLS_StyleScopedClasses['customer-selector-actions']} */ ;
+/** @type {__VLS_StyleScopedClasses['btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['chip-list']} */ ;
 /** @type {__VLS_StyleScopedClasses['chip']} */ ;
-/** @type {__VLS_StyleScopedClasses['customer-results']} */ ;
 /** @type {__VLS_StyleScopedClasses['checks']} */ ;
 /** @type {__VLS_StyleScopedClasses['actions']} */ ;
 /** @type {__VLS_StyleScopedClasses['btn']} */ ;
@@ -1090,6 +1217,26 @@ if (__VLS_ctx.productPickerOpen) {
 /** @type {__VLS_StyleScopedClasses['btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['primary']} */ ;
 /** @type {__VLS_StyleScopedClasses['btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['modal-backdrop']} */ ;
+/** @type {__VLS_StyleScopedClasses['product-modal']} */ ;
+/** @type {__VLS_StyleScopedClasses['customer-modal']} */ ;
+/** @type {__VLS_StyleScopedClasses['modal-head']} */ ;
+/** @type {__VLS_StyleScopedClasses['icon-btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['modal-toolbar']} */ ;
+/** @type {__VLS_StyleScopedClasses['customer-modal-toolbar']} */ ;
+/** @type {__VLS_StyleScopedClasses['btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['modal-state']} */ ;
+/** @type {__VLS_StyleScopedClasses['modal-state']} */ ;
+/** @type {__VLS_StyleScopedClasses['customer-list']} */ ;
+/** @type {__VLS_StyleScopedClasses['customer-row']} */ ;
+/** @type {__VLS_StyleScopedClasses['customer-main']} */ ;
+/** @type {__VLS_StyleScopedClasses['customer-meta']} */ ;
+/** @type {__VLS_StyleScopedClasses['modal-footer']} */ ;
+/** @type {__VLS_StyleScopedClasses['btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['primary']} */ ;
+/** @type {__VLS_StyleScopedClasses['btn']} */ ;
 var __VLS_dollars;
 const __VLS_self = (await import('vue')).defineComponent({
     setup() {
@@ -1098,9 +1245,11 @@ const __VLS_self = (await import('vue')).defineComponent({
             productLoading: productLoading,
             productPickerOpen: productPickerOpen,
             productSearch: productSearch,
+            customerPickerOpen: customerPickerOpen,
             customerSearch: customerSearch,
             customerLoading: customerLoading,
             customers: customers,
+            selectedCustomerPickerIds: selectedCustomerPickerIds,
             message: message,
             discounts: discounts,
             cards: cards,
@@ -1114,6 +1263,7 @@ const __VLS_self = (await import('vue')).defineComponent({
             selectedCustomerIds: selectedCustomerIds,
             selectedCustomerCount: selectedCustomerCount,
             selectedGoodsSummary: selectedGoodsSummary,
+            selectedCustomersSummary: selectedCustomersSummary,
             filteredProducts: filteredProducts,
             refreshAll: refreshAll,
             rowGoodsIds: rowGoodsIds,
@@ -1131,8 +1281,14 @@ const __VLS_self = (await import('vue')).defineComponent({
             selectFilteredProducts: selectFilteredProducts,
             clearProductSelection: clearProductSelection,
             confirmProductSelection: confirmProductSelection,
+            openCustomerPicker: openCustomerPicker,
+            closeCustomerPicker: closeCustomerPicker,
             findCustomers: findCustomers,
-            addCustomerToDiscount: addCustomerToDiscount,
+            isCustomerSelected: isCustomerSelected,
+            toggleCustomer: toggleCustomer,
+            selectFoundCustomers: selectFoundCustomers,
+            clearCustomerSelection: clearCustomerSelection,
+            confirmCustomerSelection: confirmCustomerSelection,
             removeCustomerId: removeCustomerId,
             submitDiscount: submitDiscount,
             removeDiscount: removeDiscount,
