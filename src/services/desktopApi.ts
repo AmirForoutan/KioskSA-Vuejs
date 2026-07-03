@@ -67,6 +67,8 @@ export type DesktopInvoice = {
   Phone: string;
   Price: number;
   Discount?: number;
+  InvoiceDiscount?: number;
+  TotalDiscount?: number;
   Tax: number;
   PackingPrice: number;
   Payable: number;

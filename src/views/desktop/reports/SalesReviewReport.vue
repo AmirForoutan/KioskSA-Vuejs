@@ -42,6 +42,7 @@ const filtered = computed(() => {
 });
 
 const totalPayable = computed(() => filtered.value.reduce((sum, row) => sum + amount(row.Payable), 0));
+const totalDiscount = computed(() => filtered.value.reduce((sum, row) => sum + invoiceDiscount(row), 0));
 const totalTax = computed(() => filtered.value.reduce((sum, row) => sum + amount(row.Tax), 0));
 const totalPos = computed(() => filtered.value.reduce((sum, row) => sum + paymentPart(row, "pos"), 0));
 const totalCash = computed(() => filtered.value.reduce((sum, row) => sum + paymentPart(row, "cash"), 0));
@@ -91,6 +92,10 @@ function optionalAmount(row: DesktopInvoice, ...keys: string[]) {
     if (value !== undefined && value !== null && value !== "") return amount(value);
   }
   return null;
+}
+
+function invoiceDiscount(row: DesktopInvoice) {
+  return optionalAmount(row, "Discount", "InvoiceDiscount", "TotalDiscount", "discount", "invoiceDiscount", "totalDiscount") ?? 0;
 }
 
 function paymentPart(row: DesktopInvoice, key: "pos" | "cash" | "credit") {
@@ -192,6 +197,7 @@ function exportExcel() {
   exportToExcel(
     filtered.value.map((row) => ({
       ...row,
+      Discount: invoiceDiscount(row),
       CashPrice: paymentPart(row, "cash"),
       PosPrice: paymentPart(row, "pos"),
       CreditPrice: paymentPart(row, "credit"),
@@ -247,6 +253,10 @@ function exportExcel() {
         <b>{{ totalPayable.toLocaleString() }}</b>
       </div>
       <div>
+        <span>جمع تخفیف</span>
+        <b>{{ totalDiscount.toLocaleString() }}</b>
+      </div>
+      <div>
         <span>نقدی</span>
         <b>{{ totalCash.toLocaleString() }}</b>
       </div>
@@ -282,6 +292,7 @@ function exportExcel() {
         <div>مشتری</div>
         <div>نوع سفارش</div>
         <div>جمع خام</div>
+        <div>تخفیف</div>
         <div>مالیات</div>
         <div>بسته‌بندی</div>
         <div>نقدی</div>
@@ -307,6 +318,7 @@ function exportExcel() {
         </div>
         <div>{{ row.InvoiceTypeName }}</div>
         <div>{{ amount(row.Price).toLocaleString() }}</div>
+        <div class="pay discount">{{ invoiceDiscount(row).toLocaleString() }}</div>
         <div>{{ amount(row.Tax).toLocaleString() }}</div>
         <div>{{ amount(row.PackingPrice).toLocaleString() }}</div>
         <div class="pay cash">{{ paymentPart(row, "cash").toLocaleString() }}</div>
@@ -381,7 +393,7 @@ function exportExcel() {
 
 .r-summary {
   display: grid;
-  grid-template-columns: repeat(8, minmax(130px, 1fr));
+  grid-template-columns: repeat(9, minmax(130px, 1fr));
   gap: 10px;
 }
 
@@ -416,8 +428,8 @@ function exportExcel() {
 
 .r-tr {
   display: grid;
-  grid-template-columns: 80px 108px 88px minmax(190px, 1.4fr) 110px 110px 100px 100px 100px 110px 100px 100px 120px 120px 130px;
-  min-width: 1760px;
+  grid-template-columns: 80px 108px 88px minmax(190px, 1.4fr) 110px 110px 100px 100px 100px 100px 110px 100px 100px 120px 120px 130px;
+  min-width: 1880px;
   gap: 10px;
   align-items: center;
   padding: 11px 12px;
@@ -425,8 +437,8 @@ function exportExcel() {
 }
 
 .r-tr.has-actions {
-  grid-template-columns: 80px 108px 88px minmax(190px, 1.4fr) 110px 110px 100px 100px 100px 110px 100px 100px 120px 120px 130px 130px;
-  min-width: 1900px;
+  grid-template-columns: 80px 108px 88px minmax(190px, 1.4fr) 110px 110px 100px 100px 100px 100px 110px 100px 100px 120px 120px 130px 130px;
+  min-width: 2020px;
 }
 
 .r-tr>div {
@@ -472,6 +484,10 @@ small {
 
 .pay.pos {
   color: #bfdbfe;
+}
+
+.pay.discount {
+  color: #fca5a5;
 }
 
 .pay.credit {

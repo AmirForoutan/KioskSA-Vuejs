@@ -30,6 +30,7 @@ const filtered = computed(() => {
     });
 });
 const totalPayable = computed(() => filtered.value.reduce((sum, row) => sum + amount(row.Payable), 0));
+const totalDiscount = computed(() => filtered.value.reduce((sum, row) => sum + invoiceDiscount(row), 0));
 const totalTax = computed(() => filtered.value.reduce((sum, row) => sum + amount(row.Tax), 0));
 const totalPos = computed(() => filtered.value.reduce((sum, row) => sum + paymentPart(row, "pos"), 0));
 const totalCash = computed(() => filtered.value.reduce((sum, row) => sum + paymentPart(row, "cash"), 0));
@@ -77,6 +78,9 @@ function optionalAmount(row, ...keys) {
             return amount(value);
     }
     return null;
+}
+function invoiceDiscount(row) {
+    return optionalAmount(row, "Discount", "InvoiceDiscount", "TotalDiscount", "discount", "invoiceDiscount", "totalDiscount") ?? 0;
 }
 function paymentPart(row, key) {
     const pos = amount(row.PosPrice);
@@ -176,6 +180,7 @@ function exportExcel() {
         return;
     exportToExcel(filtered.value.map((row) => ({
         ...row,
+        Discount: invoiceDiscount(row),
         CashPrice: paymentPart(row, "cash"),
         PosPrice: paymentPart(row, "pos"),
         CreditPrice: paymentPart(row, "credit"),
@@ -213,6 +218,7 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['r-tr']} */ ;
 /** @type {__VLS_StyleScopedClasses['r-tr']} */ ;
 /** @type {__VLS_StyleScopedClasses['r-tr']} */ ;
+/** @type {__VLS_StyleScopedClasses['pay']} */ ;
 /** @type {__VLS_StyleScopedClasses['pay']} */ ;
 /** @type {__VLS_StyleScopedClasses['pay']} */ ;
 /** @type {__VLS_StyleScopedClasses['pay']} */ ;
@@ -285,6 +291,10 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.b, __VLS_intrinsicElements.b)(
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.b, __VLS_intrinsicElements.b)({});
+(__VLS_ctx.totalDiscount.toLocaleString());
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.b, __VLS_intrinsicElements.b)({});
 (__VLS_ctx.totalCash.toLocaleString());
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
@@ -319,6 +329,7 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.d
     ...{ class: "r-tr r-th" },
     ...{ class: ({ 'has-actions': __VLS_ctx.canManageInvoices }) },
 });
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
@@ -374,6 +385,10 @@ for (const [row] of __VLS_getVForSourceType((__VLS_ctx.filtered))) {
     (row.InvoiceTypeName);
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
     (__VLS_ctx.amount(row.Price).toLocaleString());
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "pay discount" },
+    });
+    (__VLS_ctx.invoiceDiscount(row).toLocaleString());
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
     (__VLS_ctx.amount(row.Tax).toLocaleString());
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
@@ -479,6 +494,8 @@ if (__VLS_ctx.contextMenu) {
 /** @type {__VLS_StyleScopedClasses['customer-cell']} */ ;
 /** @type {__VLS_StyleScopedClasses['bold']} */ ;
 /** @type {__VLS_StyleScopedClasses['pay']} */ ;
+/** @type {__VLS_StyleScopedClasses['discount']} */ ;
+/** @type {__VLS_StyleScopedClasses['pay']} */ ;
 /** @type {__VLS_StyleScopedClasses['cash']} */ ;
 /** @type {__VLS_StyleScopedClasses['pay']} */ ;
 /** @type {__VLS_StyleScopedClasses['pos']} */ ;
@@ -512,6 +529,7 @@ const __VLS_self = (await import('vue')).defineComponent({
             canManageInvoices: canManageInvoices,
             filtered: filtered,
             totalPayable: totalPayable,
+            totalDiscount: totalDiscount,
             totalTax: totalTax,
             totalPos: totalPos,
             totalCash: totalCash,
@@ -520,6 +538,7 @@ const __VLS_self = (await import('vue')).defineComponent({
             totalNetPaid: totalNetPaid,
             loadReport: loadReport,
             amount: amount,
+            invoiceDiscount: invoiceDiscount,
             paymentPart: paymentPart,
             refundAmount: refundAmount,
             netPaidAmount: netPaidAmount,
