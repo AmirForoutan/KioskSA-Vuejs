@@ -1,16 +1,11 @@
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import "@majidh1/jalalidatepicker";
-import "@majidh1/jalalidatepicker/dist/jalalidatepicker.min.css";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { can } from "../../../components/acl/can";
 import { requestInvoiceEdit } from "../../../components/stores/invoice-edit.store";
-import { deleteDesktopInvoice, loadDesktopInvoices, loadDesktopInvoiceItems, printDesktopInvoice, } from "../../../services/desktopApi";
+import { deleteDesktopInvoice, loadDesktopInvoices, loadDesktopInvoiceItems, printDesktopInvoice } from "../../../services/desktopApi";
 import { exportToExcel } from "../../utils/exportExcel";
-import { setupJalaliDateInputs } from "../../../utilities";
 import { useDesktopToastMessage } from "../useDesktopToastMessage";
 import { escapeHtml, formatMoney, money, moneyPair, printReceipt, reportRange } from "./receiptPrint";
-const from = ref("");
-const to = ref("");
-const q = ref("");
+const props = defineProps();
 const loading = ref(false);
 const printLoading = ref(false);
 const message = ref("");
@@ -23,11 +18,11 @@ const canEditInvoices = computed(() => can("reports.invoices.edit"));
 const canDeleteInvoices = computed(() => can("reports.invoices.delete"));
 const canManageInvoices = computed(() => canEditInvoices.value || canDeleteInvoices.value);
 const filtered = computed(() => {
-    const s = q.value.trim();
+    const s = String(props.query || "").trim();
     if (!s)
         return rows.value;
     return rows.value.filter((row) => {
-        const haystack = `${row.SaleInvoiceNumberDay} ${row.CustomerName ?? ""} ${row.Phone ?? ""} ${row.InvoiceTypeName ?? ""} ${row.TableTitle ?? ""} ${row.TableCode ?? ""}`;
+        const haystack = `${row.SaleInvoiceNumberDay} ${row.CustomerCode ?? ""} ${row.CustomerName ?? ""} ${row.Phone ?? ""} ${row.InvoiceTypeName ?? ""} ${row.TableTitle ?? ""} ${row.TableCode ?? ""}`;
         return haystack.includes(s);
     });
 });
@@ -42,18 +37,18 @@ const totalCredit = computed(() => filtered.value.reduce((sum, row) => sum + pay
 const totalRefund = computed(() => filtered.value.reduce((sum, row) => sum + refundAmount(row), 0));
 const totalNetPaid = computed(() => filtered.value.reduce((sum, row) => sum + netPaidAmount(row), 0));
 onMounted(() => {
-    setupJalaliDateInputs();
     loadReport();
     window.addEventListener("click", closeContextMenu);
 });
 onBeforeUnmount(() => {
     window.removeEventListener("click", closeContextMenu);
 });
+watch(() => props.refreshKey, loadReport);
 async function loadReport() {
     loading.value = true;
     message.value = "";
     try {
-        rows.value = await loadDesktopInvoices({ FromDate: from.value.trim(), ToDate: to.value.trim() });
+        rows.value = await loadDesktopInvoices({ FromDate: String(props.fromDate || "").trim(), ToDate: String(props.toDate || "").trim() });
         if (!rows.value.length)
             message.value = "فاکتوری برای این بازه پیدا نشد";
     }
@@ -169,15 +164,11 @@ async function printInvoice(row, usage) {
 function exportExcel() {
     if (!can("reports.export.excel"))
         return;
-    exportToExcel(filtered.value.map((row) => ({ ...row, Discount: invoiceDiscount(row), CashPrice: paymentPart(row, "cash"), PosPrice: paymentPart(row, "pos"), CreditPrice: paymentPart(row, "credit"), RefundAmount: refundAmount(row), NetPaidAmount: netPaidAmount(row) })), [
-        { key: "SaleInvoiceNumberDay", title: "شماره روزانه" }, { key: "OrderDate", title: "تاریخ" }, { key: "OrderTime", title: "ساعت ثبت" }, { key: "CustomerName", title: "مشتری فاکتور" }, { key: "Phone", title: "موبایل" }, { key: "InvoiceTypeName", title: "نوع سفارش" }, { key: "Price", title: "جمع خام" }, { key: "Discount", title: "تخفیف" }, { key: "Tax", title: "مالیات" }, { key: "PackingPrice", title: "بسته‌بندی" }, { key: "CashPrice", title: "نقدی" }, { key: "PosPrice", title: "کارتخوان" }, { key: "CreditPrice", title: "اعتباری" }, { key: "RefundAmount", title: "عودت" }, { key: "NetPaidAmount", title: "خالص تسویه" }, { key: "Payable", title: "قابل پرداخت" },
-    ], "sales-review");
+    exportToExcel(filtered.value.map((row) => ({ ...row, Discount: invoiceDiscount(row), CashPrice: paymentPart(row, "cash"), PosPrice: paymentPart(row, "pos"), CreditPrice: paymentPart(row, "credit"), RefundAmount: refundAmount(row), NetPaidAmount: netPaidAmount(row) })), [{ key: "SaleInvoiceNumberDay", title: "شماره روزانه" }, { key: "OrderDate", title: "تاریخ" }, { key: "OrderTime", title: "ساعت ثبت" }, { key: "CustomerName", title: "مشتری فاکتور" }, { key: "Phone", title: "موبایل" }, { key: "InvoiceTypeName", title: "نوع سفارش" }, { key: "Price", title: "جمع خام" }, { key: "Discount", title: "تخفیف" }, { key: "Tax", title: "مالیات" }, { key: "PackingPrice", title: "بسته‌بندی" }, { key: "CashPrice", title: "نقدی" }, { key: "PosPrice", title: "کارتخوان" }, { key: "CreditPrice", title: "اعتباری" }, { key: "RefundAmount", title: "عودت" }, { key: "NetPaidAmount", title: "خالص تسویه" }, { key: "Payable", title: "قابل پرداخت" }], "sales-review");
 }
 function printSalesSummaryReport() {
     const payments = [moneyPair("نقدی", totalCash.value), moneyPair("کارتخوان", totalPos.value), moneyPair("اعتباری", totalCredit.value), moneyPair("عودت", totalRefund.value), moneyPair("خالص تسویه", totalNetPaid.value)].join("");
-    printReceipt("سرجمع فروش و تسویه", reportRange(from.value, to.value), `<div class="section"><div class="section-title">سرجمع فروش</div>
-      ${moneyPair("تعداد فاکتور", filtered.value.length)}${moneyPair("جمع خام", totalRaw.value)}${moneyPair("جمع تخفیف", totalDiscount.value)}${moneyPair("مالیات", totalTax.value)}${moneyPair("بسته‌بندی", totalPacking.value)}${moneyPair("قابل پرداخت", totalPayable.value)}
-    </div><div class="section"><div class="section-title">نحوه تسویه</div>${payments}</div>`);
+    printReceipt("سرجمع فروش و تسویه", reportRange(props.fromDate || "", props.toDate || ""), `<div class="section"><div class="section-title">سرجمع فروش</div>${moneyPair("تعداد فاکتور", filtered.value.length)}${moneyPair("جمع خام", totalRaw.value)}${moneyPair("جمع تخفیف", totalDiscount.value)}${moneyPair("مالیات", totalTax.value)}${moneyPair("بسته‌بندی", totalPacking.value)}${moneyPair("قابل پرداخت", totalPayable.value)}</div><div class="section"><div class="section-title">نحوه تسویه</div>${payments}</div>`);
 }
 function normalizeItemForPrint(item) {
     const quantity = money(item.Quantity ?? item.Count ?? item.GoodsCount ?? 1);
@@ -210,8 +201,7 @@ async function printSalesItemsReport() {
         });
         const items = Array.from(map.values()).sort((a, b) => b.total - a.total);
         const itemRows = items.map((row) => `<tr><td>${escapeHtml(row.goodsName)}</td><td class="num">${formatMoney(row.quantity)}</td><td class="num">${formatMoney(row.total)}</td></tr>`).join("");
-        printReceipt("جمع فروش به همراه اقلام", reportRange(from.value, to.value), `<div class="section"><div class="section-title">سرجمع</div>${moneyPair("جمع فروش", totalPayable.value)}${moneyPair("جمع تخفیف", totalDiscount.value)}${moneyPair("تعداد فاکتور", filtered.value.length)}</div>
-      <div class="section"><div class="section-title">گزارش اقلام</div><table><thead><tr><th>کالا</th><th class="num">تعداد</th><th class="num">مبلغ</th></tr></thead><tbody>${itemRows}</tbody></table></div>`);
+        printReceipt("جمع فروش به همراه اقلام", reportRange(props.fromDate || "", props.toDate || ""), `<div class="section"><div class="section-title">سرجمع</div>${moneyPair("جمع فروش", totalPayable.value)}${moneyPair("جمع تخفیف", totalDiscount.value)}${moneyPair("تعداد فاکتور", filtered.value.length)}</div><div class="section"><div class="section-title">گزارش اقلام</div><table><thead><tr><th>کالا</th><th class="num">تعداد</th><th class="num">مبلغ</th></tr></thead><tbody>${itemRows}</tbody></table></div>`);
     }
     finally {
         printLoading.value = false;
@@ -221,8 +211,6 @@ debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
 let __VLS_components;
 let __VLS_directives;
-/** @type {__VLS_StyleScopedClasses['r-btn']} */ ;
-/** @type {__VLS_StyleScopedClasses['r-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['r-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['r-summary']} */ ;
 /** @type {__VLS_StyleScopedClasses['r-summary']} */ ;
@@ -241,7 +229,6 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['r-mini']} */ ;
 /** @type {__VLS_StyleScopedClasses['row-context-menu']} */ ;
 /** @type {__VLS_StyleScopedClasses['row-context-menu']} */ ;
-/** @type {__VLS_StyleScopedClasses['r-toolbar']} */ ;
 /** @type {__VLS_StyleScopedClasses['r-summary']} */ ;
 // CSS variable injection 
 // CSS variable injection end 
@@ -249,33 +236,8 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.d
     ...{ class: "r-shell" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "r-toolbar" },
+    ...{ class: "r-actions" },
 });
-__VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
-    ...{ class: "r-input" },
-    placeholder: "جستجوی شماره، مشتری، موبایل...",
-});
-(__VLS_ctx.q);
-__VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
-    ...{ class: "r-input" },
-    placeholder: "از تاریخ، مثل 1404/03/01",
-    readonly: true,
-    'data-jdp': true,
-});
-(__VLS_ctx.from);
-__VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
-    ...{ class: "r-input" },
-    placeholder: "تا تاریخ، مثل 1404/03/31",
-    readonly: true,
-    'data-jdp': true,
-});
-(__VLS_ctx.to);
-__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-    ...{ onClick: (__VLS_ctx.loadReport) },
-    ...{ class: "r-btn primary" },
-    disabled: (__VLS_ctx.loading),
-});
-(__VLS_ctx.loading ? "در حال دریافت" : "اعمال فیلتر");
 if (__VLS_ctx.can('reports.export.excel')) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
         ...{ onClick: (__VLS_ctx.exportExcel) },
@@ -491,12 +453,7 @@ if (__VLS_ctx.contextMenu) {
     });
 }
 /** @type {__VLS_StyleScopedClasses['r-shell']} */ ;
-/** @type {__VLS_StyleScopedClasses['r-toolbar']} */ ;
-/** @type {__VLS_StyleScopedClasses['r-input']} */ ;
-/** @type {__VLS_StyleScopedClasses['r-input']} */ ;
-/** @type {__VLS_StyleScopedClasses['r-input']} */ ;
-/** @type {__VLS_StyleScopedClasses['r-btn']} */ ;
-/** @type {__VLS_StyleScopedClasses['primary']} */ ;
+/** @type {__VLS_StyleScopedClasses['r-actions']} */ ;
 /** @type {__VLS_StyleScopedClasses['r-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['r-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['r-btn']} */ ;
@@ -536,9 +493,6 @@ const __VLS_self = (await import('vue')).defineComponent({
         return {
             can: can,
             money: money,
-            from: from,
-            to: to,
-            q: q,
             loading: loading,
             printLoading: printLoading,
             message: message,
@@ -557,7 +511,6 @@ const __VLS_self = (await import('vue')).defineComponent({
             totalCredit: totalCredit,
             totalRefund: totalRefund,
             totalNetPaid: totalNetPaid,
-            loadReport: loadReport,
             invoiceDiscount: invoiceDiscount,
             paymentPart: paymentPart,
             refundAmount: refundAmount,
@@ -571,10 +524,12 @@ const __VLS_self = (await import('vue')).defineComponent({
             printSalesItemsReport: printSalesItemsReport,
         };
     },
+    __typeProps: {},
 });
 export default (await import('vue')).defineComponent({
     setup() {
         return {};
     },
+    __typeProps: {},
 });
 ; /* PartiallyEnd: #4569/main.vue */

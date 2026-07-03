@@ -1,38 +1,31 @@
-import { computed, onMounted, ref } from "vue";
-import "@majidh1/jalalidatepicker";
-import "@majidh1/jalalidatepicker/dist/jalalidatepicker.min.css";
+import { computed, onMounted, ref, watch } from "vue";
 import { can } from "../../../components/acl/can";
 import { loadDesktopCreditTransactions } from "../../../services/desktopApi";
 import { exportToExcel } from "../../utils/exportExcel";
-import { setupJalaliDateInputs } from "../../../utilities";
 import { useDesktopToastMessage } from "../useDesktopToastMessage";
 import { escapeHtml, formatMoney, money, moneyPair, printReceipt, reportRange } from "./receiptPrint";
-const from = ref("");
-const to = ref("");
-const q = ref("");
+const props = defineProps();
 const loading = ref(false);
 const message = ref("");
 const rows = ref([]);
 useDesktopToastMessage(message);
 const filtered = computed(() => {
-    const s = q.value.trim();
+    const s = String(props.query || "").trim();
     if (!s)
         return rows.value;
-    return rows.value.filter((row) => `${row.TransactionId} ${row.CustomerName ?? ""} ${row.Phone ?? ""} ${row.TransactionTypeName ?? ""} ${row.Description ?? ""} ${row.InvoiceNumber ?? ""}`.includes(s));
+    return rows.value.filter((row) => `${row.TransactionId} ${row.CustomerId ?? ""} ${row.CustomerName ?? ""} ${row.Phone ?? ""} ${row.TransactionTypeName ?? ""} ${row.Description ?? ""} ${row.InvoiceNumber ?? ""}`.includes(s));
 });
 const increaseTotal = computed(() => sumByType([1]));
 const creditUseTotal = computed(() => sumByType([2]));
 const cashReceiptTotal = computed(() => sumByType([3]));
 const refundTotal = computed(() => sumByType([4]));
-onMounted(() => {
-    setupJalaliDateInputs();
-    loadReport();
-});
+onMounted(loadReport);
+watch(() => props.refreshKey, loadReport);
 async function loadReport() {
     loading.value = true;
     message.value = "";
     try {
-        rows.value = await loadDesktopCreditTransactions({ FromDate: from.value.trim(), ToDate: to.value.trim() });
+        rows.value = await loadDesktopCreditTransactions({ FromDate: String(props.fromDate || "").trim(), ToDate: String(props.toDate || "").trim() });
         if (!rows.value.length)
             message.value = "رسید مالی برای این بازه پیدا نشد";
     }
@@ -54,14 +47,12 @@ function exportExcel() {
 }
 function printCreditReceiptsReport() {
     const rowsHtml = filtered.value.map((row) => `<tr><td>${escapeHtml(row.TransactionId)}</td><td>${escapeHtml(row.TransactionTypeName)}</td><td>${escapeHtml(row.CustomerName || "-")}</td><td class="num">${formatMoney(row.Amount)}</td></tr>`).join("");
-    printReceipt("رسیدهای اعتبار", reportRange(from.value, to.value), `<div class="section"><div class="section-title">سرجمع رسیدها</div>${moneyPair("افزایش اعتبار", increaseTotal.value)}${moneyPair("مصرف اعتبار", creditUseTotal.value)}${moneyPair("پرداخت نقدی", cashReceiptTotal.value)}${moneyPair("عودت", refundTotal.value)}${moneyPair("تعداد رسید", filtered.value.length)}</div><div class="section"><div class="section-title">رسیدها</div><table><thead><tr><th>#</th><th>نوع</th><th>مشتری</th><th class="num">مبلغ</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>`);
+    printReceipt("رسیدهای اعتبار", reportRange(props.fromDate || "", props.toDate || ""), `<div class="section"><div class="section-title">سرجمع رسیدها</div>${moneyPair("افزایش اعتبار", increaseTotal.value)}${moneyPair("مصرف اعتبار", creditUseTotal.value)}${moneyPair("پرداخت نقدی", cashReceiptTotal.value)}${moneyPair("عودت", refundTotal.value)}${moneyPair("تعداد رسید", filtered.value.length)}</div><div class="section"><div class="section-title">رسیدها</div><table><thead><tr><th>#</th><th>نوع</th><th>مشتری</th><th class="num">مبلغ</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>`);
 }
 debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
 let __VLS_components;
 let __VLS_directives;
-/** @type {__VLS_StyleScopedClasses['cr-btn']} */ ;
-/** @type {__VLS_StyleScopedClasses['cr-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['cr-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['cr-summary']} */ ;
 /** @type {__VLS_StyleScopedClasses['cr-summary']} */ ;
@@ -76,7 +67,6 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['type-pill']} */ ;
 /** @type {__VLS_StyleScopedClasses['type-pill']} */ ;
 /** @type {__VLS_StyleScopedClasses['type-pill']} */ ;
-/** @type {__VLS_StyleScopedClasses['cr-toolbar']} */ ;
 /** @type {__VLS_StyleScopedClasses['cr-summary']} */ ;
 // CSS variable injection 
 // CSS variable injection end 
@@ -84,33 +74,8 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.d
     ...{ class: "cr-shell" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "cr-toolbar" },
+    ...{ class: "cr-actions" },
 });
-__VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
-    ...{ class: "cr-input" },
-    placeholder: "جستجوی مشتری، موبایل، شماره رسید یا فاکتور...",
-});
-(__VLS_ctx.q);
-__VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
-    ...{ class: "cr-input" },
-    placeholder: "از تاریخ",
-    readonly: true,
-    'data-jdp': true,
-});
-(__VLS_ctx.from);
-__VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
-    ...{ class: "cr-input" },
-    placeholder: "تا تاریخ",
-    readonly: true,
-    'data-jdp': true,
-});
-(__VLS_ctx.to);
-__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-    ...{ onClick: (__VLS_ctx.loadReport) },
-    ...{ class: "cr-btn primary" },
-    disabled: (__VLS_ctx.loading),
-});
-(__VLS_ctx.loading ? "در حال دریافت" : "اعمال فیلتر");
 if (__VLS_ctx.can('reports.export.excel')) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
         ...{ onClick: (__VLS_ctx.exportExcel) },
@@ -208,12 +173,7 @@ for (const [row] of __VLS_getVForSourceType((__VLS_ctx.filtered))) {
     (row.Description || "-");
 }
 /** @type {__VLS_StyleScopedClasses['cr-shell']} */ ;
-/** @type {__VLS_StyleScopedClasses['cr-toolbar']} */ ;
-/** @type {__VLS_StyleScopedClasses['cr-input']} */ ;
-/** @type {__VLS_StyleScopedClasses['cr-input']} */ ;
-/** @type {__VLS_StyleScopedClasses['cr-input']} */ ;
-/** @type {__VLS_StyleScopedClasses['cr-btn']} */ ;
-/** @type {__VLS_StyleScopedClasses['primary']} */ ;
+/** @type {__VLS_StyleScopedClasses['cr-actions']} */ ;
 /** @type {__VLS_StyleScopedClasses['cr-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['cr-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['cr-summary']} */ ;
@@ -237,9 +197,6 @@ const __VLS_self = (await import('vue')).defineComponent({
         return {
             can: can,
             money: money,
-            from: from,
-            to: to,
-            q: q,
             loading: loading,
             message: message,
             filtered: filtered,
@@ -247,15 +204,16 @@ const __VLS_self = (await import('vue')).defineComponent({
             creditUseTotal: creditUseTotal,
             cashReceiptTotal: cashReceiptTotal,
             refundTotal: refundTotal,
-            loadReport: loadReport,
             exportExcel: exportExcel,
             printCreditReceiptsReport: printCreditReceiptsReport,
         };
     },
+    __typeProps: {},
 });
 export default (await import('vue')).defineComponent({
     setup() {
         return {};
     },
+    __typeProps: {},
 });
 ; /* PartiallyEnd: #4569/main.vue */

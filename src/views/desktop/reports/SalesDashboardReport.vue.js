@@ -1,18 +1,14 @@
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import Chart from "chart.js/auto";
-import "@majidh1/jalalidatepicker";
-import "@majidh1/jalalidatepicker/dist/jalalidatepicker.min.css";
 import { loadDesktopCreditTransactions, loadDesktopInvoices, } from "../../../services/desktopApi";
-import { setupJalaliDateInputs } from "../../../utilities";
 import { useDesktopToastMessage } from "../useDesktopToastMessage";
 import { escapeHtml, formatMoney, money, moneyPair, printReceipt, reportRange } from "./receiptPrint";
+const props = defineProps();
 const chartColors = ["#14b8a6", "#f59e0b", "#6366f1", "#ef4444", "#22c55e", "#06b6d4", "#ec4899", "#84cc16", "#f97316", "#8b5cf6"];
 const chartSoftColors = ["rgba(20,184,166,.78)", "rgba(245,158,11,.78)", "rgba(99,102,241,.78)", "rgba(239,68,68,.78)", "rgba(34,197,94,.78)", "rgba(6,182,212,.78)", "rgba(236,72,153,.78)", "rgba(132,204,22,.78)", "rgba(249,115,22,.78)", "rgba(139,92,246,.78)"];
-const from = ref("");
-const to = ref("");
 const loading = ref(false);
 const message = ref("");
-const rows = ref([]);
+const allRows = ref([]);
 const creditTransactions = ref([]);
 useDesktopToastMessage(message);
 const dailyCanvas = ref(null);
@@ -27,6 +23,15 @@ let paymentChart = null;
 let hourlyChart = null;
 let discountChart = null;
 let customerChart = null;
+const rows = computed(() => {
+    const s = String(props.query || "").trim();
+    if (!s)
+        return allRows.value;
+    return allRows.value.filter((row) => {
+        const haystack = `${row.SaleInvoiceNumberDay} ${row.CustomerCode ?? ""} ${row.CustomerName ?? ""} ${row.Phone ?? ""} ${row.InvoiceTypeName ?? ""} ${row.TableTitle ?? ""} ${row.TableCode ?? ""}`;
+        return haystack.includes(s);
+    });
+});
 const totalSales = computed(() => rows.value.reduce((sum, row) => sum + money(row.Payable), 0));
 const totalRawSales = computed(() => rows.value.reduce((sum, row) => sum + money(row.Price), 0));
 const totalDiscount = computed(() => rows.value.reduce((sum, row) => sum + invoiceDiscount(row), 0));
@@ -37,9 +42,7 @@ const totalPos = computed(() => rows.value.reduce((sum, row) => sum + paymentPar
 const totalCredit = computed(() => rows.value.reduce((sum, row) => sum + paymentPart(row, "credit"), 0));
 const averageInvoice = computed(() => (rows.value.length ? Math.round(totalSales.value / rows.value.length) : 0));
 const discountRatio = computed(() => totalRawSales.value ? Math.round((totalDiscount.value / totalRawSales.value) * 1000) / 10 : 0);
-const dailySales = computed(() => group(rows.value, (row) => row.OrderDate || "بدون تاریخ")
-    .sort((a, b) => a.key.localeCompare(b.key))
-    .slice(-14));
+const dailySales = computed(() => group(rows.value, (row) => row.OrderDate || "بدون تاریخ").sort((a, b) => a.key.localeCompare(b.key)).slice(-14));
 const dailyDiscounts = computed(() => dailySales.value.map((row) => ({ ...row, discount: discountForDate(row.key) })));
 const invoiceTypes = computed(() => group(rows.value, (row) => row.InvoiceTypeName || "نامشخص").sort((a, b) => b.total - a.total));
 const paymentBreakdown = computed(() => [
@@ -48,33 +51,27 @@ const paymentBreakdown = computed(() => [
     { key: "credit", title: "اعتباری", count: 0, total: totalCredit.value },
 ]);
 const topCustomers = computed(() => group(rows.value, (row) => row.CustomerName || "بدون مشتری").sort((a, b) => b.total - a.total).slice(0, 8));
-const hourlySales = computed(() => group(rows.value, (row) => {
-    const hour = String(row.OrderTime || "").slice(0, 2);
-    return hour || "--";
-})
-    .filter((row) => row.key !== "--")
-    .sort((a, b) => a.key.localeCompare(b.key)));
-onMounted(async () => {
-    setupJalaliDateInputs();
-    await loadReport();
-});
+const hourlySales = computed(() => group(rows.value, (row) => String(row.OrderTime || "").slice(0, 2) || "--").filter((row) => row.key !== "--").sort((a, b) => a.key.localeCompare(b.key)));
+onMounted(loadReport);
 onBeforeUnmount(() => destroyCharts());
+watch(() => props.refreshKey, loadReport);
+watch(() => props.query, async () => { await nextTick(); renderCharts(); });
 async function loadReport() {
     loading.value = true;
     message.value = "";
     try {
-        rows.value = await loadDesktopInvoices({ FromDate: from.value.trim(), ToDate: to.value.trim() });
+        allRows.value = await loadDesktopInvoices({ FromDate: String(props.fromDate || "").trim(), ToDate: String(props.toDate || "").trim() });
         try {
-            creditTransactions.value = await loadDesktopCreditTransactions({ FromDate: from.value.trim(), ToDate: to.value.trim() });
+            creditTransactions.value = await loadDesktopCreditTransactions({ FromDate: String(props.fromDate || "").trim(), ToDate: String(props.toDate || "").trim() });
         }
         catch {
             creditTransactions.value = [];
         }
-        if (!rows.value.length)
+        if (!allRows.value.length)
             message.value = "برای این بازه داده‌ای پیدا نشد";
     }
     catch (error) {
-        rows.value = [];
+        allRows.value = [];
         creditTransactions.value = [];
         message.value = error instanceof Error ? error.message : "خطا در دریافت داشبورد فروش";
     }
@@ -114,9 +111,7 @@ function paymentPart(row, key) {
     return pos;
 }
 function legacyCreditAmount(row) {
-    return creditTransactions.value
-        .filter((transaction) => Number(transaction.TransactionType) === 2 && Number(transaction.InvoiceId || 0) === Number(row.SaleInvoiceId))
-        .reduce((sum, transaction) => sum + money(transaction.Amount), 0);
+    return creditTransactions.value.filter((transaction) => Number(transaction.TransactionType) === 2 && Number(transaction.InvoiceId || 0) === Number(row.SaleInvoiceId)).reduce((sum, transaction) => sum + money(transaction.Amount), 0);
 }
 function group(source, keySelector) {
     const map = new Map();
@@ -161,46 +156,16 @@ function renderCharts() {
     const payments = paymentBreakdown.value;
     const hourly = hourlySales.value;
     const customers = topCustomers.value;
-    dailyChart = createChart(dailyCanvas.value, {
-        type: "bar",
-        data: { labels: daily.map((row) => row.title), datasets: [
-                { type: "bar", label: "فروش روزانه", data: daily.map((row) => row.total), backgroundColor: daily.map((_, i) => chartSoftColors[i % chartSoftColors.length]), borderColor: daily.map((_, i) => chartColors[i % chartColors.length]), borderWidth: 1, borderRadius: 9, maxBarThickness: 38 },
-                { type: "line", label: "میانگین متحرک", data: movingAverage(daily.map((row) => row.total)), borderColor: "#fef3c7", backgroundColor: "rgba(254,243,199,.14)", pointBackgroundColor: "#f59e0b", pointRadius: 3, tension: .35, fill: true },
-            ] },
-        options: chartOptions("روند فروش روزانه"),
-    });
-    typeChart = createChart(typeCanvas.value, {
-        type: "doughnut",
-        data: { labels: types.map((row) => row.title), datasets: [{ data: types.map((row) => row.total), backgroundColor: types.map((_, i) => chartSoftColors[i % chartSoftColors.length]), borderColor: "#171b24", borderWidth: 4, hoverOffset: 10 }] },
-        options: chartOptions("سهم نوع سفارش"),
-    });
+    dailyChart = createChart(dailyCanvas.value, { type: "bar", data: { labels: daily.map((row) => row.title), datasets: [{ type: "bar", label: "فروش روزانه", data: daily.map((row) => row.total), backgroundColor: daily.map((_, i) => chartSoftColors[i % chartSoftColors.length]), borderColor: daily.map((_, i) => chartColors[i % chartColors.length]), borderWidth: 1, borderRadius: 9, maxBarThickness: 38 }, { type: "line", label: "میانگین متحرک", data: movingAverage(daily.map((row) => row.total)), borderColor: "#fef3c7", backgroundColor: "rgba(254,243,199,.14)", pointBackgroundColor: "#f59e0b", pointRadius: 3, tension: .35, fill: true }] }, options: chartOptions("روند فروش روزانه") });
+    typeChart = createChart(typeCanvas.value, { type: "doughnut", data: { labels: types.map((row) => row.title), datasets: [{ data: types.map((row) => row.total), backgroundColor: types.map((_, i) => chartSoftColors[i % chartSoftColors.length]), borderColor: "#171b24", borderWidth: 4, hoverOffset: 10 }] }, options: chartOptions("سهم نوع سفارش") });
     const paymentOptions = chartOptions("ترکیب پرداخت");
     paymentOptions.indexAxis = "y";
     paymentOptions.plugins.legend.display = false;
     paymentOptions.scales.x.beginAtZero = true;
-    paymentChart = createChart(paymentCanvas.value, {
-        type: "bar",
-        data: { labels: payments.map((row) => row.title), datasets: [{ label: "مبلغ پرداخت", data: payments.map((row) => row.total), backgroundColor: ["rgba(245,158,11,.86)", "rgba(59,130,246,.86)", "rgba(20,184,166,.86)"], borderColor: ["#f59e0b", "#3b82f6", "#14b8a6"], borderWidth: 2, borderRadius: 10, minBarLength: 8, maxBarThickness: 42 }] },
-        options: paymentOptions,
-    });
-    hourlyChart = createChart(hourlyCanvas.value, {
-        type: "line",
-        data: { labels: hourly.map((row) => `${row.title}:00`), datasets: [{ label: "فروش ساعتی", data: hourly.map((row) => row.total), borderColor: "#ec4899", backgroundColor: "rgba(236,72,153,.18)", pointBackgroundColor: "#f59e0b", pointBorderColor: "#fef3c7", pointRadius: 4, tension: .38, fill: true }] },
-        options: chartOptions("فروش ساعتی"),
-    });
-    discountChart = createChart(discountCanvas.value, {
-        type: "bar",
-        data: { labels: discounts.map((row) => row.title), datasets: [
-                { label: "فروش", data: discounts.map((row) => row.total), backgroundColor: "rgba(20,184,166,.72)", borderColor: "#14b8a6", borderWidth: 1, borderRadius: 8, maxBarThickness: 34 },
-                { label: "تخفیف", data: discounts.map((row) => row.discount || 0), backgroundColor: "rgba(248,113,113,.82)", borderColor: "#f87171", borderWidth: 1, borderRadius: 8, maxBarThickness: 34 },
-            ] },
-        options: chartOptions("فروش و تخفیف روزانه", false),
-    });
-    customerChart = createChart(customerCanvas.value, {
-        type: "bar",
-        data: { labels: customers.map((row) => row.title), datasets: [{ label: "فروش مشتری", data: customers.map((row) => row.total), backgroundColor: customers.map((_, i) => chartSoftColors[i % chartSoftColors.length]), borderColor: customers.map((_, i) => chartColors[i % chartColors.length]), borderWidth: 1, borderRadius: 8, maxBarThickness: 32 }] },
-        options: chartOptions("مشتریان برتر"),
-    });
+    paymentChart = createChart(paymentCanvas.value, { type: "bar", data: { labels: payments.map((row) => row.title), datasets: [{ label: "مبلغ پرداخت", data: payments.map((row) => row.total), backgroundColor: ["rgba(245,158,11,.86)", "rgba(59,130,246,.86)", "rgba(20,184,166,.86)"], borderColor: ["#f59e0b", "#3b82f6", "#14b8a6"], borderWidth: 2, borderRadius: 10, minBarLength: 8, maxBarThickness: 42 }] }, options: paymentOptions });
+    hourlyChart = createChart(hourlyCanvas.value, { type: "line", data: { labels: hourly.map((row) => `${row.title}:00`), datasets: [{ label: "فروش ساعتی", data: hourly.map((row) => row.total), borderColor: "#ec4899", backgroundColor: "rgba(236,72,153,.18)", pointBackgroundColor: "#f59e0b", pointBorderColor: "#fef3c7", pointRadius: 4, tension: .38, fill: true }] }, options: chartOptions("فروش ساعتی") });
+    discountChart = createChart(discountCanvas.value, { type: "bar", data: { labels: discounts.map((row) => row.title), datasets: [{ label: "فروش", data: discounts.map((row) => row.total), backgroundColor: "rgba(20,184,166,.72)", borderColor: "#14b8a6", borderWidth: 1, borderRadius: 8, maxBarThickness: 34 }, { label: "تخفیف", data: discounts.map((row) => row.discount || 0), backgroundColor: "rgba(248,113,113,.82)", borderColor: "#f87171", borderWidth: 1, borderRadius: 8, maxBarThickness: 34 }] }, options: chartOptions("فروش و تخفیف روزانه") });
+    customerChart = createChart(customerCanvas.value, { type: "bar", data: { labels: customers.map((row) => row.title), datasets: [{ label: "فروش مشتری", data: customers.map((row) => row.total), backgroundColor: customers.map((_, i) => chartSoftColors[i % chartSoftColors.length]), borderColor: customers.map((_, i) => chartColors[i % chartColors.length]), borderWidth: 1, borderRadius: 8, maxBarThickness: 32 }] }, options: chartOptions("مشتریان برتر") });
 }
 function movingAverage(values) {
     return values.map((_, index) => {
@@ -224,7 +189,7 @@ function destroyCharts() {
     customerChart = null;
 }
 function printDashboardReport() {
-    const range = reportRange(from.value, to.value);
+    const range = reportRange(props.fromDate || "", props.toDate || "");
     const payments = paymentBreakdown.value.map((row) => moneyPair(row.title, row.total)).join("");
     const types = invoiceTypes.value.map((row) => `<tr><td>${escapeHtml(row.title)}</td><td class="num">${row.count.toLocaleString("fa-IR")}</td><td class="num">${formatMoney(row.total)}</td></tr>`).join("");
     const days = dailySales.value.map((row) => `<tr><td>${escapeHtml(row.title)}</td><td class="num">${row.count.toLocaleString("fa-IR")}</td><td class="num">${formatMoney(row.total)}</td></tr>`).join("");
@@ -234,8 +199,6 @@ debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
 let __VLS_components;
 let __VLS_directives;
-/** @type {__VLS_StyleScopedClasses['dash-btn']} */ ;
-/** @type {__VLS_StyleScopedClasses['dash-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['dash-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['kpi']} */ ;
 /** @type {__VLS_StyleScopedClasses['kpi']} */ ;
@@ -263,7 +226,6 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['rank-row']} */ ;
 /** @type {__VLS_StyleScopedClasses['rank-row']} */ ;
 /** @type {__VLS_StyleScopedClasses['payment-breakdown']} */ ;
-/** @type {__VLS_StyleScopedClasses['dash-toolbar']} */ ;
 /** @type {__VLS_StyleScopedClasses['kpi-grid']} */ ;
 /** @type {__VLS_StyleScopedClasses['dash-grid']} */ ;
 // CSS variable injection 
@@ -272,28 +234,8 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.d
     ...{ class: "dash-shell" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "dash-toolbar" },
+    ...{ class: "dash-actions" },
 });
-__VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
-    ...{ class: "dash-input" },
-    placeholder: "از تاریخ",
-    readonly: true,
-    'data-jdp': true,
-});
-(__VLS_ctx.from);
-__VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
-    ...{ class: "dash-input" },
-    placeholder: "تا تاریخ",
-    readonly: true,
-    'data-jdp': true,
-});
-(__VLS_ctx.to);
-__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-    ...{ onClick: (__VLS_ctx.loadReport) },
-    ...{ class: "dash-btn primary" },
-    disabled: (__VLS_ctx.loading),
-});
-(__VLS_ctx.loading ? "در حال دریافت" : "اعمال فیلتر");
 __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
     ...{ onClick: (__VLS_ctx.printDashboardReport) },
     ...{ class: "dash-btn" },
@@ -471,11 +413,7 @@ for (const [row, index] of __VLS_getVForSourceType((__VLS_ctx.topCustomers))) {
     (row.total.toLocaleString());
 }
 /** @type {__VLS_StyleScopedClasses['dash-shell']} */ ;
-/** @type {__VLS_StyleScopedClasses['dash-toolbar']} */ ;
-/** @type {__VLS_StyleScopedClasses['dash-input']} */ ;
-/** @type {__VLS_StyleScopedClasses['dash-input']} */ ;
-/** @type {__VLS_StyleScopedClasses['dash-btn']} */ ;
-/** @type {__VLS_StyleScopedClasses['primary']} */ ;
+/** @type {__VLS_StyleScopedClasses['dash-actions']} */ ;
 /** @type {__VLS_StyleScopedClasses['dash-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['kpi-grid']} */ ;
 /** @type {__VLS_StyleScopedClasses['kpi']} */ ;
@@ -521,17 +459,14 @@ const __VLS_self = (await import('vue')).defineComponent({
     setup() {
         return {
             chartColors: chartColors,
-            from: from,
-            to: to,
-            loading: loading,
             message: message,
-            rows: rows,
             dailyCanvas: dailyCanvas,
             typeCanvas: typeCanvas,
             paymentCanvas: paymentCanvas,
             hourlyCanvas: hourlyCanvas,
             discountCanvas: discountCanvas,
             customerCanvas: customerCanvas,
+            rows: rows,
             totalSales: totalSales,
             totalDiscount: totalDiscount,
             totalTax: totalTax,
@@ -541,14 +476,15 @@ const __VLS_self = (await import('vue')).defineComponent({
             discountRatio: discountRatio,
             paymentBreakdown: paymentBreakdown,
             topCustomers: topCustomers,
-            loadReport: loadReport,
             printDashboardReport: printDashboardReport,
         };
     },
+    __typeProps: {},
 });
 export default (await import('vue')).defineComponent({
     setup() {
         return {};
     },
+    __typeProps: {},
 });
 ; /* PartiallyEnd: #4569/main.vue */
