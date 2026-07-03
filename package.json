@@ -1,6 +1,6 @@
 {
   "name": "Kiosk App",
-  "version": "2.1.5",
+  "version": "2.1.6",
   "private": true,
   "scripts": {
     "build": "vue-tsc -b && vite build",
