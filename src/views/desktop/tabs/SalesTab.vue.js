@@ -7,6 +7,7 @@ import { clearTableOrderRequest, peekTableOrderRequest, TABLE_ORDER_REQUEST_EVEN
 import { useAuthState } from "../../../components/stores/auth.store";
 import { getCurrency, ShwoKeyboardStatus } from "../../../utilities";
 import { fetchDesktopCustomerCredit, fetchRuntimeConfig, loadDesktopTables, loadDesktopCatalog, loadDesktopToppingData, payDesktopPos, searchDesktopCustomers, sendDesktopInvoice, updateDesktopInvoice, useDesktopCustomerCredit, } from "../../../services/desktopApi";
+import { listLocalDiscounts } from "../../../services/localDiscountApi";
 const categories = ref([]);
 const goods = ref([]);
 const toppingItems = ref([]);
@@ -41,6 +42,7 @@ const creditMessage = ref("");
 const discountMode = ref("none");
 const discountPercent = ref(0);
 const discountAmount = ref(0);
+const localDiscounts = ref([]);
 const toppingModalOpen = ref(false);
 const toppingProduct = ref(null);
 const selectedToppingCounts = ref({});
@@ -89,7 +91,7 @@ const packingTotal = computed(() => {
         return 0;
     return cart.value.reduce((sum, row) => sum + money(row.item.PackingPrice) * row.quantity, 0);
 });
-const discountValue = computed(() => {
+const manualDiscountValue = computed(() => {
     if (discountMode.value === "percent" && canDiscountPercent.value) {
         const percent = clamp(money(discountPercent.value), 0, maxDiscountPercent.value);
         return Math.min(subTotal.value, Math.floor((subTotal.value * percent) / 100));
@@ -99,6 +101,9 @@ const discountValue = computed(() => {
     }
     return 0;
 });
+const autoDiscount = computed(() => findBestLocalDiscount());
+const autoDiscountTitle = computed(() => autoDiscount.value.discount?.Title || autoDiscount.value.discount?.DiscountCode || "");
+const discountValue = computed(() => Math.max(manualDiscountValue.value, autoDiscount.value.amount));
 const grandTotal = computed(() => Math.max(subTotal.value + taxTotal.value + packingTotal.value - discountValue.value, 0));
 const totalItemQuantity = computed(() => cart.value.reduce((sum, row) => sum + row.quantity, 0));
 const payableAmount = computed(() => Math.round(grandTotal.value));
@@ -154,7 +159,7 @@ onMounted(async () => {
         currencyIsRial.value = false;
     }
     handleInvoiceEditRequest();
-    await Promise.all([loadCatalog(), loadRuntimeSettings(), loadTables()]);
+    await Promise.all([loadCatalog(), loadRuntimeSettings(), loadTables(), loadLocalDiscounts()]);
     handleInvoiceEditRequest();
     handleTableOrderRequest();
 });
@@ -228,6 +233,16 @@ async function loadTables() {
         tableGroups.value = [];
         diningTables.value = [];
         const message = error instanceof Error ? error.message : "خطا در دریافت میزها";
+        serviceMessage.value = serviceMessage.value ? `${serviceMessage.value} | ${message}` : message;
+    }
+}
+async function loadLocalDiscounts() {
+    try {
+        localDiscounts.value = await listLocalDiscounts();
+    }
+    catch (error) {
+        localDiscounts.value = [];
+        const message = error instanceof Error ? error.message : "خطا در دریافت تخفیف‌ها";
         serviceMessage.value = serviceMessage.value ? `${serviceMessage.value} | ${message}` : message;
     }
 }
@@ -470,6 +485,128 @@ function invoicePaymentPart(invoice, key) {
     if (key === "credit")
         return credit;
     return pos;
+}
+function selectedCustomerIds() {
+    const customer = selectedCustomer.value;
+    if (!customer)
+        return [];
+    const rawIds = [
+        customer.CustomerId,
+        customer.UserId,
+        customer.UID,
+        customer.Id,
+        customer.CustomerCode,
+        customer.Code,
+        customer.customerId,
+        customer.userId,
+        customer.uid,
+        customer.id,
+        customer.customerCode,
+    ];
+    return Array.from(new Set(rawIds
+        .map((value) => Number(value))
+        .filter((id) => Number.isFinite(id) && id > 0)));
+}
+function parseDiscountIds(value) {
+    if (Array.isArray(value)) {
+        return value.map(Number).filter((id) => Number.isFinite(id) && id > 0);
+    }
+    return String(value || "")
+        .split(/[,،\n\s]+/)
+        .map((id) => Number(String(id).trim()))
+        .filter((id) => Number.isFinite(id) && id > 0);
+}
+function localDiscountCustomerIds(discount) {
+    const record = discount;
+    return parseDiscountIds(record.CustomerIds ?? record.customerIds ?? record.CustomerIdsText);
+}
+function localDiscountGoodsIds(discount) {
+    const record = discount;
+    return parseDiscountIds(record.GoodsIds ?? record.goodsIds ?? record.GoodsIdsText);
+}
+function compactDate(value) {
+    return String(value || "").replace(/\D/g, "");
+}
+function currentJalaliDateCompact() {
+    return compactDate(new Date().toLocaleDateString("fa-IR", { year: "numeric", month: "2-digit", day: "2-digit" })
+        .replace(/[۰-۹]/g, (digit) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(digit))));
+}
+function timeToNumber(value) {
+    const text = String(value || "").replace(/\D/g, "");
+    if (!text)
+        return 0;
+    if (text.length <= 2)
+        return Number(text) * 100;
+    return Number(text.slice(0, 2)) * 100 + Number(text.slice(2, 4) || 0);
+}
+function isLocalDiscountCurrentlyValid(discount) {
+    if (discount.IsActive === false)
+        return false;
+    const today = currentJalaliDateCompact();
+    const start = compactDate(discount.StartDate);
+    const end = compactDate(discount.EndDate);
+    if (start && today && Number(today) < Number(start))
+        return false;
+    if (end && today && Number(today) > Number(end))
+        return false;
+    const now = new Date();
+    const current = now.getHours() * 100 + now.getMinutes();
+    const from = timeToNumber(discount.FromTime);
+    const to = timeToNumber(discount.ToTime);
+    if (from && current < from)
+        return false;
+    if (to && current > to)
+        return false;
+    return true;
+}
+function isLocalDiscountForSelectedCustomer(discount) {
+    const customerIds = localDiscountCustomerIds(discount);
+    if (!customerIds.length)
+        return true;
+    const ids = selectedCustomerIds();
+    if (!ids.length)
+        return false;
+    return ids.some((id) => customerIds.includes(id));
+}
+function isRowEligibleForLocalDiscount(row, goodsIds) {
+    if (!goodsIds.length)
+        return true;
+    return goodsIds.includes(Number(row.item.GoodsId)) || goodsIds.includes(Number(row.item.GoodsCode));
+}
+function localDiscountAmount(discount, base) {
+    if (base <= 0)
+        return 0;
+    if (money(discount.MinInvoiceAmount) > 0 && base < money(discount.MinInvoiceAmount))
+        return 0;
+    let amount = 0;
+    if (Number(discount.DiscountType) === 1) {
+        amount = base * (money(discount.DiscountPercent) / 100);
+    }
+    else {
+        amount = Math.min(money(discount.DiscountAmount), base);
+    }
+    if (money(discount.MaxDiscountAmount) > 0)
+        amount = Math.min(amount, money(discount.MaxDiscountAmount));
+    return Math.max(0, Math.round(amount));
+}
+function findBestLocalDiscount() {
+    let best = { amount: 0, discount: null };
+    if (!cart.value.length || !localDiscounts.value.length)
+        return best;
+    for (const discount of localDiscounts.value) {
+        if (!isLocalDiscountCurrentlyValid(discount))
+            continue;
+        if (!isLocalDiscountForSelectedCustomer(discount))
+            continue;
+        const goodsIds = discount.ApplyToAllGoods ? [] : localDiscountGoodsIds(discount);
+        const applicableBase = cart.value
+            .filter((row) => isRowEligibleForLocalDiscount(row, goodsIds))
+            .reduce((sum, row) => sum + rowUnitPrice(row) * row.quantity, 0);
+        const amount = localDiscountAmount(discount, applicableBase);
+        if (amount > best.amount)
+            best = { amount, discount };
+    }
+    return best;
 }
 function applyInvoiceDiscount(invoice) {
     const discount = money(invoice.Discount ?? invoice.InvoiceDiscount);
@@ -1957,6 +2094,14 @@ if (__VLS_ctx.checkoutOpen) {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
         __VLS_asFunctionalElement(__VLS_intrinsicElements.b, __VLS_intrinsicElements.b)({});
     }
+    if (__VLS_ctx.autoDiscount.amount > 0) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.b, __VLS_intrinsicElements.b)({});
+        (__VLS_ctx.autoDiscountTitle);
+        (__VLS_ctx.formatMoney(__VLS_ctx.autoDiscount.amount));
+        (__VLS_ctx.currencyLabel);
+    }
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "grand" },
     });
@@ -2390,6 +2535,8 @@ const __VLS_self = (await import('vue')).defineComponent({
             subTotal: subTotal,
             taxTotal: taxTotal,
             packingTotal: packingTotal,
+            autoDiscount: autoDiscount,
+            autoDiscountTitle: autoDiscountTitle,
             discountValue: discountValue,
             grandTotal: grandTotal,
             totalItemQuantity: totalItemQuantity,

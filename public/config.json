@@ -3,7 +3,7 @@
     "kioskOrder": true,
     "scaleOrder": false,
     "showOrderRegistration": true,
-    "IsClub": false,
+    "IsClub": true,
     "IsSalon": true,
     "IsTakeAway": false,
     "showTables": false,

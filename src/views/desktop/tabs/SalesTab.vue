@@ -42,6 +42,7 @@ import {
   type DesktopToppingLevel,
   type DesktopToppingProduct,
 } from "../../../services/desktopApi";
+import { listLocalDiscounts, type LocalDiscount } from "../../../services/localDiscountApi";
 
 type CartRow = {
   id: string;
@@ -88,6 +89,7 @@ const creditMessage = ref("");
 const discountMode = ref<DiscountMode>("none");
 const discountPercent = ref(0);
 const discountAmount = ref(0);
+const localDiscounts = ref<LocalDiscount[]>([]);
 const toppingModalOpen = ref(false);
 const toppingProduct = ref<DesktopProduct | null>(null);
 const selectedToppingCounts = ref<Record<string, number>>({});
@@ -151,7 +153,7 @@ const packingTotal = computed(() => {
   return cart.value.reduce((sum, row) => sum + money(row.item.PackingPrice) * row.quantity, 0);
 });
 
-const discountValue = computed(() => {
+const manualDiscountValue = computed(() => {
   if (discountMode.value === "percent" && canDiscountPercent.value) {
     const percent = clamp(money(discountPercent.value), 0, maxDiscountPercent.value);
     return Math.min(subTotal.value, Math.floor((subTotal.value * percent) / 100));
@@ -161,6 +163,10 @@ const discountValue = computed(() => {
   }
   return 0;
 });
+
+const autoDiscount = computed(() => findBestLocalDiscount());
+const autoDiscountTitle = computed(() => autoDiscount.value.discount?.Title || autoDiscount.value.discount?.DiscountCode || "");
+const discountValue = computed(() => Math.max(manualDiscountValue.value, autoDiscount.value.amount));
 
 const grandTotal = computed(() =>
   Math.max(subTotal.value + taxTotal.value + packingTotal.value - discountValue.value, 0)
@@ -235,7 +241,7 @@ onMounted(async () => {
     currencyIsRial.value = false;
   }
   handleInvoiceEditRequest();
-  await Promise.all([loadCatalog(), loadRuntimeSettings(), loadTables()]);
+  await Promise.all([loadCatalog(), loadRuntimeSettings(), loadTables(), loadLocalDiscounts()]);
   handleInvoiceEditRequest();
   handleTableOrderRequest();
 });
@@ -309,6 +315,17 @@ async function loadTables() {
     tableGroups.value = [];
     diningTables.value = [];
     const message = error instanceof Error ? error.message : "خطا در دریافت میزها";
+    serviceMessage.value = serviceMessage.value ? `${serviceMessage.value} | ${message}` : message;
+  }
+}
+
+
+async function loadLocalDiscounts() {
+  try {
+    localDiscounts.value = await listLocalDiscounts();
+  } catch (error) {
+    localDiscounts.value = [];
+    const message = error instanceof Error ? error.message : "خطا در دریافت تخفیف‌ها";
     serviceMessage.value = serviceMessage.value ? `${serviceMessage.value} | ${message}` : message;
   }
 }
@@ -564,6 +581,139 @@ function invoicePaymentPart(invoice: DesktopInvoice, key: "pos" | "cash" | "cred
   if (key === "cash") return cash;
   if (key === "credit") return credit;
   return pos;
+}
+
+
+function selectedCustomerIds() {
+  const customer = selectedCustomer.value as (DesktopCustomer & Record<string, unknown>) | null;
+  if (!customer) return [] as number[];
+
+  const rawIds = [
+    customer.CustomerId,
+    customer.UserId,
+    customer.UID,
+    customer.Id,
+    customer.CustomerCode,
+    customer.Code,
+    customer.customerId,
+    customer.userId,
+    customer.uid,
+    customer.id,
+    customer.customerCode,
+  ];
+
+  return Array.from(new Set(
+    rawIds
+      .map((value) => Number(value))
+      .filter((id) => Number.isFinite(id) && id > 0)
+  ));
+}
+
+function parseDiscountIds(value: unknown) {
+  if (Array.isArray(value)) {
+    return value.map(Number).filter((id) => Number.isFinite(id) && id > 0);
+  }
+  return String(value || "")
+    .split(/[,،\n\s]+/)
+    .map((id) => Number(String(id).trim()))
+    .filter((id) => Number.isFinite(id) && id > 0);
+}
+
+function localDiscountCustomerIds(discount: LocalDiscount) {
+  const record = discount as Record<string, unknown>;
+  return parseDiscountIds(record.CustomerIds ?? record.customerIds ?? record.CustomerIdsText);
+}
+
+function localDiscountGoodsIds(discount: LocalDiscount) {
+  const record = discount as Record<string, unknown>;
+  return parseDiscountIds(record.GoodsIds ?? record.goodsIds ?? record.GoodsIdsText);
+}
+
+function compactDate(value: unknown) {
+  return String(value || "").replace(/\D/g, "");
+}
+
+function currentJalaliDateCompact() {
+  return compactDate(
+    new Date().toLocaleDateString("fa-IR", { year: "numeric", month: "2-digit", day: "2-digit" })
+      .replace(/[۰-۹]/g, (digit) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(digit)))
+  );
+}
+
+function timeToNumber(value: unknown) {
+  const text = String(value || "").replace(/\D/g, "");
+  if (!text) return 0;
+  if (text.length <= 2) return Number(text) * 100;
+  return Number(text.slice(0, 2)) * 100 + Number(text.slice(2, 4) || 0);
+}
+
+function isLocalDiscountCurrentlyValid(discount: LocalDiscount) {
+  if (discount.IsActive === false) return false;
+
+  const today = currentJalaliDateCompact();
+  const start = compactDate(discount.StartDate);
+  const end = compactDate(discount.EndDate);
+  if (start && today && Number(today) < Number(start)) return false;
+  if (end && today && Number(today) > Number(end)) return false;
+
+  const now = new Date();
+  const current = now.getHours() * 100 + now.getMinutes();
+  const from = timeToNumber(discount.FromTime);
+  const to = timeToNumber(discount.ToTime);
+  if (from && current < from) return false;
+  if (to && current > to) return false;
+
+  return true;
+}
+
+function isLocalDiscountForSelectedCustomer(discount: LocalDiscount) {
+  const customerIds = localDiscountCustomerIds(discount);
+  if (!customerIds.length) return true;
+
+  const ids = selectedCustomerIds();
+  if (!ids.length) return false;
+
+  return ids.some((id) => customerIds.includes(id));
+}
+
+function isRowEligibleForLocalDiscount(row: CartRow, goodsIds: number[]) {
+  if (!goodsIds.length) return true;
+  return goodsIds.includes(Number(row.item.GoodsId)) || goodsIds.includes(Number(row.item.GoodsCode));
+}
+
+function localDiscountAmount(discount: LocalDiscount, base: number) {
+  if (base <= 0) return 0;
+  if (money(discount.MinInvoiceAmount) > 0 && base < money(discount.MinInvoiceAmount)) return 0;
+
+  let amount = 0;
+  if (Number(discount.DiscountType) === 1) {
+    amount = base * (money(discount.DiscountPercent) / 100);
+  } else {
+    amount = Math.min(money(discount.DiscountAmount), base);
+  }
+
+  if (money(discount.MaxDiscountAmount) > 0) amount = Math.min(amount, money(discount.MaxDiscountAmount));
+  return Math.max(0, Math.round(amount));
+}
+
+function findBestLocalDiscount() {
+  let best: { amount: number; discount: LocalDiscount | null } = { amount: 0, discount: null };
+  if (!cart.value.length || !localDiscounts.value.length) return best;
+
+  for (const discount of localDiscounts.value) {
+    if (!isLocalDiscountCurrentlyValid(discount)) continue;
+    if (!isLocalDiscountForSelectedCustomer(discount)) continue;
+
+    const goodsIds = discount.ApplyToAllGoods ? [] : localDiscountGoodsIds(discount);
+    const applicableBase = cart.value
+      .filter((row) => isRowEligibleForLocalDiscount(row, goodsIds))
+      .reduce((sum, row) => sum + rowUnitPrice(row) * row.quantity, 0);
+
+    const amount = localDiscountAmount(discount, applicableBase);
+    if (amount > best.amount) best = { amount, discount };
+  }
+
+  return best;
 }
 
 function applyInvoiceDiscount(invoice: DesktopInvoice) {
@@ -1548,6 +1698,8 @@ function currentTime() {
             <div v-if="!skipPaymentForTable"><span>کارتخوان</span><b>{{ formatMoney(posPayableAmount) }} {{
               currencyLabel }}</b></div>
             <div v-else><span>وضعیت</span><b>باز روی میز</b></div>
+            <div v-if="autoDiscount.amount > 0"><span>تخفیف خودکار</span><b>{{ autoDiscountTitle }} - {{
+              formatMoney(autoDiscount.amount) }} {{ currencyLabel }}</b></div>
             <div class="grand"><span>مبلغ نهایی</span><b>{{ formatMoney(grandTotal) }} {{ currencyLabel }}</b></div>
           </div>
         </div>
@@ -1590,7 +1742,7 @@ function currentTime() {
               <span v-if="table.IsOccupied" class="table-card-money">{{ formatMoney(money(table.Payable)) }} {{
                 currencyLabel }}</span>
               <span v-if="table.IsOccupied" class="table-card-time">{{ formatOccupiedDuration(table.OccupiedMinutes)
-                }}</span>
+              }}</span>
               <b>{{ table.TableTitle }}</b>
               <small>{{ table.TableCode }}</small>
             </button>

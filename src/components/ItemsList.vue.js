@@ -1,7 +1,7 @@
 import { ref, computed, onMounted, nextTick, watch, inject, toRaw } from 'vue';
 import { getData, saveData, removeData } from '../services/storageService';
 import { getCurrency, IsClubStat, OrderRegistrationStat, IsSalonOrderStat, IsTakeAwayOrderStat, GetIsCollapseCart, IsShowTables, IsShowDiscountCart, IsTableSelectionRequired, KeepSalonTableOpenAfterSubmit, ShowKioskOrderTypeSelector } from '../utilities';
-import { sendToPOS, getCustomerData, sendInvoice, fetchCategories, fetchGoods, fetchToppingProducts, fetchToppings, fetchToppingLevels, fetchDiscountsCarts, useCustomerCredit, fetchCustomerCredit, checkStockLicense, checkStockGoods, fetchTables } from '../services/apiService';
+import { sendToPOS, getCustomerData, sendInvoice, fetchCategories, fetchGoods, fetchToppingProducts, fetchToppings, fetchToppingLevels, fetchDiscountsCarts, useCustomerCredit, fetchCustomerCredit, checkStockLicense, checkStockGoods, fetchTables, fetchGoodsDiscounts } from '../services/apiService';
 import { useToast } from 'vue-toastification';
 import ScrollArrows from './ScrollArrows.vue';
 import { useNow } from '@vueuse/core';
@@ -48,7 +48,8 @@ const showOrderTypeSelector = ref(false);
 const orderTypeConfigError = ref(false);
 const IsShowDiscountCartField = ref(false);
 const HaveStockLicense = ref(false);
-const goodsDiscountTotal = ref(0); // تخفیف کل کالاها
+const goodsDiscountProducts = ref([]);
+const goodsDiscountTotal = computed(() => autoGoodsDiscount.value.amount); // تخفیف خودکار کالاها
 // بخش اعتبار مشتریان
 const customerCredit = ref(0);
 const creditAmount = ref(0);
@@ -200,7 +201,7 @@ const totalPrice = computed(() => {
         }
     });
     // اعمال تخفیف باشگاه مشتریان
-    const afterDiscount = basePrice + totalPacking - discount.value;
+    const afterDiscount = basePrice + totalPacking - discount.value - goodsDiscountTotal.value;
     const finalAmount = afterDiscount + totalTaxValue;
     return finalAmount > 0 ? finalAmount : 0;
 });
@@ -243,7 +244,7 @@ onMounted(async () => {
     // بارگذاری اطلاعات کالاها و ...
     await loadData(props.connectionId);
     try {
-        const [categoryData, goodsData, toppingData, levelData, productData, cartData, toppingsData, tableData] = await Promise.all([
+        const [categoryData, goodsData, toppingData, levelData, productData, cartData, toppingsData, tableData, discountData, discountProductData] = await Promise.all([
             getData('category'),
             getData('goods'),
             getData('topping'),
@@ -251,7 +252,9 @@ onMounted(async () => {
             getData('toppingproducts'),
             getData('cart'),
             getData('cartToppings'),
-            getData('tables')
+            getData('tables'),
+            getData('discounts'),
+            getData('discountProducts')
         ]);
         groups.value = Array.isArray(categoryData) ? categoryData : categoryData?.GoodsGroup || [];
         goods.value = Array.isArray(goodsData) ? goodsData : Object.values(goodsData);
@@ -263,6 +266,8 @@ onMounted(async () => {
             ? JSON.parse(JSON.stringify(toppingsData))
             : {};
         tables.value = normalizeTables(tableData);
+        goodsDiscounts.value = Array.isArray(discountData) ? discountData : [];
+        goodsDiscountProducts.value = Array.isArray(discountProductData) ? discountProductData : [];
     }
     catch (error) {
         console.error('خطا در دریافت داده:', error);
@@ -937,6 +942,92 @@ function getToppingCount(product) {
     const topping = selectedToppings.value.find(t => t.ToppingProductId === product.GoodsId);
     return topping ? topping.count : 0;
 }
+function isLocalDiscountActive(discountRow) {
+    if (!discountRow || discountRow.IsActive === false || discountRow.CanUse === false)
+        return false;
+    const d = new Date();
+    const today = convertPersianDigitsToEnglish(d.toLocaleDateString('fa-IR', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    }));
+    const startDate = discountRow.StartDate || discountRow.FromDate;
+    const endDate = discountRow.EndDate || discountRow.ToDate || discountRow.ExpireDate;
+    if ((startDate || endDate) && !isDateInRange(today, startDate, endDate))
+        return false;
+    const currentTime = d.getHours() * 100 + d.getMinutes();
+    const fromTime = convertTimeToNumberDis(discountRow.StartTime || discountRow.FromTime);
+    const toTime = convertTimeToNumberDis(discountRow.EndTime || discountRow.ToTime);
+    if (fromTime && currentTime < fromTime)
+        return false;
+    if (toTime && currentTime > toTime)
+        return false;
+    return true;
+}
+function convertTimeToNumberDis(timeStr) {
+    if (!timeStr)
+        return 0;
+    const cleaned = String(timeStr).replace(/\D/g, '');
+    if (!cleaned)
+        return 0;
+    if (cleaned.length <= 2)
+        return Number(cleaned) * 100;
+    return Number(cleaned.slice(0, 2)) * 100 + Number(cleaned.slice(2, 4) || 0);
+}
+function discountIdOf(discountRow) {
+    return Number(discountRow?.DiscountId ?? discountRow?.DiscountCodeId ?? discountRow?.GoodsDiscountId ?? 0);
+}
+function localDiscountProducts(discountRow) {
+    const discountId = discountIdOf(discountRow);
+    return Array.isArray(goodsDiscountProducts.value)
+        ? goodsDiscountProducts.value.filter(dp => Number(dp.DiscountId) === discountId)
+        : [];
+}
+function isItemEligibleForLocalDiscount(cartItem, discountRow, products) {
+    const useForAll = discountRow?.UseForAll === true || discountRow?.ApplyToAllGoods === true || products.length === 0;
+    if (useForAll)
+        return true;
+    return products.some(dp => Number(dp.ProductCode ?? dp.GoodsId ?? dp.Goodsid) === Number(cartItem.item.GoodsId) ||
+        String(dp.ProductCode ?? '') === String(cartItem.item.GoodsCode ?? ''));
+}
+function calculateLocalDiscountAmount(discountRow, amount) {
+    const base = Number(amount || 0);
+    if (base <= 0)
+        return 0;
+    const minBuy = Number(discountRow?.MinBuy ?? discountRow?.MinInvoiceAmount ?? 0);
+    if (minBuy > 0 && base < minBuy)
+        return 0;
+    let value = 0;
+    if (isPercentDiscountType(discountRow?.DiscountType)) {
+        value = base * (normalizeDiscountValue(discountRow) / 100);
+    }
+    else {
+        value = Math.min(normalizeDiscountValue(discountRow), base);
+    }
+    const maxDiscount = Number(discountRow?.DiscountMax ?? discountRow?.MaxDiscountAmount ?? 0);
+    if (maxDiscount > 0)
+        value = Math.min(value, maxDiscount);
+    return Math.max(0, Math.round(value));
+}
+const autoGoodsDiscount = computed(() => {
+    if (!Array.isArray(goodsDiscounts.value) || goodsDiscounts.value.length === 0 || cartItems.value.length === 0) {
+        return { amount: 0, discount: null };
+    }
+    let best = { amount: 0, discount: null };
+    for (const discountRow of goodsDiscounts.value) {
+        if (!isLocalDiscountActive(discountRow))
+            continue;
+        const products = localDiscountProducts(discountRow);
+        const applicableItems = cartItems.value.filter(item => isItemEligibleForLocalDiscount(item, discountRow, products));
+        if (!applicableItems.length)
+            continue;
+        const applicableBase = applicableItems.reduce((sum, item) => sum + lineBaseAmount(item), 0);
+        const amount = calculateLocalDiscountAmount(discountRow, applicableBase);
+        if (amount > best.amount)
+            best = { amount, discount: discountRow };
+    }
+    return best;
+});
 //  اطلاعات بررسی و اعمال تخفیفات باشگاه مشتریان حامی //
 const totalDiscountApplied = computed(() => {
     return Math.round(goodsDiscountTotal.value + discount.value);
@@ -1292,16 +1383,17 @@ async function loadData(conId) {
             removeData('toppinglevel'),
             removeData('toppingproducts'),
             removeData('tables'),
-            //removeData('discounts')
+            removeData('discounts'),
+            removeData('discountProducts')
         ]);
-        const [categories, goods, toppings, toppingLevels, toppingProducts, tables, goodsDiscounts] = await Promise.all([
+        const [categories, goods, toppings, toppingLevels, toppingProducts, tables, discountsResponse] = await Promise.all([
             fetchCategories(conId).then(res => res.GoodsGroup || res),
             fetchGoods(conId).then(res => res.Goods || res),
             fetchToppings(conId).then(res => res.Goods || res),
             fetchToppingLevels(conId).then(res => res.ToppingLevel || res),
             fetchToppingProducts(conId).then(res => res.ToppingGoods || res),
             fetchTables(conId).then(res => normalizeTables(res)).catch(() => []),
-            //fetchGoodsDiscounts(conId).then(res => res.Discounts || res)
+            fetchGoodsDiscounts(conId).catch(() => ({ Discounts: [], DiscountProducts: [], CustomerDiscountProductsList: [] }))
         ]);
         await Promise.all([
             saveData('category', categories),
@@ -1310,7 +1402,8 @@ async function loadData(conId) {
             saveData('toppinglevel', toppingLevels),
             saveData('toppingproducts', toppingProducts),
             saveData('tables', tables),
-            //saveData('discounts', goodsDiscounts)
+            saveData('discounts', Array.isArray(discountsResponse?.Discounts) ? discountsResponse.Discounts : []),
+            saveData('discountProducts', Array.isArray(discountsResponse?.DiscountProducts) ? discountsResponse.DiscountProducts : (discountsResponse?.CustomerDiscountProductsList || []))
         ]);
     }
     catch (error) {
