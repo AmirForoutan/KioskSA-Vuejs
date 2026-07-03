@@ -1,7 +1,7 @@
 import "@majidh1/jalalidatepicker";
 import "@majidh1/jalalidatepicker/dist/jalalidatepicker.min.css";
 import { computed, nextTick, onMounted, reactive, ref } from "vue";
-import { loadDesktopCatalog, searchDesktopCustomers } from "../../../services/desktopApi";
+import { loadDesktopCatalog, loadDesktopCustomers, searchDesktopCustomers } from "../../../services/desktopApi";
 import { disableLocalDiscount, disableLocalDiscountCard, listLocalDiscountCardTransactions, listLocalDiscountCards, listLocalDiscounts, saveLocalDiscount, saveLocalDiscountCard, } from "../../../services/localDiscountApi";
 const loading = ref(false);
 const productLoading = ref(false);
@@ -274,33 +274,34 @@ function confirmProductSelection() {
     discountForm.ApplyToAllGoods = selectedProductIds.value.length === 0 ? discountForm.ApplyToAllGoods : false;
     productPickerOpen.value = false;
 }
-function openCustomerPicker() {
+async function openCustomerPicker() {
     selectedCustomerPickerIds.value = parseNumberIds(discountForm.CustomerIdsText);
-    customerPickerOpen.value = true;
-    customers.value = [];
     customerSearch.value = "";
+    customerPickerOpen.value = true;
+    await loadCustomersForPicker("");
 }
 function closeCustomerPicker() {
     customerPickerOpen.value = false;
 }
-async function findCustomers() {
-    const q = customerSearch.value.trim();
-    if (!q) {
-        message.value = "برای جستجوی مشتری، نام یا موبایل را وارد کنید";
-        return;
-    }
+async function loadCustomersForPicker(searchTerm) {
     customerLoading.value = true;
     try {
-        customers.value = await searchDesktopCustomers(q);
+        const term = searchTerm.trim();
+        const result = term ? await searchDesktopCustomers(term) : await loadDesktopCustomers("");
+        customers.value = result.filter((customer) => customerId(customer) > 0);
         if (!customers.value.length)
-            message.value = "مشتری‌ای یافت نشد";
+            message.value = term ? "مشتری‌ای یافت نشد" : "لیست مشتری‌ها خالی است";
     }
     catch (error) {
-        message.value = error instanceof Error ? error.message : "خطا در جستجوی مشتری";
+        message.value = error instanceof Error ? error.message : "خطا در دریافت مشتری‌ها";
+        customers.value = [];
     }
     finally {
         customerLoading.value = false;
     }
+}
+async function findCustomers() {
+    await loadCustomersForPicker(customerSearch.value);
 }
 function isCustomerSelected(customer) {
     const id = customerId(customer);
@@ -326,11 +327,17 @@ function selectFoundCustomers() {
     }
     selectedCustomerPickerIds.value = Array.from(current).sort((a, b) => a - b);
 }
-function clearCustomerSelection() {
+function clearCustomerPickerSelection() {
+    selectedCustomerPickerIds.value = [];
+}
+function clearDiscountCustomers() {
+    discountForm.CustomerIdsText = "";
     selectedCustomerPickerIds.value = [];
 }
 function confirmCustomerSelection() {
-    discountForm.CustomerIdsText = selectedCustomerPickerIds.value.join(",");
+    const ids = Array.from(new Set(selectedCustomerPickerIds.value.map(Number).filter((id) => Number.isFinite(id) && id > 0))).sort((a, b) => a - b);
+    discountForm.CustomerIdsText = ids.join(",");
+    selectedCustomerPickerIds.value = ids;
     customerPickerOpen.value = false;
 }
 function removeCustomerId(id) {
@@ -507,7 +514,9 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['modal-footer']} */ ;
 /** @type {__VLS_StyleScopedClasses['modal-head']} */ ;
 /** @type {__VLS_StyleScopedClasses['modal-head']} */ ;
+/** @type {__VLS_StyleScopedClasses['customer-list']} */ ;
 /** @type {__VLS_StyleScopedClasses['product-row']} */ ;
+/** @type {__VLS_StyleScopedClasses['customer-row']} */ ;
 /** @type {__VLS_StyleScopedClasses['customer-row']} */ ;
 /** @type {__VLS_StyleScopedClasses['product-row']} */ ;
 /** @type {__VLS_StyleScopedClasses['customer-row']} */ ;
@@ -683,7 +692,7 @@ if (__VLS_ctx.activeTab === 'discounts') {
         type: "button",
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-        ...{ onClick: (__VLS_ctx.clearCustomerSelection) },
+        ...{ onClick: (__VLS_ctx.clearDiscountCustomers) },
         ...{ class: "btn" },
         type: "button",
         disabled: (!__VLS_ctx.selectedCustomerCount),
@@ -1075,7 +1084,7 @@ if (__VLS_ctx.customerPickerOpen) {
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
         ...{ onKeyup: (__VLS_ctx.findCustomers) },
-        placeholder: "نام، موبایل یا شناسه مشتری",
+        placeholder: "جستجوی نام، موبایل یا شناسه مشتری",
     });
     (__VLS_ctx.customerSearch);
     __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
@@ -1091,7 +1100,7 @@ if (__VLS_ctx.customerPickerOpen) {
         disabled: (!__VLS_ctx.customers.length),
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-        ...{ onClick: (__VLS_ctx.clearCustomerSelection) },
+        ...{ onClick: (__VLS_ctx.clearCustomerPickerSelection) },
         ...{ class: "btn" },
         type: "button",
     });
@@ -1113,6 +1122,7 @@ if (__VLS_ctx.customerPickerOpen) {
             __VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({
                 key: (__VLS_ctx.customerId(customer)),
                 ...{ class: "customer-row" },
+                ...{ class: ({ selected: __VLS_ctx.isCustomerSelected(customer) }) },
             });
             __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
                 ...{ onChange: (...[$event]) => {
@@ -1231,6 +1241,7 @@ if (__VLS_ctx.customerPickerOpen) {
 /** @type {__VLS_StyleScopedClasses['modal-state']} */ ;
 /** @type {__VLS_StyleScopedClasses['customer-list']} */ ;
 /** @type {__VLS_StyleScopedClasses['customer-row']} */ ;
+/** @type {__VLS_StyleScopedClasses['selected']} */ ;
 /** @type {__VLS_StyleScopedClasses['customer-main']} */ ;
 /** @type {__VLS_StyleScopedClasses['customer-meta']} */ ;
 /** @type {__VLS_StyleScopedClasses['modal-footer']} */ ;
@@ -1287,7 +1298,8 @@ const __VLS_self = (await import('vue')).defineComponent({
             isCustomerSelected: isCustomerSelected,
             toggleCustomer: toggleCustomer,
             selectFoundCustomers: selectFoundCustomers,
-            clearCustomerSelection: clearCustomerSelection,
+            clearCustomerPickerSelection: clearCustomerPickerSelection,
+            clearDiscountCustomers: clearDiscountCustomers,
             confirmCustomerSelection: confirmCustomerSelection,
             removeCustomerId: removeCustomerId,
             submitDiscount: submitDiscount,
