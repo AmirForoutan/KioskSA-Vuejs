@@ -1,4 +1,38 @@
 import { GetApiAddress, sendToAmountPOS } from "../utilities";
+const CUSTOMER_META_PREFIX = "[CUSTOMER_DISCOUNT_IDS:";
+const CUSTOMER_META_SUFFIX = "]";
+function packCustomerIds(description, customerIds) {
+    const clean = unpackCustomerIds(description).description;
+    const ids = Array.from(new Set((customerIds || []).map(Number).filter((id) => Number.isFinite(id) && id > 0)));
+    if (!ids.length)
+        return clean || undefined;
+    const meta = `${CUSTOMER_META_PREFIX}${ids.join(",")}${CUSTOMER_META_SUFFIX}`;
+    return `${clean ? `${clean}\n` : ""}${meta}`;
+}
+export function unpackCustomerIds(description) {
+    const text = String(description ?? "");
+    const start = text.indexOf(CUSTOMER_META_PREFIX);
+    if (start < 0)
+        return { description: text, customerIds: [] };
+    const end = text.indexOf(CUSTOMER_META_SUFFIX, start + CUSTOMER_META_PREFIX.length);
+    if (end < 0)
+        return { description: text, customerIds: [] };
+    const raw = text.slice(start + CUSTOMER_META_PREFIX.length, end);
+    const customerIds = raw
+        .split(",")
+        .map((item) => Number(item.trim()))
+        .filter((item) => Number.isFinite(item) && item > 0);
+    const descriptionOnly = `${text.slice(0, start)}${text.slice(end + CUSTOMER_META_SUFFIX.length)}`.trim();
+    return { description: descriptionOnly, customerIds };
+}
+function normalizeDiscount(row) {
+    const unpacked = unpackCustomerIds(row.Description);
+    return {
+        ...row,
+        Description: unpacked.description,
+        CustomerIds: Array.isArray(row.CustomerIds) && row.CustomerIds.length ? row.CustomerIds : unpacked.customerIds,
+    };
+}
 async function postAt(baseUrl, endpoint, body) {
     const base = baseUrl.replace(/\/$/, "");
     const path = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
@@ -40,10 +74,13 @@ function unwrapData(response, keys = []) {
 export async function listLocalDiscounts() {
     const response = await postApi("/pc/discounts/list", {});
     assertOk(response, "خطا در دریافت تخفیف‌ها");
-    return unwrapData(response, ["discounts", "Discounts"]);
+    return unwrapData(response, ["discounts", "Discounts"]).map(normalizeDiscount);
 }
 export async function saveLocalDiscount(payload) {
-    const response = await postApi("/pc/discounts/save", payload);
+    const response = await postApi("/pc/discounts/save", {
+        ...payload,
+        Description: packCustomerIds(payload.Description, payload.CustomerIds),
+    });
     return assertOk(response, "خطا در ذخیره تخفیف");
 }
 export async function disableLocalDiscount(discountId) {
@@ -61,7 +98,7 @@ export async function saveLocalDiscountCard(payload) {
 }
 export async function disableLocalDiscountCard(discountCardId) {
     const response = await postApi("/pc/discount-cards/delete", { DiscountCardId: discountCardId });
-    return assertOk(response, "خطا در غیرفعال کردن کارت تخفیف");
+    return assertOk(response, "خطا در غیرفعال کردن کارت");
 }
 export async function listLocalDiscountCardTransactions(params = {}) {
     const response = await postApi("/pc/discount-card-transactions/list", params);

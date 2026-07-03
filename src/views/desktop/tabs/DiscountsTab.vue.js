@@ -1,10 +1,12 @@
 import { computed, onMounted, reactive, ref } from "vue";
-import { loadDesktopCatalog } from "../../../services/desktopApi";
 import { disableLocalDiscount, disableLocalDiscountCard, listLocalDiscountCardTransactions, listLocalDiscountCards, listLocalDiscounts, saveLocalDiscount, saveLocalDiscountCard, } from "../../../services/localDiscountApi";
 const loading = ref(false);
 const productLoading = ref(false);
 const productPickerOpen = ref(false);
 const productSearch = ref("");
+const customerSearch = ref("");
+const customerLoading = ref(false);
+const customers = ref([]);
 const message = ref("");
 const discounts = ref([]);
 const cards = ref([]);
@@ -29,6 +31,7 @@ const discountForm = reactive({
     ApplyToAllGoods: true,
     IsActive: true,
     GoodsIdsText: "",
+    CustomerIdsText: "",
 });
 const cardForm = reactive({
     DiscountCardId: 0,
@@ -45,9 +48,11 @@ const cardForm = reactive({
 });
 const hasMessage = computed(() => message.value.trim().length > 0);
 const selectedProductIdSet = computed(() => new Set(selectedProductIds.value));
-const selectedGoodsCount = computed(() => parseGoodsIds(discountForm.GoodsIdsText).length);
+const selectedGoodsCount = computed(() => parseNumberIds(discountForm.GoodsIdsText).length);
+const selectedCustomerIds = computed(() => parseNumberIds(discountForm.CustomerIdsText));
+const selectedCustomerCount = computed(() => selectedCustomerIds.value.length);
 const selectedGoodsSummary = computed(() => {
-    const ids = parseGoodsIds(discountForm.GoodsIdsText);
+    const ids = parseNumberIds(discountForm.GoodsIdsText);
     if (!ids.length)
         return "کالایی انتخاب نشده";
     if (ids.length <= 4)
@@ -65,8 +70,12 @@ const filteredProducts = computed(() => {
     });
 });
 onMounted(() => {
+    setupDatePicker();
     void refreshAll();
 });
+function setupDatePicker() {
+    setupJalaliDateInputs();
+}
 async function refreshAll() {
     loading.value = true;
     message.value = "";
@@ -110,7 +119,7 @@ function nullableText(value) {
     const normalized = String(value ?? "").trim();
     return normalized.length ? normalized : null;
 }
-function parseGoodsIds(value) {
+function parseNumberIds(value) {
     if (Array.isArray(value)) {
         return value
             .map((item) => Number(item))
@@ -126,13 +135,25 @@ function parseGoodsIds(value) {
 function rowGoodsIds(row) {
     const record = row;
     if (Array.isArray(row.GoodsIds))
-        return parseGoodsIds(row.GoodsIds);
+        return parseNumberIds(row.GoodsIds);
     if (Array.isArray(record.goodsIds))
-        return parseGoodsIds(record.goodsIds);
+        return parseNumberIds(record.goodsIds);
     if (typeof row.GoodsIds === "string")
-        return parseGoodsIds(row.GoodsIds);
+        return parseNumberIds(row.GoodsIds);
     if (typeof record.GoodsIdsText === "string")
-        return parseGoodsIds(record.GoodsIdsText);
+        return parseNumberIds(record.GoodsIdsText);
+    return [];
+}
+function rowCustomerIds(row) {
+    const record = row;
+    if (Array.isArray(row.CustomerIds))
+        return parseNumberIds(row.CustomerIds);
+    if (Array.isArray(record.customerIds))
+        return parseNumberIds(record.customerIds);
+    if (typeof row.CustomerIds === "string")
+        return parseNumberIds(row.CustomerIds);
+    if (typeof record.CustomerIdsText === "string")
+        return parseNumberIds(record.CustomerIdsText);
     return [];
 }
 function productId(product) {
@@ -141,6 +162,15 @@ function productId(product) {
 function productTitle(product) {
     const code = product.GoodsCode ? `کد ${product.GoodsCode} - ` : "";
     return `${code}${product.GoodsName ?? "کالا"}`;
+}
+function customerId(customer) {
+    return Number(customer.CustomerId ?? customer.UserId ?? 0);
+}
+function customerTitle(customer) {
+    const id = customerId(customer);
+    const name = customer.FullName || customer.Name || `${customer.Firstname || ""} ${customer.Lastname || ""}`.trim() || "مشتری";
+    const phone = customer.PhoneNumber || customer.Mobile || "";
+    return `${id ? `#${id} - ` : ""}${name}${phone ? ` - ${phone}` : ""}`;
 }
 function resetDiscountForm() {
     Object.assign(discountForm, {
@@ -160,11 +190,13 @@ function resetDiscountForm() {
         ApplyToAllGoods: true,
         IsActive: true,
         GoodsIdsText: "",
+        CustomerIdsText: "",
     });
     selectedProductIds.value = [];
 }
 function editDiscount(row) {
     const goodsIds = rowGoodsIds(row);
+    const customerIds = rowCustomerIds(row);
     Object.assign(discountForm, {
         DiscountId: toNumber(row.DiscountId),
         DiscountCode: String(row.DiscountCode ?? ""),
@@ -182,12 +214,13 @@ function editDiscount(row) {
         ApplyToAllGoods: row.ApplyToAllGoods !== false,
         IsActive: row.IsActive !== false,
         GoodsIdsText: goodsIds.join(","),
+        CustomerIdsText: customerIds.join(","),
     });
     selectedProductIds.value = goodsIds;
     activeTab.value = "discounts";
 }
 async function openProductPicker() {
-    selectedProductIds.value = parseGoodsIds(discountForm.GoodsIdsText);
+    selectedProductIds.value = parseNumberIds(discountForm.GoodsIdsText);
     productSearch.value = "";
     productPickerOpen.value = true;
     await loadProducts();
@@ -227,6 +260,36 @@ function confirmProductSelection() {
     discountForm.ApplyToAllGoods = selectedProductIds.value.length === 0 ? discountForm.ApplyToAllGoods : false;
     productPickerOpen.value = false;
 }
+async function findCustomers() {
+    const q = customerSearch.value.trim();
+    if (!q) {
+        message.value = "برای جستجوی مشتری، نام یا موبایل را وارد کنید";
+        return;
+    }
+    customerLoading.value = true;
+    try {
+        customers.value = await searchDesktopCustomers(q);
+        if (!customers.value.length)
+            message.value = "مشتری‌ای یافت نشد";
+    }
+    catch (error) {
+        message.value = error instanceof Error ? error.message : "خطا در جستجوی مشتری";
+    }
+    finally {
+        customerLoading.value = false;
+    }
+}
+function addCustomerToDiscount(customer) {
+    const id = customerId(customer);
+    if (id <= 0)
+        return;
+    const current = new Set(parseNumberIds(discountForm.CustomerIdsText));
+    current.add(id);
+    discountForm.CustomerIdsText = Array.from(current).sort((a, b) => a - b).join(",");
+}
+function removeCustomerId(id) {
+    discountForm.CustomerIdsText = parseNumberIds(discountForm.CustomerIdsText).filter((item) => item !== id).join(",");
+}
 async function submitDiscount() {
     if (!discountForm.Title.trim()) {
         message.value = "عنوان تخفیف الزامی است";
@@ -242,7 +305,7 @@ async function submitDiscount() {
     }
     loading.value = true;
     try {
-        const goodsIds = discountForm.ApplyToAllGoods ? [] : parseGoodsIds(discountForm.GoodsIdsText);
+        const goodsIds = discountForm.ApplyToAllGoods ? [] : parseNumberIds(discountForm.GoodsIdsText);
         await saveLocalDiscount({
             DiscountId: discountForm.DiscountId,
             DiscountCode: nullableText(discountForm.DiscountCode) ?? undefined,
@@ -260,6 +323,7 @@ async function submitDiscount() {
             ApplyToAllGoods: discountForm.ApplyToAllGoods,
             IsActive: discountForm.IsActive,
             GoodsIds: goodsIds,
+            CustomerIds: parseNumberIds(discountForm.CustomerIdsText),
         });
         message.value = "تخفیف ذخیره شد";
         resetDiscountForm();
@@ -503,12 +567,18 @@ if (__VLS_ctx.activeTab === 'discounts') {
     (__VLS_ctx.discountForm.MinInvoiceAmount);
     __VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({});
     __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+        readonly: true,
         placeholder: "1405/01/01",
+        'data-jdp': true,
+        'data-jdp-bound': true,
     });
     (__VLS_ctx.discountForm.StartDate);
     __VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({});
     __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+        readonly: true,
         placeholder: "1405/12/29",
+        'data-jdp': true,
+        'data-jdp-bound': true,
     });
     (__VLS_ctx.discountForm.EndDate);
     __VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({});
@@ -539,6 +609,71 @@ if (__VLS_ctx.activeTab === 'discounts') {
         type: "button",
         disabled: (__VLS_ctx.discountForm.ApplyToAllGoods),
     });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "customer-select-box wide" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.strong, __VLS_intrinsicElements.strong)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+    (__VLS_ctx.selectedCustomerCount ? `${__VLS_ctx.selectedCustomerCount} مشتری انتخاب شده` : 'عمومی؛ برای همه مشتری‌ها');
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.small, __VLS_intrinsicElements.small)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+        placeholder: "مثلا 12,18,25 - خالی یعنی عمومی",
+    });
+    (__VLS_ctx.discountForm.CustomerIdsText);
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "customer-search-row" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+        ...{ onKeyup: (__VLS_ctx.findCustomers) },
+        placeholder: "جستجوی مشتری با نام یا موبایل",
+    });
+    (__VLS_ctx.customerSearch);
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (__VLS_ctx.findCustomers) },
+        ...{ class: "btn" },
+        type: "button",
+        disabled: (__VLS_ctx.customerLoading),
+    });
+    if (__VLS_ctx.selectedCustomerIds.length) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "chip-list" },
+        });
+        for (const [id] of __VLS_getVForSourceType((__VLS_ctx.selectedCustomerIds))) {
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+                ...{ onClick: (...[$event]) => {
+                        if (!(__VLS_ctx.activeTab === 'discounts'))
+                            return;
+                        if (!(__VLS_ctx.selectedCustomerIds.length))
+                            return;
+                        __VLS_ctx.removeCustomerId(id);
+                    } },
+                key: (id),
+                ...{ class: "chip" },
+                type: "button",
+            });
+            (id);
+        }
+    }
+    if (__VLS_ctx.customers.length) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "customer-results" },
+        });
+        for (const [customer] of __VLS_getVForSourceType((__VLS_ctx.customers))) {
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+                ...{ onClick: (...[$event]) => {
+                        if (!(__VLS_ctx.activeTab === 'discounts'))
+                            return;
+                        if (!(__VLS_ctx.customers.length))
+                            return;
+                        __VLS_ctx.addCustomerToDiscount(customer);
+                    } },
+                key: (__VLS_ctx.customerId(customer)),
+                type: "button",
+            });
+            (__VLS_ctx.customerTitle(customer));
+        }
+    }
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "checks" },
     });
@@ -577,6 +712,15 @@ if (__VLS_ctx.activeTab === 'discounts') {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
     __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
     __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.tr, __VLS_intrinsicElements.tr)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
     __VLS_asFunctionalElement(__VLS_intrinsicElements.tbody, __VLS_intrinsicElements.tbody)({});
     for (const [row] of __VLS_getVForSourceType((__VLS_ctx.discounts))) {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.tr, __VLS_intrinsicElements.tr)({
@@ -589,9 +733,12 @@ if (__VLS_ctx.activeTab === 'discounts') {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
         (Number(row.DiscountType) === 1 ? 'درصدی' : 'مبلغی');
         __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
-        (Number(row.DiscountType) === 1 ? row.DiscountPercent + '%' : Number(row.DiscountAmount).toLocaleString());
+        (Number(row.DiscountType) === 1 ? row.DiscountPercent + '%' :
+            Number(row.DiscountAmount).toLocaleString());
         __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
         (row.ApplyToAllGoods ? 'همه' : __VLS_ctx.rowGoodsIds(row).join(','));
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
+        (__VLS_ctx.rowCustomerIds(row).length ? __VLS_ctx.rowCustomerIds(row).join(',') : 'عمومی');
         __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
         (row.IsActive ? 'بله' : 'خیر');
         __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({
@@ -738,6 +885,53 @@ if (__VLS_ctx.activeTab === 'cards') {
                     __VLS_ctx.removeCard(row);
                 } },
         });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.thead, __VLS_intrinsicElements.thead)({});
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.tr, __VLS_intrinsicElements.tr)({});
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.tbody, __VLS_intrinsicElements.tbody)({});
+        for (const [row] of __VLS_getVForSourceType((__VLS_ctx.cards))) {
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.tr, __VLS_intrinsicElements.tr)({
+                key: (row.DiscountCardId),
+            });
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
+            (row.DiscountCardId);
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
+            (row.CardNumber);
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
+            (row.CustomerName || row.CustomerPhone || '-');
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
+            (row.DiscountPercent);
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
+            (Number(row.DiscountAmount || 0).toLocaleString());
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
+            (Number(row.Balance || 0).toLocaleString());
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
+            (row.IsActive ? 'بله' : 'خیر');
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({
+                ...{ class: "row-actions" },
+            });
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+                ...{ onClick: (...[$event]) => {
+                        if (!(__VLS_ctx.activeTab === 'cards'))
+                            return;
+                        __VLS_ctx.editCard(row);
+                    } },
+            });
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+                ...{ onClick: (...[$event]) => {
+                        if (!(__VLS_ctx.activeTab === 'cards'))
+                            return;
+                        __VLS_ctx.removeCard(row);
+                    } },
+            });
+        }
     }
 }
 if (__VLS_ctx.activeTab === 'transactions') {
@@ -890,6 +1084,13 @@ if (__VLS_ctx.productPickerOpen) {
 /** @type {__VLS_StyleScopedClasses['wide']} */ ;
 /** @type {__VLS_StyleScopedClasses['disabled']} */ ;
 /** @type {__VLS_StyleScopedClasses['btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['customer-select-box']} */ ;
+/** @type {__VLS_StyleScopedClasses['wide']} */ ;
+/** @type {__VLS_StyleScopedClasses['customer-search-row']} */ ;
+/** @type {__VLS_StyleScopedClasses['btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['chip-list']} */ ;
+/** @type {__VLS_StyleScopedClasses['chip']} */ ;
+/** @type {__VLS_StyleScopedClasses['customer-results']} */ ;
 /** @type {__VLS_StyleScopedClasses['checks']} */ ;
 /** @type {__VLS_StyleScopedClasses['actions']} */ ;
 /** @type {__VLS_StyleScopedClasses['btn']} */ ;
@@ -909,6 +1110,7 @@ if (__VLS_ctx.productPickerOpen) {
 /** @type {__VLS_StyleScopedClasses['btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['card']} */ ;
 /** @type {__VLS_StyleScopedClasses['table-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['row-actions']} */ ;
 /** @type {__VLS_StyleScopedClasses['row-actions']} */ ;
 /** @type {__VLS_StyleScopedClasses['card']} */ ;
 /** @type {__VLS_StyleScopedClasses['table-card']} */ ;
@@ -939,6 +1141,9 @@ const __VLS_self = (await import('vue')).defineComponent({
             productLoading: productLoading,
             productPickerOpen: productPickerOpen,
             productSearch: productSearch,
+            customerSearch: customerSearch,
+            customerLoading: customerLoading,
+            customers: customers,
             message: message,
             discounts: discounts,
             cards: cards,
@@ -949,12 +1154,17 @@ const __VLS_self = (await import('vue')).defineComponent({
             cardForm: cardForm,
             hasMessage: hasMessage,
             selectedGoodsCount: selectedGoodsCount,
+            selectedCustomerIds: selectedCustomerIds,
+            selectedCustomerCount: selectedCustomerCount,
             selectedGoodsSummary: selectedGoodsSummary,
             filteredProducts: filteredProducts,
             refreshAll: refreshAll,
             rowGoodsIds: rowGoodsIds,
+            rowCustomerIds: rowCustomerIds,
             productId: productId,
             productTitle: productTitle,
+            customerId: customerId,
+            customerTitle: customerTitle,
             resetDiscountForm: resetDiscountForm,
             editDiscount: editDiscount,
             openProductPicker: openProductPicker,
@@ -964,6 +1174,9 @@ const __VLS_self = (await import('vue')).defineComponent({
             selectFilteredProducts: selectFilteredProducts,
             clearProductSelection: clearProductSelection,
             confirmProductSelection: confirmProductSelection,
+            findCustomers: findCustomers,
+            addCustomerToDiscount: addCustomerToDiscount,
+            removeCustomerId: removeCustomerId,
             submitDiscount: submitDiscount,
             removeDiscount: removeDiscount,
             resetCardForm: resetCardForm,

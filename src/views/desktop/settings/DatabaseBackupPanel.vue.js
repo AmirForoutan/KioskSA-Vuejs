@@ -3,6 +3,8 @@ import { can } from "../../../components/acl/can";
 import { createDbBackup, getDbBackupPath, saveDbBackupPath, selectDbBackupPath } from "../../../services/dbBackupApi";
 const backupPath = ref("");
 const loading = ref(false);
+const selecting = ref(false);
+const backingUp = ref(false);
 const message = ref("");
 const errorMessage = ref(false);
 onMounted(loadSavedPath);
@@ -27,28 +29,24 @@ async function loadSavedPath() {
         backupPath.value = "";
     }
 }
-async function choosePathAndBackup() {
+async function choosePathOnly() {
     if (!can("backup.database"))
         return;
     loading.value = true;
+    selecting.value = true;
     errorMessage.value = false;
-    message.value = "در حال باز کردن انتخاب مسیر روی سیستم سرویس...";
+    message.value = "پنجره انتخاب مسیر روی سیستم سرویس باز می‌شود؛ بعد از انتخاب مسیر فقط ذخیره می‌شود.";
     try {
         const selected = await selectDbBackupPath();
         backupPath.value = String(selected.path || selected.backupPath || backupPath.value || "");
-        if (!backupPath.value.trim()) {
-            message.value = selected.message || "انتخاب مسیر لغو شد";
-            return;
-        }
-        message.value = "مسیر انتخاب شد؛ در حال گرفتن بکاپ...";
-        const result = await createDbBackup(backupPath.value.trim());
-        message.value = `${result.message || "بکاپ ساخته شد"}${result.path ? ` - ${result.path}` : ""}`;
+        message.value = backupPath.value.trim() ? selected.message || "مسیر انتخاب و ذخیره شد" : selected.message || "انتخاب مسیر لغو شد";
     }
     catch (error) {
         errorMessage.value = true;
-        message.value = friendlyError(error, "خطا در انتخاب مسیر یا گرفتن بکاپ");
+        message.value = friendlyError(error, "خطا در انتخاب مسیر");
     }
     finally {
+        selecting.value = false;
         loading.value = false;
     }
 }
@@ -85,8 +83,9 @@ async function runBackup() {
         return;
     }
     loading.value = true;
+    backingUp.value = true;
     errorMessage.value = false;
-    message.value = "در حال گرفتن بکاپ...";
+    message.value = "در حال گرفتن بکاپ؛ بسته به حجم دیتابیس ممکن است چند دقیقه طول بکشد...";
     try {
         const result = await createDbBackup(backupPath.value.trim());
         backupPath.value = String(result.backupPath || backupPath.value);
@@ -97,6 +96,7 @@ async function runBackup() {
         message.value = friendlyError(error, "خطا در گرفتن بکاپ");
     }
     finally {
+        backingUp.value = false;
         loading.value = false;
     }
 }
@@ -134,12 +134,12 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
 });
 (__VLS_ctx.backupPath);
 __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-    ...{ onClick: (__VLS_ctx.choosePathAndBackup) },
+    ...{ onClick: (__VLS_ctx.choosePathOnly) },
     ...{ class: "s-btn" },
     type: "button",
     disabled: (!__VLS_ctx.can('backup.database') || __VLS_ctx.loading),
 });
-(__VLS_ctx.loading ? "در حال انجام" : "انتخاب مسیر و بکاپ");
+(__VLS_ctx.selecting ? "در انتظار انتخاب" : "انتخاب مسیر");
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "backup-actions" },
 });
@@ -153,7 +153,7 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElement
     ...{ class: "s-btn primary" },
     disabled: (!__VLS_ctx.can('backup.database') || __VLS_ctx.loading || !__VLS_ctx.backupPath.trim()),
 });
-(__VLS_ctx.loading ? "در حال عملیات" : "بکاپ با مسیر فعلی");
+(__VLS_ctx.backingUp ? "در حال بکاپ" : "گرفتن بکاپ");
 if (!__VLS_ctx.can('backup.database')) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "backup-message warn" },
@@ -187,9 +187,11 @@ const __VLS_self = (await import('vue')).defineComponent({
             can: can,
             backupPath: backupPath,
             loading: loading,
+            selecting: selecting,
+            backingUp: backingUp,
             message: message,
             errorMessage: errorMessage,
-            choosePathAndBackup: choosePathAndBackup,
+            choosePathOnly: choosePathOnly,
             savePathOnly: savePathOnly,
             runBackup: runBackup,
         };
