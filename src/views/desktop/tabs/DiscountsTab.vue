@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import "@majidh1/jalalidatepicker";
 import "@majidh1/jalalidatepicker/dist/jalalidatepicker.min.css";
-import { computed, onMounted, reactive, ref } from "vue";
-import { loadDesktopCatalog, type DesktopProduct } from "../../../services/desktopApi";
+import { computed, nextTick, onMounted, reactive, ref } from "vue";
+import { loadDesktopCatalog, searchDesktopCustomers, type DesktopCustomer, type DesktopProduct } from "../../../services/desktopApi";
 import {
   disableLocalDiscount,
   disableLocalDiscountCard,
@@ -81,10 +81,7 @@ const filteredProducts = computed(() => {
   const q = productSearch.value.trim().toLowerCase();
   const rows = products.value.filter((item) => item && item.IsActive !== false);
   if (!q) return rows;
-  return rows.filter((item) => {
-    const haystack = `${item.GoodsId ?? ""} ${item.GoodsCode ?? ""} ${item.GoodsName ?? ""}`.toLowerCase();
-    return haystack.includes(q);
-  });
+  return rows.filter((item) => `${item.GoodsId ?? ""} ${item.GoodsCode ?? ""} ${item.GoodsName ?? ""}`.toLowerCase().includes(q));
 });
 
 onMounted(() => {
@@ -93,7 +90,10 @@ onMounted(() => {
 });
 
 function setupDatePicker() {
-  setupJalaliDateInputs();
+  void nextTick(() => {
+    const picker = (window as unknown as { jalaliDatepicker?: { startWatch?: (options?: unknown) => void } }).jalaliDatepicker;
+    picker?.startWatch?.({ autoHide: true, persianDigits: false });
+  });
 }
 
 async function refreshAll() {
@@ -140,10 +140,7 @@ function nullableText(value: string) {
 
 function parseNumberIds(value: unknown) {
   if (Array.isArray(value)) {
-    return value
-      .map((item) => Number(item))
-      .filter((item) => Number.isFinite(item) && item > 0)
-      .filter((item, index, array) => array.indexOf(item) === index);
+    return value.map(Number).filter((item) => Number.isFinite(item) && item > 0).filter((item, index, array) => array.indexOf(item) === index);
   }
 
   return String(value || "")
@@ -155,24 +152,25 @@ function parseNumberIds(value: unknown) {
 
 function rowGoodsIds(row: LocalDiscount) {
   const record = row as Record<string, unknown>;
-  if (Array.isArray(row.GoodsIds)) return parseNumberIds(row.GoodsIds);
+  if (Array.isArray(record.GoodsIds)) return parseNumberIds(record.GoodsIds);
   if (Array.isArray(record.goodsIds)) return parseNumberIds(record.goodsIds);
-  if (typeof row.GoodsIds === "string") return parseNumberIds(row.GoodsIds);
+  if (typeof record.GoodsIds === "string") return parseNumberIds(record.GoodsIds);
   if (typeof record.GoodsIdsText === "string") return parseNumberIds(record.GoodsIdsText);
   return [];
 }
 
 function rowCustomerIds(row: LocalDiscount) {
   const record = row as Record<string, unknown>;
-  if (Array.isArray(row.CustomerIds)) return parseNumberIds(row.CustomerIds);
+  if (Array.isArray(record.CustomerIds)) return parseNumberIds(record.CustomerIds);
   if (Array.isArray(record.customerIds)) return parseNumberIds(record.customerIds);
-  if (typeof row.CustomerIds === "string") return parseNumberIds(row.CustomerIds);
+  if (typeof record.CustomerIds === "string") return parseNumberIds(record.CustomerIds);
   if (typeof record.CustomerIdsText === "string") return parseNumberIds(record.CustomerIdsText);
   return [];
 }
 
 function productId(product: DesktopProduct) {
-  return Number(product.GoodsId ?? product.ProductId ?? 0);
+  const record = product as Record<string, unknown>;
+  return Number(product.GoodsId ?? record.ProductId ?? 0);
 }
 
 function productTitle(product: DesktopProduct) {
@@ -486,10 +484,8 @@ async function removeCard(row: LocalDiscountCard) {
           <label>مبلغ<input v-model.number="discountForm.DiscountAmount" type="number" min="0" /></label>
           <label>سقف تخفیف<input v-model.number="discountForm.MaxDiscountAmount" type="number" min="0" /></label>
           <label>حداقل فاکتور<input v-model.number="discountForm.MinInvoiceAmount" type="number" min="0" /></label>
-          <label>از تاریخ<input readonly v-model="discountForm.StartDate" placeholder="1405/01/01" data-jdp
-              data-jdp-bound /></label>
-          <label>تا تاریخ<input readonly v-model="discountForm.EndDate" placeholder="1405/12/29" data-jdp
-              data-jdp-bound /></label>
+          <label>از تاریخ<input v-model="discountForm.StartDate" readonly placeholder="1405/01/01" data-jdp /></label>
+          <label>تا تاریخ<input v-model="discountForm.EndDate" readonly placeholder="1405/12/29" data-jdp /></label>
           <label>از ساعت<input v-model="discountForm.FromTime" placeholder="09:00" /></label>
           <label>تا ساعت<input v-model="discountForm.ToTime" placeholder="23:59" /></label>
 
@@ -536,22 +532,18 @@ async function removeCard(row: LocalDiscountCard) {
       <div class="card table-card">
         <table>
           <thead>
-            <tr>
-              <th>شناسه</th><th>عنوان</th><th>نوع</th><th>مقدار</th><th>کالاها</th><th>فعال</th><th></th>
-            </tr>
+            <tr><th>شناسه</th><th>عنوان</th><th>نوع</th><th>مقدار</th><th>کالاها</th><th>مشتری‌ها</th><th>فعال</th><th></th></tr>
           </thead>
           <tbody>
             <tr v-for="row in discounts" :key="row.DiscountId">
               <td>{{ row.DiscountId }}</td>
               <td>{{ row.Title }}</td>
               <td>{{ Number(row.DiscountType) === 1 ? 'درصدی' : 'مبلغی' }}</td>
-              <td>{{ Number(row.DiscountType) === 1 ? row.DiscountPercent + '%' :
-                Number(row.DiscountAmount).toLocaleString() }}</td>
+              <td>{{ Number(row.DiscountType) === 1 ? row.DiscountPercent + '%' : Number(row.DiscountAmount).toLocaleString() }}</td>
               <td>{{ row.ApplyToAllGoods ? 'همه' : rowGoodsIds(row).join(',') }}</td>
               <td>{{ rowCustomerIds(row).length ? rowCustomerIds(row).join(',') : 'عمومی' }}</td>
               <td>{{ row.IsActive ? 'بله' : 'خیر' }}</td>
-              <td class="row-actions"><button @click="editDiscount(row)">ویرایش</button><button
-                  @click="removeDiscount(row)">غیرفعال</button></td>
+              <td class="row-actions"><button @click="editDiscount(row)">ویرایش</button><button @click="removeDiscount(row)">غیرفعال</button></td>
             </tr>
           </tbody>
         </table>
@@ -569,8 +561,8 @@ async function removeCard(row: LocalDiscountCard) {
           <label>درصد تخفیف<input v-model.number="cardForm.DiscountPercent" type="number" min="0" max="100" /></label>
           <label>مبلغ تخفیف<input v-model.number="cardForm.DiscountAmount" type="number" min="0" /></label>
           <label>مانده اعتبار<input v-model.number="cardForm.Balance" type="number" min="0" /></label>
-          <label>از تاریخ<input v-model="cardForm.StartDate" /></label>
-          <label>تا تاریخ<input v-model="cardForm.EndDate" /></label>
+          <label>از تاریخ<input v-model="cardForm.StartDate" readonly data-jdp /></label>
+          <label>تا تاریخ<input v-model="cardForm.EndDate" readonly data-jdp /></label>
         </div>
         <div class="checks"><label><input v-model="cardForm.IsActive" type="checkbox" /> فعال</label></div>
         <div class="actions"><button class="btn primary" :disabled="loading">ذخیره</button><button class="btn" type="button" @click="resetCardForm">جدید</button></div>
@@ -578,9 +570,7 @@ async function removeCard(row: LocalDiscountCard) {
 
       <div class="card table-card">
         <table>
-          <thead>
-            <tr><th>شناسه</th><th>شماره</th><th>مشتری</th><th>درصد</th><th>مبلغ</th><th>مانده</th><th>فعال</th><th></th></tr>
-          </thead>
+          <thead><tr><th>شناسه</th><th>شماره</th><th>مشتری</th><th>درصد</th><th>مبلغ</th><th>مانده</th><th>فعال</th><th></th></tr></thead>
           <tbody>
             <tr v-for="row in cards" :key="row.DiscountCardId">
               <td>{{ row.DiscountCardId }}</td>
@@ -599,31 +589,46 @@ async function removeCard(row: LocalDiscountCard) {
 
     <div v-if="activeTab === 'transactions'" class="card table-card full">
       <table>
-        <thead>
-          <tr>
-            <th>شناسه</th>
-            <th>کارت</th>
-            <th>فاکتور</th>
-            <th>نوع</th>
-            <th>مبلغ</th>
-            <th>تاریخ</th>
-            <th>شرح</th>
-          </tr>
-        </thead>
+        <thead><tr><th>شناسه</th><th>کارت</th><th>فاکتور</th><th>نوع</th><th>مبلغ</th><th>تاریخ</th><th>شرح</th></tr></thead>
         <tbody>
-          <tr v-for="row in transactions" :key="row.DiscountCardTransactionId"><td>{{ row.DiscountCardTransactionId }}</td><td>{{ row.CardNumber || row.DiscountCardId }}</td><td>{{ row.SaleInvoiceId || '-' }}</td><td>{{ row.TransactionType }}</td><td>{{ Number(row.Amount || 0).toLocaleString() }}</td><td>{{ row.TransactionDate }}</td><td>{{ row.Description }}</td></tr>
+          <tr v-for="row in transactions" :key="row.DiscountCardTransactionId">
+            <td>{{ row.DiscountCardTransactionId }}</td>
+            <td>{{ row.CardNumber || row.DiscountCardId }}</td>
+            <td>{{ row.SaleInvoiceId || '-' }}</td>
+            <td>{{ row.TransactionType }}</td>
+            <td>{{ Number(row.Amount || 0).toLocaleString() }}</td>
+            <td>{{ row.TransactionDate }}</td>
+            <td>{{ row.Description }}</td>
+          </tr>
         </tbody>
       </table>
     </div>
 
     <div v-if="productPickerOpen" class="modal-backdrop" @click.self="closeProductPicker">
       <div class="product-modal">
-        <header class="modal-head"><div><h3>انتخاب کالاهای شامل تخفیف</h3><p>{{ selectedProductIds.length }} کالا انتخاب شده است</p></div><button class="icon-btn" type="button" @click="closeProductPicker">×</button></header>
-        <div class="modal-toolbar"><input v-model="productSearch" placeholder="جستجو بر اساس نام، کد یا شناسه کالا" /><button class="btn" type="button" @click="selectFilteredProducts">انتخاب همه نتایج</button><button class="btn" type="button" @click="clearProductSelection">پاک کردن انتخاب</button></div>
+        <header class="modal-head">
+          <div><h3>انتخاب کالاهای شامل تخفیف</h3><p>{{ selectedProductIds.length }} کالا انتخاب شده است</p></div>
+          <button class="icon-btn" type="button" @click="closeProductPicker">×</button>
+        </header>
+        <div class="modal-toolbar">
+          <input v-model="productSearch" placeholder="جستجو بر اساس نام، کد یا شناسه کالا" />
+          <button class="btn" type="button" @click="selectFilteredProducts">انتخاب همه نتایج</button>
+          <button class="btn" type="button" @click="clearProductSelection">پاک کردن انتخاب</button>
+        </div>
         <div v-if="productLoading" class="modal-state">در حال دریافت کالاها...</div>
         <div v-else-if="!filteredProducts.length" class="modal-state">کالایی یافت نشد</div>
-        <div v-else class="product-list"><label v-for="product in filteredProducts" :key="productId(product)" class="product-row"><input type="checkbox" :checked="isProductSelected(product)" @change="toggleProduct(product)" /><span class="product-main">{{ productTitle(product) }}</span><span class="product-meta">شناسه: {{ productId(product) }}</span><span class="product-price">{{ Number(product.GoodsPrice || 0).toLocaleString() }}</span></label></div>
-        <footer class="modal-footer"><button class="btn primary" type="button" @click="confirmProductSelection">تأیید انتخاب</button><button class="btn" type="button" @click="closeProductPicker">انصراف</button></footer>
+        <div v-else class="product-list">
+          <label v-for="product in filteredProducts" :key="productId(product)" class="product-row">
+            <input type="checkbox" :checked="isProductSelected(product)" @change="toggleProduct(product)" />
+            <span class="product-main">{{ productTitle(product) }}</span>
+            <span class="product-meta">شناسه: {{ productId(product) }}</span>
+            <span class="product-price">{{ Number(product.GoodsPrice || 0).toLocaleString() }}</span>
+          </label>
+        </div>
+        <footer class="modal-footer">
+          <button class="btn primary" type="button" @click="confirmProductSelection">تأیید انتخاب</button>
+          <button class="btn" type="button" @click="closeProductPicker">انصراف</button>
+        </footer>
       </div>
     </div>
   </section>
@@ -636,11 +641,11 @@ async function removeCard(row: LocalDiscountCard) {
 .page-head p { margin: 0; color: #9ca3af; }
 .message { padding: 10px 12px; border-radius: 12px; margin-bottom: 12px; background: rgba(20, 184, 166, .12); border: 1px solid rgba(20, 184, 166, .25); }
 .tabs { display: flex; gap: 8px; margin-bottom: 12px; }
-.tabs button, .btn, .row-actions button { border: 1px solid rgba(255,255,255,.1); color: #e5e7eb; background: rgba(255,255,255,.05); border-radius: 10px; padding: 9px 14px; cursor: pointer; }
+.tabs button, .btn, .row-actions button, .customer-results button, .chip { border: 1px solid rgba(255,255,255,.1); color: #e5e7eb; background: rgba(255,255,255,.05); border-radius: 10px; padding: 9px 14px; cursor: pointer; }
 .tabs button.active, .btn.primary { background: rgba(20,184,166,.22); border-color: rgba(20,184,166,.45); font-weight: 800; }
 .btn.ghost { background: transparent; }
 .btn:disabled { opacity: .55; cursor: not-allowed; }
-.grid-layout { display: grid; grid-template-columns: minmax(330px, 420px) 1fr; gap: 12px; align-items: start; }
+.grid-layout { display: grid; grid-template-columns: minmax(330px, 460px) 1fr; gap: 12px; align-items: start; }
 .card { background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); border-radius: 16px; padding: 14px; }
 .form h3 { margin: 0 0 12px; }
 .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
@@ -651,15 +656,21 @@ input, select { border: 1px solid rgba(255,255,255,.12); background: rgba(0,0,0,
 .actions { display: flex; gap: 8px; }
 .table-card { overflow: auto; }
 .table-card.full { height: calc(100vh - 230px); }
-table { width: 100%; border-collapse: collapse; min-width: 760px; }
+table { width: 100%; border-collapse: collapse; min-width: 820px; }
 th, td { text-align: right; padding: 10px; border-bottom: 1px solid rgba(255,255,255,.07); white-space: nowrap; }
 th { color: #93c5fd; font-weight: 800; }
 .row-actions { display: flex; gap: 6px; }
-.product-select-box { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px; border: 1px dashed rgba(255,255,255,.18); border-radius: 14px; background: rgba(0,0,0,.16); }
+.product-select-box, .customer-select-box { display: grid; gap: 10px; padding: 12px; border: 1px dashed rgba(255,255,255,.18); border-radius: 14px; background: rgba(0,0,0,.16); }
+.product-select-box { display: flex; justify-content: space-between; align-items: center; }
 .product-select-box.disabled { opacity: .55; }
-.product-select-box div { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.product-select-box span { color: #cbd5e1; }
-.product-select-box small { color: #93c5fd; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 250px; }
+.product-select-box div, .customer-select-box > div:first-child { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.product-select-box span, .customer-select-box span { color: #cbd5e1; }
+.product-select-box small, .customer-select-box small { color: #93c5fd; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 330px; }
+.customer-search-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+.customer-results { display: grid; gap: 6px; max-height: 150px; overflow: auto; }
+.customer-results button { text-align: right; }
+.chip-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { padding: 6px 9px; background: rgba(59,130,246,.18); }
 .modal-backdrop { position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,.72); display: flex; align-items: center; justify-content: center; padding: 24px; }
 .product-modal { width: min(920px, 96vw); max-height: 88vh; display: flex; flex-direction: column; border-radius: 20px; background: #111827; border: 1px solid rgba(255,255,255,.12); box-shadow: 0 24px 80px rgba(0,0,0,.5); overflow: hidden; }
 .modal-head, .modal-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,.08); }
@@ -676,5 +687,5 @@ th { color: #93c5fd; font-weight: 800; }
 .product-meta { color: #9ca3af; }
 .product-price { color: #bbf7d0; text-align: left; }
 .modal-state { padding: 40px; text-align: center; color: #9ca3af; }
-@media (max-width: 980px) { .grid-layout { grid-template-columns: 1fr; } .modal-toolbar { grid-template-columns: 1fr; } .product-row { grid-template-columns: 30px 1fr; } .product-meta, .product-price { grid-column: 2; text-align: right; } }
+@media (max-width: 980px) { .grid-layout { grid-template-columns: 1fr; } .modal-toolbar, .customer-search-row { grid-template-columns: 1fr; } .product-row { grid-template-columns: 30px 1fr; } .product-meta, .product-price { grid-column: 2; text-align: right; } }
 </style>
