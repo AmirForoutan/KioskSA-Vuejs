@@ -768,7 +768,8 @@ if (__VLS_ctx.activeTab === 'discounts') {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
         (Number(row.DiscountType) === 1 ? 'درصدی' : 'مبلغی');
         __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
-        (Number(row.DiscountType) === 1 ? row.DiscountPercent + '%' : Number(row.DiscountAmount).toLocaleString());
+        (Number(row.DiscountType) === 1 ? row.DiscountPercent + '%' :
+            Number(row.DiscountAmount).toLocaleString());
         __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
         (row.ApplyToAllGoods ? 'همه' : __VLS_ctx.rowGoodsIds(row).join(','));
         __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
