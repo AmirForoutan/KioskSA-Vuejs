@@ -101,6 +101,7 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
     placeholder: "از تاریخ",
     readonly: true,
     'data-jdp': true,
+    'data-jdp-only-date': true,
 });
 (__VLS_ctx.from);
 __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
@@ -108,6 +109,7 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
     placeholder: "تا تاریخ",
     readonly: true,
     'data-jdp': true,
+    'data-jdp-only-date': true,
 });
 (__VLS_ctx.to);
 __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({

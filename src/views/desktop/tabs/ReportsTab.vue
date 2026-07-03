@@ -57,7 +57,8 @@ function clearFilters() {
     <div class="rp-head">
       <div class="rp-title">گزارشات</div>
       <div class="rp-tabs">
-        <button v-for="i in items" :key="i.key" class="rp-tab" :class="{ active: i.key === active }" @click="active = i.key">
+        <button v-for="i in items" :key="i.key" class="rp-tab" :class="{ active: i.key === active }"
+          @click="active = i.key">
           {{ i.title }}
         </button>
       </div>
@@ -68,9 +69,10 @@ function clearFilters() {
         <b>{{ activeTitle }}</b>
         <small>این بازه زمانی و جستجو برای همه تب‌های گزارشات مشترک است.</small>
       </div>
-      <input class="rp-input search" v-model="q" placeholder="جستجوی مشترک: مشتری، موبایل، شماره فاکتور، کالا، رسید..." @keyup.enter="applyFilters" />
-      <input class="rp-input" v-model="from" placeholder="از تاریخ" readonly data-jdp />
-      <input class="rp-input" v-model="to" placeholder="تا تاریخ" readonly data-jdp />
+      <input class="rp-input search" v-model="q" placeholder="جستجوی مشترک: مشتری، موبایل، شماره فاکتور، کالا، رسید..."
+        @keyup.enter="applyFilters" />
+      <input class="rp-input" v-model="from" placeholder="از تاریخ" readonly data-jdp data-jdp-only-date />
+      <input class="rp-input" v-model="to" placeholder="تا تاریخ" readonly data-jdp data-jdp-only-date />
       <button class="rp-action primary" @click="applyFilters">اعمال فیلتر</button>
       <button class="rp-action" @click="clearFilters">پاک کردن</button>
     </div>
@@ -188,6 +190,7 @@ function clearFilters() {
 }
 
 @media (max-width: 1180px) {
+
   .rp-head,
   .rp-filter-panel {
     grid-template-columns: 1fr;
