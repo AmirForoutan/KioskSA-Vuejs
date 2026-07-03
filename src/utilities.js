@@ -132,7 +132,16 @@ export function setupJalaliDateInputs(selector = "input[data-jdp]") {
     const picker = window.jalaliDatepicker;
     if (!picker)
         return false;
-    const options = { autoHide: true, hideAfterChange: true, zIndex: 3000 };
+    const options = {
+        autoHide: true,
+        hideAfterChange: true,
+        zIndex: 3000,
+        date: true,
+        time: true,
+        hasSecond: false,
+        persianDigits: false,
+        selector,
+    };
     picker.startWatch(options);
     const bindInputs = () => {
         document.querySelectorAll(selector).forEach((input) => {

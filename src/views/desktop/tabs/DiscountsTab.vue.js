@@ -3,6 +3,7 @@ import "@majidh1/jalalidatepicker/dist/jalalidatepicker.min.css";
 import { computed, nextTick, onMounted, reactive, ref } from "vue";
 import { loadDesktopCatalog, loadDesktopCustomers, searchDesktopCustomers } from "../../../services/desktopApi";
 import { disableLocalDiscount, disableLocalDiscountCard, listLocalDiscountCardTransactions, listLocalDiscountCards, listLocalDiscounts, saveLocalDiscount, saveLocalDiscountCard, } from "../../../services/localDiscountApi";
+import { setupJalaliDateInputs } from "../../../utilities";
 const loading = ref(false);
 const productLoading = ref(false);
 const productPickerOpen = ref(false);
@@ -54,9 +55,9 @@ const cardForm = reactive({
 const hasMessage = computed(() => message.value.trim().length > 0);
 const selectedProductIdSet = computed(() => new Set(selectedProductIds.value));
 const selectedCustomerPickerIdSet = computed(() => new Set(selectedCustomerPickerIds.value));
-const selectedGoodsCount = computed(() => parseNumberIds(discountForm.GoodsIdsText).length);
 const selectedCustomerIds = computed(() => parseNumberIds(discountForm.CustomerIdsText));
 const selectedCustomerCount = computed(() => selectedCustomerIds.value.length);
+const selectedGoodsCount = computed(() => parseNumberIds(discountForm.GoodsIdsText).length);
 const selectedGoodsSummary = computed(() => {
     const ids = parseNumberIds(discountForm.GoodsIdsText);
     if (!ids.length)
@@ -85,10 +86,7 @@ onMounted(() => {
     void refreshAll();
 });
 function setupDatePicker() {
-    void nextTick(() => {
-        const picker = window.jalaliDatepicker;
-        picker?.startWatch?.({ autoHide: true, persianDigits: false });
-    });
+    void nextTick(() => setupJalaliDateInputs("input[data-jdp]"));
 }
 async function refreshAll() {
     loading.value = true;
@@ -108,6 +106,7 @@ async function refreshAll() {
     }
     finally {
         loading.value = false;
+        setupDatePicker();
     }
 }
 async function loadProducts() {
@@ -206,6 +205,7 @@ function resetDiscountForm() {
     });
     selectedProductIds.value = [];
     selectedCustomerPickerIds.value = [];
+    setupDatePicker();
 }
 function editDiscount(row) {
     const goodsIds = rowGoodsIds(row);
@@ -232,6 +232,7 @@ function editDiscount(row) {
     selectedProductIds.value = goodsIds;
     selectedCustomerPickerIds.value = customerIds;
     activeTab.value = "discounts";
+    setupDatePicker();
 }
 async function openProductPicker() {
     selectedProductIds.value = parseNumberIds(discountForm.GoodsIdsText);
@@ -239,13 +240,8 @@ async function openProductPicker() {
     productPickerOpen.value = true;
     await loadProducts();
 }
-function closeProductPicker() {
-    productPickerOpen.value = false;
-}
-function isProductSelected(product) {
-    const id = productId(product);
-    return id > 0 && selectedProductIdSet.value.has(id);
-}
+function closeProductPicker() { productPickerOpen.value = false; }
+function isProductSelected(product) { const id = productId(product); return id > 0 && selectedProductIdSet.value.has(id); }
 function toggleProduct(product) {
     const id = productId(product);
     if (id <= 0)
@@ -266,9 +262,7 @@ function selectFilteredProducts() {
     }
     selectedProductIds.value = Array.from(current).sort((a, b) => a - b);
 }
-function clearProductSelection() {
-    selectedProductIds.value = [];
-}
+function clearProductSelection() { selectedProductIds.value = []; }
 function confirmProductSelection() {
     discountForm.GoodsIdsText = selectedProductIds.value.join(",");
     discountForm.ApplyToAllGoods = selectedProductIds.value.length === 0 ? discountForm.ApplyToAllGoods : false;
@@ -280,9 +274,7 @@ async function openCustomerPicker() {
     customerPickerOpen.value = true;
     await loadCustomersForPicker("");
 }
-function closeCustomerPicker() {
-    customerPickerOpen.value = false;
-}
+function closeCustomerPicker() { customerPickerOpen.value = false; }
 async function loadCustomersForPicker(searchTerm) {
     customerLoading.value = true;
     try {
@@ -300,13 +292,8 @@ async function loadCustomersForPicker(searchTerm) {
         customerLoading.value = false;
     }
 }
-async function findCustomers() {
-    await loadCustomersForPicker(customerSearch.value);
-}
-function isCustomerSelected(customer) {
-    const id = customerId(customer);
-    return id > 0 && selectedCustomerPickerIdSet.value.has(id);
-}
+async function findCustomers() { await loadCustomersForPicker(customerSearch.value); }
+function isCustomerSelected(customer) { const id = customerId(customer); return id > 0 && selectedCustomerPickerIdSet.value.has(id); }
 function toggleCustomer(customer) {
     const id = customerId(customer);
     if (id <= 0)
@@ -327,13 +314,8 @@ function selectFoundCustomers() {
     }
     selectedCustomerPickerIds.value = Array.from(current).sort((a, b) => a - b);
 }
-function clearCustomerPickerSelection() {
-    selectedCustomerPickerIds.value = [];
-}
-function clearDiscountCustomers() {
-    discountForm.CustomerIdsText = "";
-    selectedCustomerPickerIds.value = [];
-}
+function clearCustomerPickerSelection() { selectedCustomerPickerIds.value = []; }
+function clearDiscountCustomers() { discountForm.CustomerIdsText = ""; selectedCustomerPickerIds.value = []; }
 function confirmCustomerSelection() {
     const ids = Array.from(new Set(selectedCustomerPickerIds.value.map(Number).filter((id) => Number.isFinite(id) && id > 0))).sort((a, b) => a - b);
     discountForm.CustomerIdsText = ids.join(",");
@@ -408,35 +390,13 @@ async function removeDiscount(row) {
     }
 }
 function resetCardForm() {
-    Object.assign(cardForm, {
-        DiscountCardId: 0,
-        CardNumber: "",
-        CustomerId: 0,
-        CustomerPhone: "",
-        CustomerName: "",
-        DiscountPercent: 0,
-        DiscountAmount: 0,
-        Balance: 0,
-        StartDate: "",
-        EndDate: "",
-        IsActive: true,
-    });
+    Object.assign(cardForm, { DiscountCardId: 0, CardNumber: "", CustomerId: 0, CustomerPhone: "", CustomerName: "", DiscountPercent: 0, DiscountAmount: 0, Balance: 0, StartDate: "", EndDate: "", IsActive: true });
+    setupDatePicker();
 }
 function editCard(row) {
-    Object.assign(cardForm, {
-        DiscountCardId: toNumber(row.DiscountCardId),
-        CardNumber: String(row.CardNumber ?? ""),
-        CustomerId: toNumber(row.CustomerId),
-        CustomerPhone: String(row.CustomerPhone ?? ""),
-        CustomerName: String(row.CustomerName ?? ""),
-        DiscountPercent: toNumber(row.DiscountPercent),
-        DiscountAmount: toNumber(row.DiscountAmount),
-        Balance: toNumber(row.Balance),
-        StartDate: String(row.StartDate ?? ""),
-        EndDate: String(row.EndDate ?? ""),
-        IsActive: row.IsActive !== false,
-    });
+    Object.assign(cardForm, { DiscountCardId: toNumber(row.DiscountCardId), CardNumber: String(row.CardNumber ?? ""), CustomerId: toNumber(row.CustomerId), CustomerPhone: String(row.CustomerPhone ?? ""), CustomerName: String(row.CustomerName ?? ""), DiscountPercent: toNumber(row.DiscountPercent), DiscountAmount: toNumber(row.DiscountAmount), Balance: toNumber(row.Balance), StartDate: String(row.StartDate ?? ""), EndDate: String(row.EndDate ?? ""), IsActive: row.IsActive !== false });
     activeTab.value = "cards";
+    setupDatePicker();
 }
 async function submitCard() {
     if (!cardForm.CardNumber.trim()) {
@@ -445,19 +405,7 @@ async function submitCard() {
     }
     loading.value = true;
     try {
-        await saveLocalDiscountCard({
-            DiscountCardId: cardForm.DiscountCardId,
-            CardNumber: cardForm.CardNumber.trim(),
-            CustomerId: cardForm.CustomerId > 0 ? cardForm.CustomerId : null,
-            CustomerPhone: nullableText(cardForm.CustomerPhone) ?? undefined,
-            CustomerName: nullableText(cardForm.CustomerName) ?? undefined,
-            DiscountPercent: toNumber(cardForm.DiscountPercent),
-            DiscountAmount: toNumber(cardForm.DiscountAmount),
-            Balance: toNumber(cardForm.Balance),
-            StartDate: nullableText(cardForm.StartDate),
-            EndDate: nullableText(cardForm.EndDate),
-            IsActive: cardForm.IsActive,
-        });
+        await saveLocalDiscountCard({ DiscountCardId: cardForm.DiscountCardId, CardNumber: cardForm.CardNumber.trim(), CustomerId: cardForm.CustomerId > 0 ? cardForm.CustomerId : null, CustomerPhone: nullableText(cardForm.CustomerPhone) ?? undefined, CustomerName: nullableText(cardForm.CustomerName) ?? undefined, DiscountPercent: toNumber(cardForm.DiscountPercent), DiscountAmount: toNumber(cardForm.DiscountAmount), Balance: toNumber(cardForm.Balance), StartDate: nullableText(cardForm.StartDate), EndDate: nullableText(cardForm.EndDate), IsActive: cardForm.IsActive });
         message.value = "کارت تخفیف ذخیره شد";
         resetCardForm();
         cards.value = await listLocalDiscountCards();
@@ -495,39 +443,24 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['tabs']} */ ;
 /** @type {__VLS_StyleScopedClasses['btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['btn']} */ ;
-/** @type {__VLS_StyleScopedClasses['btn']} */ ;
-/** @type {__VLS_StyleScopedClasses['form-grid']} */ ;
-/** @type {__VLS_StyleScopedClasses['form-grid']} */ ;
-/** @type {__VLS_StyleScopedClasses['form-grid']} */ ;
 /** @type {__VLS_StyleScopedClasses['wide']} */ ;
-/** @type {__VLS_StyleScopedClasses['table-card']} */ ;
-/** @type {__VLS_StyleScopedClasses['row-actions']} */ ;
 /** @type {__VLS_StyleScopedClasses['product-select-box']} */ ;
-/** @type {__VLS_StyleScopedClasses['product-select-box']} */ ;
-/** @type {__VLS_StyleScopedClasses['product-select-box']} */ ;
-/** @type {__VLS_StyleScopedClasses['customer-select-box']} */ ;
 /** @type {__VLS_StyleScopedClasses['product-select-box']} */ ;
 /** @type {__VLS_StyleScopedClasses['customer-select-box']} */ ;
 /** @type {__VLS_StyleScopedClasses['product-select-box']} */ ;
 /** @type {__VLS_StyleScopedClasses['customer-select-box']} */ ;
 /** @type {__VLS_StyleScopedClasses['chip']} */ ;
-/** @type {__VLS_StyleScopedClasses['modal-footer']} */ ;
-/** @type {__VLS_StyleScopedClasses['modal-head']} */ ;
-/** @type {__VLS_StyleScopedClasses['modal-head']} */ ;
-/** @type {__VLS_StyleScopedClasses['customer-list']} */ ;
-/** @type {__VLS_StyleScopedClasses['product-row']} */ ;
-/** @type {__VLS_StyleScopedClasses['customer-row']} */ ;
-/** @type {__VLS_StyleScopedClasses['customer-row']} */ ;
-/** @type {__VLS_StyleScopedClasses['product-row']} */ ;
-/** @type {__VLS_StyleScopedClasses['customer-row']} */ ;
-/** @type {__VLS_StyleScopedClasses['grid-layout']} */ ;
+/** @type {__VLS_StyleScopedClasses['table-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['row-actions']} */ ;
 /** @type {__VLS_StyleScopedClasses['modal-toolbar']} */ ;
-/** @type {__VLS_StyleScopedClasses['customer-modal-toolbar']} */ ;
-/** @type {__VLS_StyleScopedClasses['product-row']} */ ;
 /** @type {__VLS_StyleScopedClasses['customer-row']} */ ;
-/** @type {__VLS_StyleScopedClasses['product-meta']} */ ;
-/** @type {__VLS_StyleScopedClasses['product-price']} */ ;
-/** @type {__VLS_StyleScopedClasses['customer-meta']} */ ;
+/** @type {__VLS_StyleScopedClasses['customer-row']} */ ;
+/** @type {__VLS_StyleScopedClasses['product-row']} */ ;
+/** @type {__VLS_StyleScopedClasses['grid-layout']} */ ;
+/** @type {__VLS_StyleScopedClasses['form-grid']} */ ;
+/** @type {__VLS_StyleScopedClasses['page-head']} */ ;
+/** @type {__VLS_StyleScopedClasses['modal-toolbar']} */ ;
+/** @type {__VLS_StyleScopedClasses['modal-footer']} */ ;
 // CSS variable injection 
 // CSS variable injection end 
 __VLS_asFunctionalElement(__VLS_intrinsicElements.section, __VLS_intrinsicElements.section)({
@@ -637,6 +570,7 @@ if (__VLS_ctx.activeTab === 'discounts') {
         readonly: true,
         placeholder: "1405/01/01",
         'data-jdp': true,
+        'data-jdp-only-date': true,
     });
     (__VLS_ctx.discountForm.StartDate);
     __VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({});
@@ -644,16 +578,23 @@ if (__VLS_ctx.activeTab === 'discounts') {
         readonly: true,
         placeholder: "1405/12/29",
         'data-jdp': true,
+        'data-jdp-only-date': true,
     });
     (__VLS_ctx.discountForm.EndDate);
     __VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({});
     __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+        readonly: true,
         placeholder: "09:00",
+        'data-jdp': true,
+        'data-jdp-only-time': true,
     });
     (__VLS_ctx.discountForm.FromTime);
     __VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({});
     __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+        readonly: true,
         placeholder: "23:59",
+        'data-jdp': true,
+        'data-jdp-only-time': true,
     });
     (__VLS_ctx.discountForm.ToTime);
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
@@ -756,6 +697,8 @@ if (__VLS_ctx.activeTab === 'discounts') {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
     __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
     __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
     __VLS_asFunctionalElement(__VLS_intrinsicElements.tbody, __VLS_intrinsicElements.tbody)({});
     for (const [row] of __VLS_getVForSourceType((__VLS_ctx.discounts))) {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.tr, __VLS_intrinsicElements.tr)({
@@ -768,8 +711,13 @@ if (__VLS_ctx.activeTab === 'discounts') {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
         (Number(row.DiscountType) === 1 ? 'درصدی' : 'مبلغی');
         __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
-        (Number(row.DiscountType) === 1 ? row.DiscountPercent + '%' :
-            Number(row.DiscountAmount).toLocaleString());
+        (Number(row.DiscountType) === 1 ? row.DiscountPercent + '%' : Number(row.DiscountAmount).toLocaleString());
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
+        (row.StartDate || '-');
+        (row.EndDate || '-');
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
+        (row.FromTime || '-');
+        (row.ToTime || '-');
         __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
         (row.ApplyToAllGoods ? 'همه' : __VLS_ctx.rowGoodsIds(row).join(','));
         __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
@@ -848,12 +796,14 @@ if (__VLS_ctx.activeTab === 'cards') {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
         readonly: true,
         'data-jdp': true,
+        'data-jdp-only-date': true,
     });
     (__VLS_ctx.cardForm.StartDate);
     __VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({});
     __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
         readonly: true,
         'data-jdp': true,
+        'data-jdp-only-date': true,
     });
     (__VLS_ctx.cardForm.EndDate);
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
@@ -1271,9 +1221,9 @@ const __VLS_self = (await import('vue')).defineComponent({
             discountForm: discountForm,
             cardForm: cardForm,
             hasMessage: hasMessage,
-            selectedGoodsCount: selectedGoodsCount,
             selectedCustomerIds: selectedCustomerIds,
             selectedCustomerCount: selectedCustomerCount,
+            selectedGoodsCount: selectedGoodsCount,
             selectedGoodsSummary: selectedGoodsSummary,
             selectedCustomersSummary: selectedCustomersSummary,
             filteredProducts: filteredProducts,
