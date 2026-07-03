@@ -2,7 +2,7 @@
 import "@majidh1/jalalidatepicker";
 import "@majidh1/jalalidatepicker/dist/jalalidatepicker.min.css";
 import { computed, nextTick, onMounted, reactive, ref } from "vue";
-import { loadDesktopCatalog, searchDesktopCustomers, type DesktopCustomer, type DesktopProduct } from "../../../services/desktopApi";
+import { loadDesktopCatalog, loadDesktopCustomers, searchDesktopCustomers, type DesktopCustomer, type DesktopProduct } from "../../../services/desktopApi";
 import {
   disableLocalDiscount,
   disableLocalDiscountCard,
@@ -293,32 +293,34 @@ function confirmProductSelection() {
   productPickerOpen.value = false;
 }
 
-function openCustomerPicker() {
+async function openCustomerPicker() {
   selectedCustomerPickerIds.value = parseNumberIds(discountForm.CustomerIdsText);
-  customerPickerOpen.value = true;
-  customers.value = [];
   customerSearch.value = "";
+  customerPickerOpen.value = true;
+  await loadCustomersForPicker("");
 }
 
 function closeCustomerPicker() {
   customerPickerOpen.value = false;
 }
 
-async function findCustomers() {
-  const q = customerSearch.value.trim();
-  if (!q) {
-    message.value = "برای جستجوی مشتری، نام یا موبایل را وارد کنید";
-    return;
-  }
+async function loadCustomersForPicker(searchTerm: string) {
   customerLoading.value = true;
   try {
-    customers.value = await searchDesktopCustomers(q);
-    if (!customers.value.length) message.value = "مشتری‌ای یافت نشد";
+    const term = searchTerm.trim();
+    const result = term ? await searchDesktopCustomers(term) : await loadDesktopCustomers("");
+    customers.value = result.filter((customer) => customerId(customer) > 0);
+    if (!customers.value.length) message.value = term ? "مشتری‌ای یافت نشد" : "لیست مشتری‌ها خالی است";
   } catch (error) {
-    message.value = error instanceof Error ? error.message : "خطا در جستجوی مشتری";
+    message.value = error instanceof Error ? error.message : "خطا در دریافت مشتری‌ها";
+    customers.value = [];
   } finally {
     customerLoading.value = false;
   }
+}
+
+async function findCustomers() {
+  await loadCustomersForPicker(customerSearch.value);
 }
 
 function isCustomerSelected(customer: DesktopCustomer) {
@@ -344,12 +346,19 @@ function selectFoundCustomers() {
   selectedCustomerPickerIds.value = Array.from(current).sort((a, b) => a - b);
 }
 
-function clearCustomerSelection() {
+function clearCustomerPickerSelection() {
+  selectedCustomerPickerIds.value = [];
+}
+
+function clearDiscountCustomers() {
+  discountForm.CustomerIdsText = "";
   selectedCustomerPickerIds.value = [];
 }
 
 function confirmCustomerSelection() {
-  discountForm.CustomerIdsText = selectedCustomerPickerIds.value.join(",");
+  const ids = Array.from(new Set(selectedCustomerPickerIds.value.map(Number).filter((id) => Number.isFinite(id) && id > 0))).sort((a, b) => a - b);
+  discountForm.CustomerIdsText = ids.join(",");
+  selectedCustomerPickerIds.value = ids;
   customerPickerOpen.value = false;
 }
 
@@ -554,7 +563,7 @@ async function removeCard(row: LocalDiscountCard) {
             </div>
             <div class="customer-selector-actions">
               <button class="btn" type="button" @click="openCustomerPicker">انتخاب از لیست مشتری‌ها</button>
-              <button class="btn" type="button" :disabled="!selectedCustomerCount" @click="clearCustomerSelection">پاک کردن انتخاب</button>
+              <button class="btn" type="button" :disabled="!selectedCustomerCount" @click="clearDiscountCustomers">پاک کردن انتخاب</button>
             </div>
             <div v-if="selectedCustomerIds.length" class="chip-list">
               <button v-for="id in selectedCustomerIds" :key="id" class="chip" type="button" @click="removeCustomerId(id)">#{{ id }} ×</button>
@@ -681,15 +690,15 @@ async function removeCard(row: LocalDiscountCard) {
           <button class="icon-btn" type="button" @click="closeCustomerPicker">×</button>
         </header>
         <div class="modal-toolbar customer-modal-toolbar">
-          <input v-model="customerSearch" placeholder="نام، موبایل یا شناسه مشتری" @keyup.enter.prevent="findCustomers" />
+          <input v-model="customerSearch" placeholder="جستجوی نام، موبایل یا شناسه مشتری" @keyup.enter.prevent="findCustomers" />
           <button class="btn" type="button" :disabled="customerLoading" @click="findCustomers">جستجو</button>
           <button class="btn" type="button" :disabled="!customers.length" @click="selectFoundCustomers">انتخاب همه نتایج</button>
-          <button class="btn" type="button" @click="clearCustomerSelection">پاک کردن انتخاب</button>
+          <button class="btn" type="button" @click="clearCustomerPickerSelection">پاک کردن انتخاب</button>
         </div>
-        <div v-if="customerLoading" class="modal-state">در حال جستجوی مشتری‌ها...</div>
-        <div v-else-if="!customers.length" class="modal-state">برای نمایش مشتری‌ها جستجو کنید</div>
+        <div v-if="customerLoading" class="modal-state">در حال دریافت مشتری‌ها...</div>
+        <div v-else-if="!customers.length" class="modal-state">مشتری‌ای برای نمایش وجود ندارد</div>
         <div v-else class="customer-list">
-          <label v-for="customer in customers" :key="customerId(customer)" class="customer-row">
+          <label v-for="customer in customers" :key="customerId(customer)" class="customer-row" :class="{ selected: isCustomerSelected(customer) }">
             <input type="checkbox" :checked="isCustomerSelected(customer)" @change="toggleCustomer(customer)" />
             <span class="customer-main">{{ customerTitle(customer) }}</span>
             <span class="customer-meta">شناسه: {{ customerId(customer) }}</span>
@@ -741,22 +750,24 @@ th { color: #93c5fd; font-weight: 800; }
 .chip { padding: 6px 9px; background: rgba(59,130,246,.18); }
 .modal-backdrop { position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,.72); display: flex; align-items: center; justify-content: center; padding: 24px; }
 .product-modal { width: min(920px, 96vw); max-height: 88vh; display: flex; flex-direction: column; border-radius: 20px; background: #111827; border: 1px solid rgba(255,255,255,.12); box-shadow: 0 24px 80px rgba(0,0,0,.5); overflow: hidden; }
-.customer-modal { width: min(820px, 96vw); }
-.modal-head, .modal-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,.08); }
+.customer-modal { width: min(680px, 94vw); max-height: 76vh; }
+.modal-head, .modal-footer { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,.08); }
 .modal-footer { border-bottom: 0; border-top: 1px solid rgba(255,255,255,.08); justify-content: flex-start; }
 .modal-head h3 { margin: 0 0 4px; }
 .modal-head p { margin: 0; color: #9ca3af; }
-.icon-btn { width: 38px; height: 38px; border-radius: 999px; border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.06); color: #fff; font-size: 24px; cursor: pointer; }
-.modal-toolbar { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,.08); }
+.icon-btn { width: 36px; height: 36px; border-radius: 999px; border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.06); color: #fff; font-size: 22px; cursor: pointer; }
+.modal-toolbar { flex: 0 0 auto; display: grid; grid-template-columns: 1fr auto auto; gap: 8px; padding: 10px 14px; border-bottom: 1px solid rgba(255,255,255,.08); }
 .customer-modal-toolbar { grid-template-columns: 1fr auto auto auto; }
 .product-list, .customer-list { overflow: auto; padding: 8px 12px; }
+.customer-list { max-height: 360px; min-height: 180px; }
 .product-row { display: grid; grid-template-columns: 34px 1fr 120px 130px; align-items: center; gap: 10px; padding: 10px; border-bottom: 1px solid rgba(255,255,255,.07); cursor: pointer; }
-.customer-row { display: grid; grid-template-columns: 34px 1fr 110px; align-items: center; gap: 10px; padding: 10px; border-bottom: 1px solid rgba(255,255,255,.07); cursor: pointer; }
+.customer-row { display: grid; grid-template-columns: 34px 1fr 110px; align-items: center; gap: 10px; padding: 9px 10px; border-bottom: 1px solid rgba(255,255,255,.07); cursor: pointer; }
 .product-row:hover, .customer-row:hover { background: rgba(255,255,255,.04); }
+.customer-row.selected { background: rgba(20,184,166,.11); }
 .product-row input, .customer-row input { width: 18px; height: 18px; }
 .product-main, .customer-main { font-weight: 800; }
 .product-meta, .customer-meta { color: #9ca3af; }
 .product-price { color: #bbf7d0; text-align: left; }
-.modal-state { padding: 40px; text-align: center; color: #9ca3af; }
+.modal-state { padding: 34px; text-align: center; color: #9ca3af; }
 @media (max-width: 980px) { .grid-layout { grid-template-columns: 1fr; } .modal-toolbar, .customer-modal-toolbar { grid-template-columns: 1fr; } .product-row, .customer-row { grid-template-columns: 30px 1fr; } .product-meta, .product-price, .customer-meta { grid-column: 2; text-align: right; } }
 </style>
