@@ -21,8 +21,9 @@ export type LocalDiscount = {
   [key: string]: unknown;
 };
 
-export type LocalDiscountSaveRequest = Omit<LocalDiscount, "DiscountId"> & {
+export type LocalDiscountSaveRequest = Omit<LocalDiscount, "DiscountId" | "Description"> & {
   DiscountId?: number;
+  Description?: string | null;
   GoodsIds?: number[];
   CustomerIds?: number[];
 };
