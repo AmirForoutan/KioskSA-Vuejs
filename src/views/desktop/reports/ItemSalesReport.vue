@@ -1,17 +1,16 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
-import "@majidh1/jalalidatepicker";
-import "@majidh1/jalalidatepicker/dist/jalalidatepicker.min.css";
+import { computed, onMounted, ref, watch } from "vue";
 import { can } from "../../../components/acl/can";
 import { loadDesktopInvoiceItems, loadDesktopInvoices, type DesktopInvoice, type DesktopInvoiceItem } from "../../../services/desktopApi";
 import { exportToExcel } from "../../utils/exportExcel";
-import { setupJalaliDateInputs } from "../../../utilities";
 import { useDesktopToastMessage } from "../useDesktopToastMessage";
 import { escapeHtml, formatMoney, money, moneyPair, printReceipt, reportRange } from "./receiptPrint";
 
 type Mode = "summary" | "date" | "invoice";
 type ItemLine = { invoiceId: number; invoiceNo: number; date: string; customer: string; phone: string; goodsKey: string; goodsName: string; quantity: number; total: number };
 type TableRow = Record<string, string | number>;
+
+const props = defineProps<{ fromDate?: string; toDate?: string; query?: string; refreshKey?: number }>();
 
 const modes = [
   { key: "summary", title: "سرجمع اقلام" },
@@ -20,9 +19,6 @@ const modes = [
 ] as const;
 
 const activeMode = ref<Mode>("summary");
-const from = ref("");
-const to = ref("");
-const q = ref("");
 const loading = ref(false);
 const message = ref("");
 const invoices = ref<DesktopInvoice[]>([]);
@@ -31,7 +27,7 @@ const lines = ref<ItemLine[]>([]);
 useDesktopToastMessage(message);
 
 const filteredLines = computed(() => {
-  const s = q.value.trim();
+  const s = String(props.query || "").trim();
   if (!s) return lines.value;
   return lines.value.filter((row) => `${row.goodsName} ${row.customer} ${row.phone} ${row.invoiceNo} ${row.date}`.includes(s));
 });
@@ -68,17 +64,15 @@ const maxItemTotal = computed(() => Math.max(1, ...topItems.value.map((row) => N
 const totalItemsSale = computed(() => filteredLines.value.reduce((sum, row) => sum + row.total, 0));
 const totalQuantity = computed(() => filteredLines.value.reduce((sum, row) => sum + row.quantity, 0));
 
-onMounted(() => {
-  setupJalaliDateInputs();
-  loadReport();
-});
+onMounted(loadReport);
+watch(() => props.refreshKey, loadReport);
 
 async function loadReport() {
   loading.value = true;
   message.value = "";
   lines.value = [];
   try {
-    invoices.value = await loadDesktopInvoices({ FromDate: from.value.trim(), ToDate: to.value.trim() });
+    invoices.value = await loadDesktopInvoices({ FromDate: String(props.fromDate || "").trim(), ToDate: String(props.toDate || "").trim() });
     const allItems = await Promise.all(invoices.value.map(async (invoice) => {
       try {
         const items = await loadDesktopInvoiceItems(invoice.SaleInvoiceId);
@@ -121,17 +115,13 @@ function printItemReport() {
     return `<tr><td>${escapeHtml(row.goodsName)}</td><td class="num">${formatMoney(row.quantity)}</td><td class="num">${formatMoney(row.total)}</td></tr>`;
   }).join("");
   const headers = activeMode.value === "invoice" ? "<tr><th>فاکتور</th><th>کالا</th><th class=\"num\">تعداد</th><th class=\"num\">مبلغ</th></tr>" : activeMode.value === "date" ? "<tr><th>تاریخ</th><th>کالا</th><th class=\"num\">تعداد</th><th class=\"num\">مبلغ</th></tr>" : "<tr><th>کالا</th><th class=\"num\">تعداد</th><th class=\"num\">مبلغ</th></tr>";
-  printReceipt("گزارش فروش اقلام", reportRange(from.value, to.value), `<div class="section"><div class="section-title">سرجمع</div>${moneyPair("جمع فروش اقلام", totalItemsSale.value)}${moneyPair("تعداد اقلام", totalQuantity.value)}${moneyPair("ردیف آیتم", filteredLines.value.length)}</div><div class="section"><div class="section-title">${escapeHtml(modes.find((m) => m.key === activeMode.value)?.title || "گزارش")}</div><table><thead>${headers}</thead><tbody>${rowsHtml}</tbody></table></div>`);
+  printReceipt("گزارش فروش اقلام", reportRange(props.fromDate || "", props.toDate || ""), `<div class="section"><div class="section-title">سرجمع</div>${moneyPair("جمع فروش اقلام", totalItemsSale.value)}${moneyPair("تعداد اقلام", totalQuantity.value)}${moneyPair("ردیف آیتم", filteredLines.value.length)}</div><div class="section"><div class="section-title">${escapeHtml(modes.find((m) => m.key === activeMode.value)?.title || "گزارش")}</div><table><thead>${headers}</thead><tbody>${rowsHtml}</tbody></table></div>`);
 }
 </script>
 
 <template>
   <div class="ir-shell">
-    <div class="ir-toolbar">
-      <input class="ir-input" v-model="q" placeholder="جستجوی کالا، مشتری، فاکتور..." />
-      <input class="ir-input" v-model="from" placeholder="از تاریخ" readonly data-jdp />
-      <input class="ir-input" v-model="to" placeholder="تا تاریخ" readonly data-jdp />
-      <button class="ir-btn primary" :disabled="loading" @click="loadReport">{{ loading ? "در حال دریافت" : "اعمال فیلتر" }}</button>
+    <div class="ir-actions">
       <button v-if="can('reports.export.excel')" class="ir-btn" :disabled="!activeRows.length" @click="exportExcel">خروجی اکسل</button>
       <button class="ir-btn" :disabled="!activeRows.length" @click="printItemReport">چاپ گزارش</button>
     </div>
@@ -153,14 +143,12 @@ function printItemReport() {
 
 <style scoped>
 .ir-shell { height: 100%; min-height: 0; display: flex; flex-direction: column; gap: 12px; }
-.ir-toolbar { display: grid; grid-template-columns: 1.2fr 1fr 1fr auto auto auto; gap: 10px; }
-.ir-input, .ir-btn { min-height: 46px; border-radius: 8px; padding: 9px 11px; color: #eef2ff; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.1); }
-.ir-btn { cursor: pointer; white-space: nowrap; } .ir-btn.primary, .ir-tabs button.active { font-weight: 900; background: rgba(20,184,166,.18); border-color: rgba(20,184,166,.34); }
-.ir-tabs { display: flex; gap: 8px; } .ir-tabs button { min-height: 42px; border-radius: 8px; color: #eef2ff; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); cursor: pointer; }
+.ir-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.ir-btn { min-height: 42px; border-radius: 8px; padding: 8px 11px; color: #eef2ff; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.1); cursor: pointer; white-space: nowrap; } .ir-btn:disabled { cursor: not-allowed; opacity: .55; }
+.ir-tabs { display: flex; gap: 8px; } .ir-tabs button { min-height: 42px; border-radius: 8px; color: #eef2ff; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); cursor: pointer; padding: 8px 12px; } .ir-tabs button.active { font-weight: 900; background: rgba(20,184,166,.18); border-color: rgba(20,184,166,.34); }
 .ir-summary { display: grid; grid-template-columns: repeat(3,minmax(160px,1fr)); gap: 10px; } .ir-summary div, .ir-message, .ir-empty, .item-bars { border-radius: 8px; padding: 10px 12px; background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.08); } .ir-summary span { color: #a7b0c3; margin-left: 8px; }
 .ir-message { color: #fde68a; background: rgba(245,158,11,.12); border-color: rgba(245,158,11,.22); }
 .item-bars { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px 14px; } .item-bar { display: grid; grid-template-columns: minmax(130px,1fr) 1.4fr 110px; gap: 10px; align-items: center; } .item-bar span { color: #a7b0c3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .item-bar div { height: 10px; border-radius: 999px; background: rgba(255,255,255,.055); overflow: hidden; } .item-bar i { height: 100%; display: block; border-radius: 999px; background: linear-gradient(90deg,#14b8a6,#f59e0b); }
-.ir-table { flex: 1; min-height: 0; overflow: auto; border-radius: 8px; border: 1px solid rgba(255,255,255,.08); background: rgba(255,255,255,.02); }
-.ir-tr { display: grid; gap: 10px; align-items: center; padding: 11px 12px; border-bottom: 1px solid rgba(255,255,255,.06); } .ir-tr.summary { grid-template-columns: 1.6fr 120px 120px 140px; } .ir-tr.date { grid-template-columns: 120px 1.6fr 120px 120px 140px; } .ir-tr.invoice { grid-template-columns: 90px 120px 1.2fr 1.6fr 100px 140px; }
+.ir-table { flex: 1; min-height: 0; overflow: auto; border-radius: 8px; border: 1px solid rgba(255,255,255,.08); background: rgba(255,255,255,.02); } .ir-tr { display: grid; gap: 10px; align-items: center; padding: 11px 12px; border-bottom: 1px solid rgba(255,255,255,.06); } .ir-tr.summary { grid-template-columns: 1.6fr 120px 120px 140px; } .ir-tr.date { grid-template-columns: 120px 1.6fr 120px 120px 140px; } .ir-tr.invoice { grid-template-columns: 90px 120px 1.2fr 1.6fr 100px 140px; }
 .ir-th { position: sticky; top: 0; z-index: 2; font-weight: 900; color: #a7b0c3; background: rgba(16,19,26,.96); } .bold { font-weight: 900; }
 </style>
