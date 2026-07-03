@@ -49,6 +49,7 @@ const orderTypeConfigError = ref(false);
 const IsShowDiscountCartField = ref(false);
 const HaveStockLicense = ref(false);
 const goodsDiscountProducts = ref([]);
+const goodsDiscountCustomers = ref([]);
 const goodsDiscountTotal = computed(() => autoGoodsDiscount.value.amount); // تخفیف خودکار کالاها
 // بخش اعتبار مشتریان
 const customerCredit = ref(0);
@@ -244,7 +245,7 @@ onMounted(async () => {
     // بارگذاری اطلاعات کالاها و ...
     await loadData(props.connectionId);
     try {
-        const [categoryData, goodsData, toppingData, levelData, productData, cartData, toppingsData, tableData, discountData, discountProductData] = await Promise.all([
+        const [categoryData, goodsData, toppingData, levelData, productData, cartData, toppingsData, tableData, discountData, discountProductData, discountCustomerData] = await Promise.all([
             getData('category'),
             getData('goods'),
             getData('topping'),
@@ -254,7 +255,8 @@ onMounted(async () => {
             getData('cartToppings'),
             getData('tables'),
             getData('discounts'),
-            getData('discountProducts')
+            getData('discountProducts'),
+            getData('discountCustomers')
         ]);
         groups.value = Array.isArray(categoryData) ? categoryData : categoryData?.GoodsGroup || [];
         goods.value = Array.isArray(goodsData) ? goodsData : Object.values(goodsData);
@@ -268,6 +270,7 @@ onMounted(async () => {
         tables.value = normalizeTables(tableData);
         goodsDiscounts.value = Array.isArray(discountData) ? discountData : [];
         goodsDiscountProducts.value = Array.isArray(discountProductData) ? discountProductData : [];
+        goodsDiscountCustomers.value = Array.isArray(discountCustomerData) ? discountCustomerData : [];
     }
     catch (error) {
         console.error('خطا در دریافت داده:', error);
@@ -983,6 +986,79 @@ function localDiscountProducts(discountRow) {
         ? goodsDiscountProducts.value.filter(dp => Number(dp.DiscountId) === discountId)
         : [];
 }
+function parseDiscountCustomerIds(value) {
+    if (Array.isArray(value)) {
+        return value.map(id => Number(id)).filter(id => Number.isFinite(id) && id > 0);
+    }
+    return String(value || '')
+        .split(/[,،\n\r\t\s]+/)
+        .map(id => Number(String(id).trim()))
+        .filter(id => Number.isFinite(id) && id > 0);
+}
+function extractCustomerIdsFromDescription(description) {
+    const text = String(description || '');
+    const marker = '[CUSTOMER_DISCOUNT_IDS:';
+    const start = text.toUpperCase().indexOf(marker);
+    if (start < 0)
+        return [];
+    const valueStart = start + marker.length;
+    const end = text.indexOf(']', valueStart);
+    if (end < 0)
+        return [];
+    return parseDiscountCustomerIds(text.slice(valueStart, end));
+}
+function selectedKioskCustomerIds() {
+    const customer = HamiClubUserData.value || {};
+    const values = [
+        customer.CustomerId,
+        customer.UserId,
+        customer.UID,
+        customer.Id,
+        customer.CustomerCode,
+        customer.Code,
+        customer.customerId,
+        customer.userId,
+        customer.uid,
+        customer.id,
+        customer.customerCode,
+        selectedDiscountCard.value?.CustomerId,
+        selectedDiscountCard.value?.UserId,
+        selectedDiscountCard.value?.UID,
+    ];
+    return Array.from(new Set(values
+        .map(value => Number(value))
+        .filter(id => Number.isFinite(id) && id > 0)));
+}
+function localDiscountCustomerIds(discountRow) {
+    const discountId = discountIdOf(discountRow);
+    const directIds = [
+        ...parseDiscountCustomerIds(discountRow?.CustomerIds),
+        ...parseDiscountCustomerIds(discountRow?.customerIds),
+        ...parseDiscountCustomerIds(discountRow?.CustomerIdsText),
+        ...parseDiscountCustomerIds(discountRow?.CustomerId),
+        ...parseDiscountCustomerIds(discountRow?.UserId),
+        ...parseDiscountCustomerIds(discountRow?.UID),
+        ...extractCustomerIdsFromDescription(discountRow?.Description)
+    ];
+    const relationIds = Array.isArray(goodsDiscountCustomers.value)
+        ? goodsDiscountCustomers.value
+            .filter(row => Number(row.DiscountId ?? row.DiscountCodeId ?? row.GoodsDiscountId) === discountId)
+            .flatMap(row => parseDiscountCustomerIds(row.CustomerId ?? row.UserId ?? row.UID ?? row.CustomerCode))
+        : [];
+    const nestedIds = Array.isArray(discountRow?.DiscountCustomers)
+        ? discountRow.DiscountCustomers.flatMap(row => parseDiscountCustomerIds(row.CustomerId ?? row.UserId ?? row.UID ?? row.CustomerCode))
+        : [];
+    return Array.from(new Set([...directIds, ...relationIds, ...nestedIds]));
+}
+function isLocalDiscountForSelectedCustomer(discountRow) {
+    const customerIds = localDiscountCustomerIds(discountRow);
+    if (customerIds.length === 0)
+        return true;
+    const selectedIds = selectedKioskCustomerIds();
+    if (selectedIds.length === 0)
+        return false;
+    return selectedIds.some(id => customerIds.includes(id));
+}
 function isItemEligibleForLocalDiscount(cartItem, discountRow, products) {
     const useForAll = discountRow?.UseForAll === true || discountRow?.ApplyToAllGoods === true || products.length === 0;
     if (useForAll)
@@ -1016,6 +1092,8 @@ const autoGoodsDiscount = computed(() => {
     let best = { amount: 0, discount: null };
     for (const discountRow of goodsDiscounts.value) {
         if (!isLocalDiscountActive(discountRow))
+            continue;
+        if (!isLocalDiscountForSelectedCustomer(discountRow))
             continue;
         const products = localDiscountProducts(discountRow);
         const applicableItems = cartItems.value.filter(item => isItemEligibleForLocalDiscount(item, discountRow, products));
@@ -1384,7 +1462,8 @@ async function loadData(conId) {
             removeData('toppingproducts'),
             removeData('tables'),
             removeData('discounts'),
-            removeData('discountProducts')
+            removeData('discountProducts'),
+            removeData('discountCustomers')
         ]);
         const [categories, goods, toppings, toppingLevels, toppingProducts, tables, discountsResponse] = await Promise.all([
             fetchCategories(conId).then(res => res.GoodsGroup || res),
@@ -1393,7 +1472,7 @@ async function loadData(conId) {
             fetchToppingLevels(conId).then(res => res.ToppingLevel || res),
             fetchToppingProducts(conId).then(res => res.ToppingGoods || res),
             fetchTables(conId).then(res => normalizeTables(res)).catch(() => []),
-            fetchGoodsDiscounts(conId).catch(() => ({ Discounts: [], DiscountProducts: [], CustomerDiscountProductsList: [] }))
+            fetchGoodsDiscounts(conId).catch(() => ({ Discounts: [], DiscountProducts: [], CustomerDiscountProductsList: [], DiscountCustomers: [], CustomerDiscountCustomersList: [] }))
         ]);
         await Promise.all([
             saveData('category', categories),
@@ -1403,7 +1482,8 @@ async function loadData(conId) {
             saveData('toppingproducts', toppingProducts),
             saveData('tables', tables),
             saveData('discounts', Array.isArray(discountsResponse?.Discounts) ? discountsResponse.Discounts : []),
-            saveData('discountProducts', Array.isArray(discountsResponse?.DiscountProducts) ? discountsResponse.DiscountProducts : (discountsResponse?.CustomerDiscountProductsList || []))
+            saveData('discountProducts', Array.isArray(discountsResponse?.DiscountProducts) ? discountsResponse.DiscountProducts : (discountsResponse?.CustomerDiscountProductsList || [])),
+            saveData('discountCustomers', Array.isArray(discountsResponse?.DiscountCustomers) ? discountsResponse.DiscountCustomers : (discountsResponse?.CustomerDiscountCustomersList || []))
         ]);
     }
     catch (error) {
