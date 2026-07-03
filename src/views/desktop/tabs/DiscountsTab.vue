@@ -20,9 +20,11 @@ const loading = ref(false);
 const productLoading = ref(false);
 const productPickerOpen = ref(false);
 const productSearch = ref("");
+const customerPickerOpen = ref(false);
 const customerSearch = ref("");
 const customerLoading = ref(false);
 const customers = ref<DesktopCustomer[]>([]);
+const selectedCustomerPickerIds = ref<number[]>([]);
 const message = ref("");
 const discounts = ref<LocalDiscount[]>([]);
 const cards = ref<LocalDiscountCard[]>([]);
@@ -67,6 +69,7 @@ const cardForm = reactive({
 
 const hasMessage = computed(() => message.value.trim().length > 0);
 const selectedProductIdSet = computed(() => new Set(selectedProductIds.value));
+const selectedCustomerPickerIdSet = computed(() => new Set(selectedCustomerPickerIds.value));
 const selectedGoodsCount = computed(() => parseNumberIds(discountForm.GoodsIdsText).length);
 const selectedCustomerIds = computed(() => parseNumberIds(discountForm.CustomerIdsText));
 const selectedCustomerCount = computed(() => selectedCustomerIds.value.length);
@@ -75,6 +78,12 @@ const selectedGoodsSummary = computed(() => {
   if (!ids.length) return "کالایی انتخاب نشده";
   if (ids.length <= 4) return ids.join(", ");
   return `${ids.slice(0, 4).join(", ")} و ${ids.length - 4} مورد دیگر`;
+});
+const selectedCustomersSummary = computed(() => {
+  const ids = selectedCustomerIds.value;
+  if (!ids.length) return "عمومی؛ برای همه مشتری‌ها";
+  if (ids.length <= 5) return ids.map((id) => `#${id}`).join("، ");
+  return `${ids.slice(0, 5).map((id) => `#${id}`).join("، ")} و ${ids.length - 5} مشتری دیگر`;
 });
 
 const filteredProducts = computed(() => {
@@ -210,6 +219,7 @@ function resetDiscountForm() {
     CustomerIdsText: "",
   });
   selectedProductIds.value = [];
+  selectedCustomerPickerIds.value = [];
 }
 
 function editDiscount(row: LocalDiscount) {
@@ -235,6 +245,7 @@ function editDiscount(row: LocalDiscount) {
     CustomerIdsText: customerIds.join(","),
   });
   selectedProductIds.value = goodsIds;
+  selectedCustomerPickerIds.value = customerIds;
   activeTab.value = "discounts";
 }
 
@@ -282,6 +293,17 @@ function confirmProductSelection() {
   productPickerOpen.value = false;
 }
 
+function openCustomerPicker() {
+  selectedCustomerPickerIds.value = parseNumberIds(discountForm.CustomerIdsText);
+  customerPickerOpen.value = true;
+  customers.value = [];
+  customerSearch.value = "";
+}
+
+function closeCustomerPicker() {
+  customerPickerOpen.value = false;
+}
+
 async function findCustomers() {
   const q = customerSearch.value.trim();
   if (!q) {
@@ -299,16 +321,42 @@ async function findCustomers() {
   }
 }
 
-function addCustomerToDiscount(customer: DesktopCustomer) {
+function isCustomerSelected(customer: DesktopCustomer) {
+  const id = customerId(customer);
+  return id > 0 && selectedCustomerPickerIdSet.value.has(id);
+}
+
+function toggleCustomer(customer: DesktopCustomer) {
   const id = customerId(customer);
   if (id <= 0) return;
-  const current = new Set(parseNumberIds(discountForm.CustomerIdsText));
-  current.add(id);
-  discountForm.CustomerIdsText = Array.from(current).sort((a, b) => a - b).join(",");
+  const current = new Set(selectedCustomerPickerIds.value);
+  if (current.has(id)) current.delete(id);
+  else current.add(id);
+  selectedCustomerPickerIds.value = Array.from(current).sort((a, b) => a - b);
+}
+
+function selectFoundCustomers() {
+  const current = new Set(selectedCustomerPickerIds.value);
+  for (const customer of customers.value) {
+    const id = customerId(customer);
+    if (id > 0) current.add(id);
+  }
+  selectedCustomerPickerIds.value = Array.from(current).sort((a, b) => a - b);
+}
+
+function clearCustomerSelection() {
+  selectedCustomerPickerIds.value = [];
+}
+
+function confirmCustomerSelection() {
+  discountForm.CustomerIdsText = selectedCustomerPickerIds.value.join(",");
+  customerPickerOpen.value = false;
 }
 
 function removeCustomerId(id: number) {
-  discountForm.CustomerIdsText = parseNumberIds(discountForm.CustomerIdsText).filter((item) => item !== id).join(",");
+  const ids = parseNumberIds(discountForm.CustomerIdsText).filter((item) => item !== id);
+  discountForm.CustomerIdsText = ids.join(",");
+  selectedCustomerPickerIds.value = ids;
 }
 
 async function submitDiscount() {
@@ -454,8 +502,7 @@ async function removeCard(row: LocalDiscountCard) {
     <header class="page-head">
       <div>
         <h2>مدیریت تخفیف‌ها</h2>
-        <p>تعریف تخفیف عمومی یا تخفیف مخصوص چند مشتری؛ با انتخاب مشتری در فاکتور، تخفیف مخصوص او خودکار قابل اعمال
-          می‌شود.</p>
+        <p>تعریف تخفیف عمومی یا تخفیف مخصوص چند مشتری؛ با انتخاب مشتری در فاکتور، تخفیف مخصوص او خودکار قابل اعمال می‌شود.</p>
       </div>
       <button class="btn ghost" :disabled="loading" @click="refreshAll">بروزرسانی</button>
     </header>
@@ -496,32 +543,21 @@ async function removeCard(row: LocalDiscountCard) {
               <span>{{ discountForm.ApplyToAllGoods ? 'همه کالاها' : `${selectedGoodsCount} کالا انتخاب شده` }}</span>
               <small v-if="!discountForm.ApplyToAllGoods">{{ selectedGoodsSummary }}</small>
             </div>
-            <button class="btn" type="button" :disabled="discountForm.ApplyToAllGoods" @click="openProductPicker">انتخاب
-              از لیست کالاها</button>
+            <button class="btn" type="button" :disabled="discountForm.ApplyToAllGoods" @click="openProductPicker">انتخاب از لیست کالاها</button>
           </div>
 
           <div class="customer-select-box wide">
             <div>
               <strong>مشتریان مجاز برای این تخفیف</strong>
-              <span>{{ selectedCustomerCount ? `${selectedCustomerCount} مشتری انتخاب شده` : 'عمومی؛ برای همه مشتری‌ها'
-                }}</span>
-              <small>برای تخفیف پرسنلی، شناسه همه پرسنل را اینجا اضافه کنید.</small>
+              <span>{{ selectedCustomerCount ? `${selectedCustomerCount} مشتری انتخاب شده` : 'عمومی؛ برای همه مشتری‌ها' }}</span>
+              <small>{{ selectedCustomersSummary }}</small>
             </div>
-            <input v-model="discountForm.CustomerIdsText" placeholder="مثلا 12,18,25 - خالی یعنی عمومی" />
-            <div class="customer-search-row">
-              <input v-model="customerSearch" placeholder="جستجوی مشتری با نام یا موبایل"
-                @keyup.enter.prevent="findCustomers" />
-              <button class="btn" type="button" :disabled="customerLoading" @click="findCustomers">جستجو</button>
+            <div class="customer-selector-actions">
+              <button class="btn" type="button" @click="openCustomerPicker">انتخاب از لیست مشتری‌ها</button>
+              <button class="btn" type="button" :disabled="!selectedCustomerCount" @click="clearCustomerSelection">پاک کردن انتخاب</button>
             </div>
             <div v-if="selectedCustomerIds.length" class="chip-list">
-              <button v-for="id in selectedCustomerIds" :key="id" class="chip" type="button"
-                @click="removeCustomerId(id)">#{{ id }} ×</button>
-            </div>
-            <div v-if="customers.length" class="customer-results">
-              <button v-for="customer in customers" :key="customerId(customer)" type="button"
-                @click="addCustomerToDiscount(customer)">
-                {{ customerTitle(customer) }}
-              </button>
+              <button v-for="id in selectedCustomerIds" :key="id" class="chip" type="button" @click="removeCustomerId(id)">#{{ id }} ×</button>
             </div>
           </div>
         </div>
@@ -538,29 +574,18 @@ async function removeCard(row: LocalDiscountCard) {
       <div class="card table-card">
         <table>
           <thead>
-            <tr>
-              <th>شناسه</th>
-              <th>عنوان</th>
-              <th>نوع</th>
-              <th>مقدار</th>
-              <th>کالاها</th>
-              <th>مشتری‌ها</th>
-              <th>فعال</th>
-              <th></th>
-            </tr>
+            <tr><th>شناسه</th><th>عنوان</th><th>نوع</th><th>مقدار</th><th>کالاها</th><th>مشتری‌ها</th><th>فعال</th><th></th></tr>
           </thead>
           <tbody>
             <tr v-for="row in discounts" :key="row.DiscountId">
               <td>{{ row.DiscountId }}</td>
               <td>{{ row.Title }}</td>
               <td>{{ Number(row.DiscountType) === 1 ? 'درصدی' : 'مبلغی' }}</td>
-              <td>{{ Number(row.DiscountType) === 1 ? row.DiscountPercent + '%' :
-                Number(row.DiscountAmount).toLocaleString() }}</td>
+              <td>{{ Number(row.DiscountType) === 1 ? row.DiscountPercent + '%' : Number(row.DiscountAmount).toLocaleString() }}</td>
               <td>{{ row.ApplyToAllGoods ? 'همه' : rowGoodsIds(row).join(',') }}</td>
               <td>{{ rowCustomerIds(row).length ? rowCustomerIds(row).join(',') : 'عمومی' }}</td>
               <td>{{ row.IsActive ? 'بله' : 'خیر' }}</td>
-              <td class="row-actions"><button @click="editDiscount(row)">ویرایش</button><button
-                  @click="removeDiscount(row)">غیرفعال</button></td>
+              <td class="row-actions"><button @click="editDiscount(row)">ویرایش</button><button @click="removeDiscount(row)">غیرفعال</button></td>
             </tr>
           </tbody>
         </table>
@@ -582,24 +607,12 @@ async function removeCard(row: LocalDiscountCard) {
           <label>تا تاریخ<input v-model="cardForm.EndDate" readonly data-jdp /></label>
         </div>
         <div class="checks"><label><input v-model="cardForm.IsActive" type="checkbox" /> فعال</label></div>
-        <div class="actions"><button class="btn primary" :disabled="loading">ذخیره</button><button class="btn"
-            type="button" @click="resetCardForm">جدید</button></div>
+        <div class="actions"><button class="btn primary" :disabled="loading">ذخیره</button><button class="btn" type="button" @click="resetCardForm">جدید</button></div>
       </form>
 
       <div class="card table-card">
         <table>
-          <thead>
-            <tr>
-              <th>شناسه</th>
-              <th>شماره</th>
-              <th>مشتری</th>
-              <th>درصد</th>
-              <th>مبلغ</th>
-              <th>مانده</th>
-              <th>فعال</th>
-              <th></th>
-            </tr>
-          </thead>
+          <thead><tr><th>شناسه</th><th>شماره</th><th>مشتری</th><th>درصد</th><th>مبلغ</th><th>مانده</th><th>فعال</th><th></th></tr></thead>
           <tbody>
             <tr v-for="row in cards" :key="row.DiscountCardId">
               <td>{{ row.DiscountCardId }}</td>
@@ -609,8 +622,7 @@ async function removeCard(row: LocalDiscountCard) {
               <td>{{ Number(row.DiscountAmount || 0).toLocaleString() }}</td>
               <td>{{ Number(row.Balance || 0).toLocaleString() }}</td>
               <td>{{ row.IsActive ? 'بله' : 'خیر' }}</td>
-              <td class="row-actions"><button @click="editCard(row)">ویرایش</button><button
-                  @click="removeCard(row)">غیرفعال</button></td>
+              <td class="row-actions"><button @click="editCard(row)">ویرایش</button><button @click="removeCard(row)">غیرفعال</button></td>
             </tr>
           </tbody>
         </table>
@@ -619,17 +631,7 @@ async function removeCard(row: LocalDiscountCard) {
 
     <div v-if="activeTab === 'transactions'" class="card table-card full">
       <table>
-        <thead>
-          <tr>
-            <th>شناسه</th>
-            <th>کارت</th>
-            <th>فاکتور</th>
-            <th>نوع</th>
-            <th>مبلغ</th>
-            <th>تاریخ</th>
-            <th>شرح</th>
-          </tr>
-        </thead>
+        <thead><tr><th>شناسه</th><th>کارت</th><th>فاکتور</th><th>نوع</th><th>مبلغ</th><th>تاریخ</th><th>شرح</th></tr></thead>
         <tbody>
           <tr v-for="row in transactions" :key="row.DiscountCardTransactionId">
             <td>{{ row.DiscountCardTransactionId }}</td>
@@ -647,10 +649,7 @@ async function removeCard(row: LocalDiscountCard) {
     <div v-if="productPickerOpen" class="modal-backdrop" @click.self="closeProductPicker">
       <div class="product-modal">
         <header class="modal-head">
-          <div>
-            <h3>انتخاب کالاهای شامل تخفیف</h3>
-            <p>{{ selectedProductIds.length }} کالا انتخاب شده است</p>
-          </div>
+          <div><h3>انتخاب کالاهای شامل تخفیف</h3><p>{{ selectedProductIds.length }} کالا انتخاب شده است</p></div>
           <button class="icon-btn" type="button" @click="closeProductPicker">×</button>
         </header>
         <div class="modal-toolbar">
@@ -674,366 +673,90 @@ async function removeCard(row: LocalDiscountCard) {
         </footer>
       </div>
     </div>
+
+    <div v-if="customerPickerOpen" class="modal-backdrop" @click.self="closeCustomerPicker">
+      <div class="product-modal customer-modal">
+        <header class="modal-head">
+          <div><h3>انتخاب مشتری‌های مجاز تخفیف</h3><p>{{ selectedCustomerPickerIds.length }} مشتری انتخاب شده است</p></div>
+          <button class="icon-btn" type="button" @click="closeCustomerPicker">×</button>
+        </header>
+        <div class="modal-toolbar customer-modal-toolbar">
+          <input v-model="customerSearch" placeholder="نام، موبایل یا شناسه مشتری" @keyup.enter.prevent="findCustomers" />
+          <button class="btn" type="button" :disabled="customerLoading" @click="findCustomers">جستجو</button>
+          <button class="btn" type="button" :disabled="!customers.length" @click="selectFoundCustomers">انتخاب همه نتایج</button>
+          <button class="btn" type="button" @click="clearCustomerSelection">پاک کردن انتخاب</button>
+        </div>
+        <div v-if="customerLoading" class="modal-state">در حال جستجوی مشتری‌ها...</div>
+        <div v-else-if="!customers.length" class="modal-state">برای نمایش مشتری‌ها جستجو کنید</div>
+        <div v-else class="customer-list">
+          <label v-for="customer in customers" :key="customerId(customer)" class="customer-row">
+            <input type="checkbox" :checked="isCustomerSelected(customer)" @change="toggleCustomer(customer)" />
+            <span class="customer-main">{{ customerTitle(customer) }}</span>
+            <span class="customer-meta">شناسه: {{ customerId(customer) }}</span>
+          </label>
+        </div>
+        <footer class="modal-footer">
+          <button class="btn primary" type="button" @click="confirmCustomerSelection">تأیید انتخاب</button>
+          <button class="btn" type="button" @click="closeCustomerPicker">انصراف</button>
+        </footer>
+      </div>
+    </div>
   </section>
 </template>
 
 <style scoped>
-.discounts-tab {
-  direction: rtl;
-  color: #e5e7eb;
-  height: 100%;
-  overflow: auto;
-}
-
-.page-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 12px;
-}
-
-.page-head h2 {
-  margin: 0 0 4px;
-  font-size: 22px;
-}
-
-.page-head p {
-  margin: 0;
-  color: #9ca3af;
-}
-
-.message {
-  padding: 10px 12px;
-  border-radius: 12px;
-  margin-bottom: 12px;
-  background: rgba(20, 184, 166, .12);
-  border: 1px solid rgba(20, 184, 166, .25);
-}
-
-.tabs {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.tabs button,
-.btn,
-.row-actions button,
-.customer-results button,
-.chip {
-  border: 1px solid rgba(255, 255, 255, .1);
-  color: #e5e7eb;
-  background: rgba(255, 255, 255, .05);
-  border-radius: 10px;
-  padding: 9px 14px;
-  cursor: pointer;
-}
-
-.tabs button.active,
-.btn.primary {
-  background: rgba(20, 184, 166, .22);
-  border-color: rgba(20, 184, 166, .45);
-  font-weight: 800;
-}
-
-.btn.ghost {
-  background: transparent;
-}
-
-.btn:disabled {
-  opacity: .55;
-  cursor: not-allowed;
-}
-
-.grid-layout {
-  display: grid;
-  grid-template-columns: minmax(330px, 460px) 1fr;
-  gap: 12px;
-  align-items: start;
-}
-
-.card {
-  background: rgba(255, 255, 255, .04);
-  border: 1px solid rgba(255, 255, 255, .08);
-  border-radius: 16px;
-  padding: 14px;
-}
-
-.form h3 {
-  margin: 0 0 12px;
-}
-
-.form-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.form-grid label {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  color: #cbd5e1;
-  font-size: 13px;
-}
-
-.form-grid label.wide,
-.form-grid .wide {
-  grid-column: 1 / -1;
-}
-
-input,
-select {
-  border: 1px solid rgba(255, 255, 255, .12);
-  background: rgba(0, 0, 0, .22);
-  color: #fff;
-  border-radius: 10px;
-  padding: 9px 10px;
-  outline: none;
-}
-
-.checks {
-  display: flex;
-  gap: 18px;
-  margin: 12px 0;
-}
-
-.actions {
-  display: flex;
-  gap: 8px;
-}
-
-.table-card {
-  overflow: auto;
-}
-
-.table-card.full {
-  height: calc(100vh - 230px);
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-  min-width: 820px;
-}
-
-th,
-td {
-  text-align: right;
-  padding: 10px;
-  border-bottom: 1px solid rgba(255, 255, 255, .07);
-  white-space: nowrap;
-}
-
-th {
-  color: #93c5fd;
-  font-weight: 800;
-}
-
-.row-actions {
-  display: flex;
-  gap: 6px;
-}
-
-.product-select-box,
-.customer-select-box {
-  display: grid;
-  gap: 10px;
-  padding: 12px;
-  border: 1px dashed rgba(255, 255, 255, .18);
-  border-radius: 14px;
-  background: rgba(0, 0, 0, .16);
-}
-
-.product-select-box {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.product-select-box.disabled {
-  opacity: .55;
-}
-
-.product-select-box div,
-.customer-select-box>div:first-child {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
-
-.product-select-box span,
-.customer-select-box span {
-  color: #cbd5e1;
-}
-
-.product-select-box small,
-.customer-select-box small {
-  color: #93c5fd;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 330px;
-}
-
-.customer-search-row {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 8px;
-}
-
-.customer-results {
-  display: grid;
-  gap: 6px;
-  max-height: 150px;
-  overflow: auto;
-}
-
-.customer-results button {
-  text-align: right;
-}
-
-.chip-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.chip {
-  padding: 6px 9px;
-  background: rgba(59, 130, 246, .18);
-}
-
-.modal-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 1000;
-  background: rgba(0, 0, 0, .72);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-}
-
-.product-modal {
-  width: min(920px, 96vw);
-  max-height: 88vh;
-  display: flex;
-  flex-direction: column;
-  border-radius: 20px;
-  background: #111827;
-  border: 1px solid rgba(255, 255, 255, .12);
-  box-shadow: 0 24px 80px rgba(0, 0, 0, .5);
-  overflow: hidden;
-}
-
-.modal-head,
-.modal-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 14px 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, .08);
-}
-
-.modal-footer {
-  border-bottom: 0;
-  border-top: 1px solid rgba(255, 255, 255, .08);
-  justify-content: flex-start;
-}
-
-.modal-head h3 {
-  margin: 0 0 4px;
-}
-
-.modal-head p {
-  margin: 0;
-  color: #9ca3af;
-}
-
-.icon-btn {
-  width: 38px;
-  height: 38px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, .12);
-  background: rgba(255, 255, 255, .06);
-  color: #fff;
-  font-size: 24px;
-  cursor: pointer;
-}
-
-.modal-toolbar {
-  display: grid;
-  grid-template-columns: 1fr auto auto;
-  gap: 8px;
-  padding: 12px 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, .08);
-}
-
-.product-list {
-  overflow: auto;
-  padding: 8px 12px;
-}
-
-.product-row {
-  display: grid;
-  grid-template-columns: 34px 1fr 120px 130px;
-  align-items: center;
-  gap: 10px;
-  padding: 10px;
-  border-bottom: 1px solid rgba(255, 255, 255, .07);
-  cursor: pointer;
-}
-
-.product-row:hover {
-  background: rgba(255, 255, 255, .04);
-}
-
-.product-row input {
-  width: 18px;
-  height: 18px;
-}
-
-.product-main {
-  font-weight: 800;
-}
-
-.product-meta {
-  color: #9ca3af;
-}
-
-.product-price {
-  color: #bbf7d0;
-  text-align: left;
-}
-
-.modal-state {
-  padding: 40px;
-  text-align: center;
-  color: #9ca3af;
-}
-
-@media (max-width: 980px) {
-  .grid-layout {
-    grid-template-columns: 1fr;
-  }
-
-  .modal-toolbar,
-  .customer-search-row {
-    grid-template-columns: 1fr;
-  }
-
-  .product-row {
-    grid-template-columns: 30px 1fr;
-  }
-
-  .product-meta,
-  .product-price {
-    grid-column: 2;
-    text-align: right;
-  }
-}
+.discounts-tab { direction: rtl; color: #e5e7eb; height: 100%; overflow: auto; }
+.page-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
+.page-head h2 { margin: 0 0 4px; font-size: 22px; }
+.page-head p { margin: 0; color: #9ca3af; }
+.message { padding: 10px 12px; border-radius: 12px; margin-bottom: 12px; background: rgba(20, 184, 166, .12); border: 1px solid rgba(20, 184, 166, .25); }
+.tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+.tabs button, .btn, .row-actions button, .chip { border: 1px solid rgba(255,255,255,.1); color: #e5e7eb; background: rgba(255,255,255,.05); border-radius: 10px; padding: 9px 14px; cursor: pointer; }
+.tabs button.active, .btn.primary { background: rgba(20,184,166,.22); border-color: rgba(20,184,166,.45); font-weight: 800; }
+.btn.ghost { background: transparent; }
+.btn:disabled { opacity: .55; cursor: not-allowed; }
+.grid-layout { display: grid; grid-template-columns: minmax(330px, 460px) 1fr; gap: 12px; align-items: start; }
+.card { background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); border-radius: 16px; padding: 14px; }
+.form h3 { margin: 0 0 12px; }
+.form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.form-grid label { display: flex; flex-direction: column; gap: 6px; color: #cbd5e1; font-size: 13px; }
+.form-grid label.wide, .form-grid .wide { grid-column: 1 / -1; }
+input, select { border: 1px solid rgba(255,255,255,.12); background: rgba(0,0,0,.22); color: #fff; border-radius: 10px; padding: 9px 10px; outline: none; }
+.checks { display: flex; gap: 18px; margin: 12px 0; }
+.actions { display: flex; gap: 8px; }
+.table-card { overflow: auto; }
+.table-card.full { height: calc(100vh - 230px); }
+table { width: 100%; border-collapse: collapse; min-width: 820px; }
+th, td { text-align: right; padding: 10px; border-bottom: 1px solid rgba(255,255,255,.07); white-space: nowrap; }
+th { color: #93c5fd; font-weight: 800; }
+.row-actions { display: flex; gap: 6px; }
+.product-select-box, .customer-select-box { display: grid; gap: 10px; padding: 12px; border: 1px dashed rgba(255,255,255,.18); border-radius: 14px; background: rgba(0,0,0,.16); }
+.product-select-box { display: flex; justify-content: space-between; align-items: center; }
+.product-select-box.disabled { opacity: .55; }
+.product-select-box div, .customer-select-box > div:first-child { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.product-select-box span, .customer-select-box span { color: #cbd5e1; }
+.product-select-box small, .customer-select-box small { color: #93c5fd; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 330px; }
+.customer-selector-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { padding: 6px 9px; background: rgba(59,130,246,.18); }
+.modal-backdrop { position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,.72); display: flex; align-items: center; justify-content: center; padding: 24px; }
+.product-modal { width: min(920px, 96vw); max-height: 88vh; display: flex; flex-direction: column; border-radius: 20px; background: #111827; border: 1px solid rgba(255,255,255,.12); box-shadow: 0 24px 80px rgba(0,0,0,.5); overflow: hidden; }
+.customer-modal { width: min(820px, 96vw); }
+.modal-head, .modal-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,.08); }
+.modal-footer { border-bottom: 0; border-top: 1px solid rgba(255,255,255,.08); justify-content: flex-start; }
+.modal-head h3 { margin: 0 0 4px; }
+.modal-head p { margin: 0; color: #9ca3af; }
+.icon-btn { width: 38px; height: 38px; border-radius: 999px; border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.06); color: #fff; font-size: 24px; cursor: pointer; }
+.modal-toolbar { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,.08); }
+.customer-modal-toolbar { grid-template-columns: 1fr auto auto auto; }
+.product-list, .customer-list { overflow: auto; padding: 8px 12px; }
+.product-row { display: grid; grid-template-columns: 34px 1fr 120px 130px; align-items: center; gap: 10px; padding: 10px; border-bottom: 1px solid rgba(255,255,255,.07); cursor: pointer; }
+.customer-row { display: grid; grid-template-columns: 34px 1fr 110px; align-items: center; gap: 10px; padding: 10px; border-bottom: 1px solid rgba(255,255,255,.07); cursor: pointer; }
+.product-row:hover, .customer-row:hover { background: rgba(255,255,255,.04); }
+.product-row input, .customer-row input { width: 18px; height: 18px; }
+.product-main, .customer-main { font-weight: 800; }
+.product-meta, .customer-meta { color: #9ca3af; }
+.product-price { color: #bbf7d0; text-align: left; }
+.modal-state { padding: 40px; text-align: center; color: #9ca3af; }
+@media (max-width: 980px) { .grid-layout { grid-template-columns: 1fr; } .modal-toolbar, .customer-modal-toolbar { grid-template-columns: 1fr; } .product-row, .customer-row { grid-template-columns: 30px 1fr; } .product-meta, .product-price, .customer-meta { grid-column: 2; text-align: right; } }
 </style>
