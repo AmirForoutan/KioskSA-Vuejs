@@ -20,5 +20,5 @@
     "ServiceAddress": "http://localhost:5005",
     "ServiceAPIAddress": "http://localhost:5005",
     "ResetTimer": 1,
-    "viewMode": 3
+    "viewMode": 1
 }
