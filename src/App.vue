@@ -3,8 +3,8 @@
   <div v-if="bootstrapped && viewModeCode !== 3 && showStandByVideo && !mobileAdminShortcutMode" id="click-counter"
     @click="handleClickCounterClick"></div>
 
-  <div v-if="bootstrapped && viewModeCode !== 3 && showStandByVideo && !mobileAdminShortcutMode" id="video-container" v-show="isVideoPlaying"
-    @click="handleBackgroundClick">
+  <div v-if="bootstrapped && viewModeCode !== 3 && showStandByVideo && !mobileAdminShortcutMode" id="video-container"
+    v-show="isVideoPlaying" @click="handleBackgroundClick">
     <video src="/img/standby.mp4" id="fullscreen-video" ref="videoElement" @ended="restartVideo" muted loop playsinline
       webkit-playsinline x5-playsinline>
     </video>
@@ -67,7 +67,8 @@
     <label>مجوزی برای شما یافت نشد، لطفا باز بودن سرویس یا داشتن لایسنس را بررسی بفرمائید</label>
   </div>
 
-  <div v-if="bootstrapped && viewModeCode !== 3 && license && showModeSelection && !mobileAdminShortcutMode" class="hami_logo" @click.stop="handleLogoClick">
+  <div v-if="bootstrapped && viewModeCode !== 3 && license && showModeSelection && !mobileAdminShortcutMode"
+    class="pargas Logo" @click.stop="handleLogoClick">
     <img src="../src/assets/images/Logo-sm.png" width="60px" alt="pargas Logo">
     <br>
     <label>نرم افزار سفارشگیر پرگاس</label>
@@ -78,8 +79,8 @@
   <RootView v-if="bootstrapped && viewModeCode === 3"></RootView>
 
   <!-- دکمه فعال‌سازی تمام‌صفحه -->
-  <button v-if="bootstrapped && viewModeCode !== 3 && license && !isFullscreen && !isMobile && !mobileAdminShortcutMode" @click="enterFullscreen"
-    style="position: fixed; bottom: 20px; right: 20px; z-index: 9999;">
+  <button v-if="bootstrapped && viewModeCode !== 3 && license && !isFullscreen && !isMobile && !mobileAdminShortcutMode"
+    @click="enterFullscreen" style="position: fixed; bottom: 20px; right: 20px; z-index: 9999;">
     فعال‌سازی تمام‌صفحه
   </button>
 </template>
@@ -522,6 +523,8 @@ const logoClickTimer = ref(null)
 // متد جدید برای مدیریت کلیک روی لوگو
 const handleLogoClick = () => {
   logoClickCount.value++
+
+  console.log(`تعداد کلیک‌ها روی لوگو: ${logoClickCount.value}`)
 
   // اگر تایمر فعال است، آن را ریست کنید
   if (logoClickTimer.value) {

@@ -390,6 +390,7 @@ const logoClickTimer = ref(null);
 // متد جدید برای مدیریت کلیک روی لوگو
 const handleLogoClick = () => {
     logoClickCount.value++;
+    console.log(`تعداد کلیک‌ها روی لوگو: ${logoClickCount.value}`);
     // اگر تایمر فعال است، آن را ریست کنید
     if (logoClickTimer.value) {
         clearTimeout(logoClickTimer.value);
@@ -651,7 +652,7 @@ if (__VLS_ctx.bootstrapped && __VLS_ctx.viewModeCode !== 3 && !__VLS_ctx.license
 if (__VLS_ctx.bootstrapped && __VLS_ctx.viewModeCode !== 3 && __VLS_ctx.license && __VLS_ctx.showModeSelection && !__VLS_ctx.mobileAdminShortcutMode) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ onClick: (__VLS_ctx.handleLogoClick) },
-        ...{ class: "hami_logo" },
+        ...{ class: "pargas Logo" },
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.img, __VLS_intrinsicElements.img)({
         src: "../src/assets/images/Logo-sm.png",
@@ -710,7 +711,8 @@ if (__VLS_ctx.bootstrapped && __VLS_ctx.viewModeCode !== 3 && __VLS_ctx.license 
 /** @type {__VLS_StyleScopedClasses['text-white']} */ ;
 /** @type {__VLS_StyleScopedClasses['mobile-admin-shortcut']} */ ;
 /** @type {__VLS_StyleScopedClasses['error_license']} */ ;
-/** @type {__VLS_StyleScopedClasses['hami_logo']} */ ;
+/** @type {__VLS_StyleScopedClasses['pargas']} */ ;
+/** @type {__VLS_StyleScopedClasses['Logo']} */ ;
 // @ts-ignore
 var __VLS_22 = __VLS_21;
 var __VLS_dollars;
