@@ -121,7 +121,7 @@ body:has(.mode-selection) .mode-selection::before {
 }
 
 body:has(.mode-selection) .mode-selection::after {
-  content: 'خوش آمدید\Aبرای شروع سفارش لمس کنید\Aسفارش خود را سریع، ساده و هوشمند ثبت کنید';
+  content: 'خوش آمدید\Aبرای شروع سفارش لمس کنید';
   position: fixed !important;
   z-index: 50 !important;
   left: 50% !important;
@@ -256,26 +256,55 @@ body:has(.mode-selection) .hami_logo img {
 }
 
 @keyframes kioskTileFloatOne {
-  0%, 100% { transform: rotate(7deg) translate3d(0, 0, 0) scale(1); }
-  50% { transform: rotate(3deg) translate3d(0, -16px, 0) scale(1.04); }
+
+  0%,
+  100% {
+    transform: rotate(7deg) translate3d(0, 0, 0) scale(1);
+  }
+
+  50% {
+    transform: rotate(3deg) translate3d(0, -16px, 0) scale(1.04);
+  }
 }
 
 @keyframes kioskTileFloatTwo {
-  0%, 100% { transform: rotate(-7deg) translate3d(0, 0, 0) scale(1); }
-  50% { transform: rotate(-3deg) translate3d(0, 15px, 0) scale(1.04); }
+
+  0%,
+  100% {
+    transform: rotate(-7deg) translate3d(0, 0, 0) scale(1);
+  }
+
+  50% {
+    transform: rotate(-3deg) translate3d(0, 15px, 0) scale(1.04);
+  }
 }
 
 @keyframes kioskTileFloatThree {
-  0%, 100% { transform: rotate(-10deg) translate3d(0, 0, 0) scale(0.94); }
-  50% { transform: rotate(-5deg) translate3d(0, -13px, 0) scale(0.99); }
+
+  0%,
+  100% {
+    transform: rotate(-10deg) translate3d(0, 0, 0) scale(0.94);
+  }
+
+  50% {
+    transform: rotate(-5deg) translate3d(0, -13px, 0) scale(0.99);
+  }
 }
 
 @keyframes kioskTileFloatFour {
-  0%, 100% { transform: rotate(10deg) translate3d(0, 0, 0) scale(0.94); }
-  50% { transform: rotate(5deg) translate3d(0, 13px, 0) scale(0.99); }
+
+  0%,
+  100% {
+    transform: rotate(10deg) translate3d(0, 0, 0) scale(0.94);
+  }
+
+  50% {
+    transform: rotate(5deg) translate3d(0, 13px, 0) scale(0.99);
+  }
 }
 
 @media (max-width: 1100px) {
+
   body:has(.mode-selection) .p-4::before,
   body:has(.mode-selection) .p-4::after,
   body:has(.mode-selection)::before,
@@ -390,6 +419,7 @@ body:has(.mode-selection) .hami_logo img {
 }
 
 @media (prefers-reduced-motion: reduce) {
+
   body:has(.mode-selection) .p-4::before,
   body:has(.mode-selection) .p-4::after,
   body:has(.mode-selection)::before,
