@@ -1,0 +1,104 @@
+/* Animation patch for kiosk entry image tiles.
+   Uses individual transform properties so it does not conflict with existing transform: ... !important rules. */
+
+body:has(.mode-selection) .p-4::before,
+body:has(.mode-selection) .p-4::after,
+body:has(.mode-selection)::before,
+body:has(.mode-selection)::after {
+  transform-origin: center center !important;
+  animation-timing-function: ease-in-out !important;
+  animation-iteration-count: infinite !important;
+  animation-fill-mode: both !important;
+  will-change: translate, scale !important;
+}
+
+body:has(.mode-selection) .p-4::before {
+  animation-name: kioskTileMotionUp !important;
+  animation-duration: 4.8s !important;
+}
+
+body:has(.mode-selection) .p-4::after {
+  animation-name: kioskTileMotionDown !important;
+  animation-duration: 5.2s !important;
+  animation-delay: -0.8s !important;
+}
+
+body:has(.mode-selection)::before {
+  animation-name: kioskTileMotionUpSmall !important;
+  animation-duration: 5.6s !important;
+  animation-delay: -1.2s !important;
+}
+
+body:has(.mode-selection)::after {
+  animation-name: kioskTileMotionDownSmall !important;
+  animation-duration: 5s !important;
+  animation-delay: -0.4s !important;
+}
+
+@keyframes kioskTileMotionUp {
+  0%, 100% {
+    translate: 0 0;
+    scale: 1;
+  }
+
+  50% {
+    translate: 0 -18px;
+    scale: 1.045;
+  }
+}
+
+@keyframes kioskTileMotionDown {
+  0%, 100% {
+    translate: 0 0;
+    scale: 1;
+  }
+
+  50% {
+    translate: 0 16px;
+    scale: 1.045;
+  }
+}
+
+@keyframes kioskTileMotionUpSmall {
+  0%, 100% {
+    translate: 0 0;
+    scale: 1;
+  }
+
+  50% {
+    translate: 0 -14px;
+    scale: 1.035;
+  }
+}
+
+@keyframes kioskTileMotionDownSmall {
+  0%, 100% {
+    translate: 0 0;
+    scale: 1;
+  }
+
+  50% {
+    translate: 0 14px;
+    scale: 1.035;
+  }
+}
+
+@media (max-width: 900px) {
+  body:has(.mode-selection) .p-4::before,
+  body:has(.mode-selection) .p-4::after,
+  body:has(.mode-selection)::before,
+  body:has(.mode-selection)::after {
+    animation-duration: 5.8s !important;
+  }
+}
+
+@media (max-width: 640px), (prefers-reduced-motion: reduce) {
+  body:has(.mode-selection) .p-4::before,
+  body:has(.mode-selection) .p-4::after,
+  body:has(.mode-selection)::before,
+  body:has(.mode-selection)::after {
+    animation: none !important;
+    translate: 0 0 !important;
+    scale: 1 !important;
+  }
+}
