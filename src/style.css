@@ -2675,7 +2675,7 @@ a {
 
 .cancel-btn {
   min-height: 42px;
-  background: rgba(239, 68, 68, 0.12);
+  background: rgba(239, 68, 68, 0.904);
   color: #fecaca;
   border: 1px solid rgba(239, 68, 68, 0.24);
   padding: 8px 14px;
@@ -2685,7 +2685,7 @@ a {
 }
 
 .cancel-btn:hover {
-  background: rgba(239, 68, 68, 0.2);
+  background: rgb(241, 23, 23);
 }
 
 .save-btn {
@@ -3429,7 +3429,6 @@ jdp-container .jdp-days .jdp-day.selected {
 }
 
 .cart-body {
-  overflow: hidden;
   display: flex;
   flex-direction: column;
   position: fixed;
@@ -3460,7 +3459,6 @@ jdp-container .jdp-days .jdp-day.selected {
 }
 
 .cart-items-list {
-  overflow-y: auto;
   flex: 1;
 }
 
