@@ -34,12 +34,10 @@ body:has(.mode-selection) .p-4 {
   overflow: hidden !important;
 }
 
-/* Keep the original decorative images hidden because their absolute positions are not safe on all kiosk ratios. */
 body:has(.mode-selection) .images {
   display: none !important;
 }
 
-/* Kill the original absolute-centered .mode-selection from src/style.css. */
 body:has(.mode-selection) .mode-selection {
   position: fixed !important;
   inset: 0 !important;
@@ -63,12 +61,10 @@ body:has(.mode-selection) .mode-selection {
   overflow: hidden !important;
 }
 
-/* Hide scale settlement only on the entry screen. */
 body:has(.mode-selection) .mode-selection .bg-green-500 {
   display: none !important;
 }
 
-/* Full-screen invisible click layer: every tap/click still triggers the original order button. */
 body:has(.mode-selection) .mode-selection .bg-blue-500 {
   position: fixed !important;
   inset: 0 !important;
@@ -99,7 +95,6 @@ body:has(.mode-selection) .mode-selection .bg-blue-500::after {
   content: none !important;
 }
 
-/* Professional visual card, independent from the old .mode-button dimensions. */
 body:has(.mode-selection) .mode-selection::before {
   content: '';
   position: fixed !important;
@@ -125,7 +120,6 @@ body:has(.mode-selection) .mode-selection::before {
   pointer-events: none !important;
 }
 
-/* Main text block. */
 body:has(.mode-selection) .mode-selection::after {
   content: 'خوش آمدید\Aبرای شروع سفارش لمس کنید\Aسفارش خود را سریع، ساده و هوشمند ثبت کنید';
   position: fixed !important;
@@ -148,7 +142,6 @@ body:has(.mode-selection) .mode-selection::after {
   pointer-events: none !important;
 }
 
-/* Responsive image tiles built from the existing /img/Icon assets. */
 body:has(.mode-selection) .p-4::before,
 body:has(.mode-selection) .p-4::after,
 body:has(.mode-selection)::before,
@@ -157,59 +150,63 @@ body:has(.mode-selection)::after {
   position: fixed !important;
   z-index: 45 !important;
   display: block !important;
-  width: clamp(92px, 10vw, 154px) !important;
-  height: clamp(92px, 10vw, 154px) !important;
-  border-radius: clamp(24px, 3vw, 42px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.84) !important;
+  width: clamp(112px, 12vw, 184px) !important;
+  height: clamp(112px, 12vw, 184px) !important;
+  border-radius: clamp(28px, 3.2vw, 48px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.86) !important;
   box-shadow:
-    0 18px 50px rgba(15, 23, 42, 0.14),
-    0 6px 18px rgba(251, 146, 60, 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
+    0 22px 58px rgba(15, 23, 42, 0.16),
+    0 8px 22px rgba(251, 146, 60, 0.10),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92) !important;
   opacity: 0.98 !important;
   pointer-events: none !important;
   background-repeat: no-repeat, no-repeat !important;
   background-position: center, center !important;
-  background-size: 72% auto, 100% 100% !important;
+  background-size: 76% auto, 100% 100% !important;
   backdrop-filter: blur(12px) !important;
+  will-change: transform !important;
 }
 
 body:has(.mode-selection) .p-4::before {
-  right: calc(50% + min(322px, 30dvw)) !important;
-  top: clamp(80px, 14dvh, 132px) !important;
-  transform: rotate(7deg) !important;
+  right: calc(50% + min(330px, 31dvw)) !important;
+  top: clamp(72px, 13dvh, 124px) !important;
+  transform: rotate(7deg) translate3d(0, 0, 0) !important;
+  animation: kioskTileFloatOne 4.8s ease-in-out infinite !important;
   background-image:
     url('/img/Icon/1.png'),
-    linear-gradient(145deg, rgba(255, 255, 255, 0.95), rgba(255, 237, 213, 0.74)) !important;
+    linear-gradient(145deg, rgba(255, 255, 255, 0.96), rgba(255, 237, 213, 0.76)) !important;
 }
 
 body:has(.mode-selection) .p-4::after {
-  left: calc(50% + min(316px, 30dvw)) !important;
-  bottom: clamp(86px, 15dvh, 140px) !important;
-  transform: rotate(-7deg) !important;
+  left: calc(50% + min(322px, 31dvw)) !important;
+  bottom: clamp(78px, 14dvh, 132px) !important;
+  transform: rotate(-7deg) translate3d(0, 0, 0) !important;
+  animation: kioskTileFloatTwo 5.2s ease-in-out infinite !important;
   background-image:
     url('/img/Icon/2.png'),
-    linear-gradient(145deg, rgba(255, 255, 255, 0.95), rgba(219, 234, 254, 0.72)) !important;
+    linear-gradient(145deg, rgba(255, 255, 255, 0.96), rgba(219, 234, 254, 0.74)) !important;
 }
 
 body:has(.mode-selection)::before {
-  right: calc(50% + min(230px, 22dvw)) !important;
-  bottom: clamp(78px, 13dvh, 124px) !important;
-  transform: rotate(-10deg) scale(0.92) !important;
+  right: calc(50% + min(238px, 23dvw)) !important;
+  bottom: clamp(70px, 12dvh, 116px) !important;
+  transform: rotate(-10deg) scale(0.94) translate3d(0, 0, 0) !important;
+  animation: kioskTileFloatThree 5.6s ease-in-out infinite !important;
   background-image:
     url('/img/Icon/3.png'),
-    linear-gradient(145deg, rgba(255, 255, 255, 0.94), rgba(254, 243, 199, 0.72)) !important;
+    linear-gradient(145deg, rgba(255, 255, 255, 0.95), rgba(254, 243, 199, 0.76)) !important;
 }
 
 body:has(.mode-selection)::after {
-  left: calc(50% + min(230px, 22dvw)) !important;
-  top: clamp(76px, 14dvh, 126px) !important;
-  transform: rotate(10deg) scale(0.92) !important;
+  left: calc(50% + min(238px, 23dvw)) !important;
+  top: clamp(68px, 13dvh, 118px) !important;
+  transform: rotate(10deg) scale(0.94) translate3d(0, 0, 0) !important;
+  animation: kioskTileFloatFour 5s ease-in-out infinite !important;
   background-image:
     url('/img/Icon/4.png'),
-    linear-gradient(145deg, rgba(255, 255, 255, 0.94), rgba(255, 237, 213, 0.72)) !important;
+    linear-gradient(145deg, rgba(255, 255, 255, 0.95), rgba(255, 237, 213, 0.76)) !important;
 }
 
-/* Small feature chips inside the safe area. */
 body:has(.mode-selection) #app::before,
 body:has(.mode-selection) #app::after {
   position: fixed !important;
@@ -258,32 +255,52 @@ body:has(.mode-selection) .hami_logo img {
   filter: drop-shadow(0 8px 18px rgba(15, 23, 42, 0.18)) !important;
 }
 
+@keyframes kioskTileFloatOne {
+  0%, 100% { transform: rotate(7deg) translate3d(0, 0, 0) scale(1); }
+  50% { transform: rotate(3deg) translate3d(0, -16px, 0) scale(1.04); }
+}
+
+@keyframes kioskTileFloatTwo {
+  0%, 100% { transform: rotate(-7deg) translate3d(0, 0, 0) scale(1); }
+  50% { transform: rotate(-3deg) translate3d(0, 15px, 0) scale(1.04); }
+}
+
+@keyframes kioskTileFloatThree {
+  0%, 100% { transform: rotate(-10deg) translate3d(0, 0, 0) scale(0.94); }
+  50% { transform: rotate(-5deg) translate3d(0, -13px, 0) scale(0.99); }
+}
+
+@keyframes kioskTileFloatFour {
+  0%, 100% { transform: rotate(10deg) translate3d(0, 0, 0) scale(0.94); }
+  50% { transform: rotate(5deg) translate3d(0, 13px, 0) scale(0.99); }
+}
+
 @media (max-width: 1100px) {
   body:has(.mode-selection) .p-4::before,
   body:has(.mode-selection) .p-4::after,
   body:has(.mode-selection)::before,
   body:has(.mode-selection)::after {
-    width: clamp(78px, 10vw, 116px) !important;
-    height: clamp(78px, 10vw, 116px) !important;
-    border-radius: 28px !important;
-    background-size: 68% auto, 100% 100% !important;
-    opacity: 0.88 !important;
+    width: clamp(94px, 11vw, 136px) !important;
+    height: clamp(94px, 11vw, 136px) !important;
+    border-radius: 30px !important;
+    background-size: 72% auto, 100% 100% !important;
+    opacity: 0.92 !important;
   }
 
   body:has(.mode-selection) .p-4::before {
-    right: calc(50% + min(286px, 29dvw)) !important;
+    right: calc(50% + min(292px, 29dvw)) !important;
   }
 
   body:has(.mode-selection) .p-4::after {
-    left: calc(50% + min(286px, 29dvw)) !important;
+    left: calc(50% + min(292px, 29dvw)) !important;
   }
 
   body:has(.mode-selection)::before {
-    right: calc(50% + min(205px, 21dvw)) !important;
+    right: calc(50% + min(212px, 21dvw)) !important;
   }
 
   body:has(.mode-selection)::after {
-    left: calc(50% + min(205px, 21dvw)) !important;
+    left: calc(50% + min(212px, 21dvw)) !important;
   }
 }
 
@@ -311,31 +328,31 @@ body:has(.mode-selection) .hami_logo img {
   body:has(.mode-selection) .p-4::after,
   body:has(.mode-selection)::before,
   body:has(.mode-selection)::after {
-    width: 76px !important;
-    height: 76px !important;
-    border-radius: 22px !important;
-    opacity: 0.54 !important;
-    background-size: 66% auto, 100% 100% !important;
+    width: 88px !important;
+    height: 88px !important;
+    border-radius: 24px !important;
+    opacity: 0.66 !important;
+    background-size: 68% auto, 100% 100% !important;
   }
 
   body:has(.mode-selection) .p-4::before {
-    right: 20px !important;
-    top: 76px !important;
+    right: 18px !important;
+    top: 70px !important;
   }
 
   body:has(.mode-selection) .p-4::after {
-    left: 20px !important;
-    bottom: 78px !important;
+    left: 18px !important;
+    bottom: 74px !important;
   }
 
   body:has(.mode-selection)::before {
-    right: 26px !important;
-    bottom: 78px !important;
+    right: 22px !important;
+    bottom: 76px !important;
   }
 
   body:has(.mode-selection)::after {
-    left: 26px !important;
-    top: 76px !important;
+    left: 22px !important;
+    top: 72px !important;
   }
 
   body:has(.mode-selection) #app::before,
@@ -369,5 +386,14 @@ body:has(.mode-selection) .hami_logo img {
 
   body:has(.mode-selection) .hami_logo {
     bottom: 12px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body:has(.mode-selection) .p-4::before,
+  body:has(.mode-selection) .p-4::after,
+  body:has(.mode-selection)::before,
+  body:has(.mode-selection)::after {
+    animation: none !important;
   }
 }
