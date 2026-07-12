@@ -96,6 +96,33 @@ export default defineConfig({
       },
     }),
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return;
+
+          if (id.includes("vue") || id.includes("pinia") || id.includes("vue-router")) {
+            return "vendor-vue";
+          }
+
+          if (id.includes("axios") || id.includes("localforage") || id.includes("mitt")) {
+            return "vendor-core";
+          }
+
+          if (id.includes("sweetalert2") || id.includes("vue-toastification")) {
+            return "vendor-ui";
+          }
+
+          if (id.includes("chart.js") || id.includes("datatables.net")) {
+            return "vendor-reports";
+          }
+
+          return "vendor";
+        },
+      },
+    },
+  },
   server: {
     proxy: {
       "/api": {
