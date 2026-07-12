@@ -68,7 +68,7 @@
   </div>
 
   <div v-if="bootstrapped && viewModeCode !== 3 && license && showModeSelection && !mobileAdminShortcutMode"
-    class="pargas Logo" @click.stop="handleLogoClick">
+    class="hami_logo" @click.stop="handleLogoClick">
     <img src="../src/assets/images/Logo-sm.png" width="60px" alt="pargas Logo">
     <br>
     <label>نرم افزار سفارشگیر پرگاس</label>
