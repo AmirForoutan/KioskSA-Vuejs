@@ -24,6 +24,7 @@ const bootstrapped = ref(false);
 const inactivityTimer = ref(null);
 const categoryListRef = ref(null);
 const isFullscreen = ref(false);
+const mobileAdminShortcutMode = ref(false);
 // متغیرهای مربوط به ویدیو در حالت بی‌فعالی
 const isVideoPlaying = ref(false);
 const idleTimer = ref(null);
@@ -81,6 +82,23 @@ async function updateCart() {
 onMounted(async () => {
     try {
         await initConfig();
+        setupMobileDetection();
+        viewModeCode.value = await GetViewMode();
+        // اگر صفحه از موبایل باز شد، فقط میانبر ادمین را نشان بده و هیچ تایمر/ویدیو/صفحه سفارش را اجرا نکن
+        if (viewModeCode.value !== 3 && isMobile.value) {
+            mobileAdminShortcutMode.value = true;
+            showStandByVideo.value = false;
+            showModeSelection.value = false;
+            mode.value = null;
+            license.value = true;
+            bootstrapped.value = true;
+            window.addEventListener('keydown', (e) => {
+                if (e.ctrlKey && e.altKey && e.shiftKey && e.key === 'A') {
+                    activateAdminPanel();
+                }
+            });
+            return;
+        }
         await updateCart();
         IDLE_TIMEOUT.value = Number.parseInt(GetStandByTimer()) * 60000; // تبدیل به دقیقه
         // بررسی لایسنس
@@ -90,14 +108,13 @@ onMounted(async () => {
         }
         else {
             license.value = false;
+            bootstrapped.value = true;
             return;
         }
         // بررسی وضعیت‌ها
         showOrderPanel.value = await OrderRegistrationStat();
         isScaleOrder.value = await IsScaleOrderStat();
         isKioskOrder.value = await IsKioskOrderStat();
-        // دریافت نوع نحوه نمایش
-        viewModeCode.value = await GetViewMode();
         showStandByVideo.value = ShowStandByVideo();
         bootstrapped.value = true;
         if (viewModeCode.value === 3) {
@@ -105,8 +122,6 @@ onMounted(async () => {
             license.value = true;
             return;
         }
-        // راه‌اندازی تشخیص موبایل
-        const cleanup = setupMobileDetection();
         // استفاده از تایمر موجود برای پاک کردن سبد خرید و بازگشت به صفحه اصلی
         const timeout = await GetResetTimer() * 60000; // تبدیل به دقیقه
         inactivityTimer.value = await setupInactivityTimer(timeout, () => {
@@ -201,7 +216,7 @@ function redirectView() {
 const ScaleInvoice = defineAsyncComponent(() => import('./components/ScaleInvoice.vue'));
 // مدیریت ویدیو در حالت بی‌فعالی
 const startVideoMonitoring = () => {
-    if (!showStandByVideo.value)
+    if (!showStandByVideo.value || mobileAdminShortcutMode.value)
         return;
     resetIdleTimer();
     const events = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
@@ -221,6 +236,8 @@ const handleClickCounterClick = (e) => {
     clickTimer.value = setTimeout(resetClickCounter, CLICK_TIMEOUT);
 };
 const handleUserActivity = (e) => {
+    if (mobileAdminShortcutMode.value)
+        return;
     // فقط فعالیت‌های مهم را پردازش کنیم
     if (e.type === 'mousemove' && e.movementX === 0 && e.movementY === 0) {
         return;
@@ -233,13 +250,13 @@ const handleUserActivity = (e) => {
     }
 };
 const resetIdleTimer = () => {
-    if (!showStandByVideo.value)
+    if (!showStandByVideo.value || mobileAdminShortcutMode.value)
         return;
     clearTimeout(idleTimer.value);
     idleTimer.value = setTimeout(showVideo, IDLE_TIMEOUT.value);
 };
 const showVideo = async () => {
-    if (!showStandByVideo.value)
+    if (!showStandByVideo.value || mobileAdminShortcutMode.value)
         return;
     try {
         isVideoPlaying.value = true;
@@ -324,6 +341,8 @@ function selectMode(selectedMode) {
     showModeSelection.value = false;
 }
 async function resetMode() {
+    if (mobileAdminShortcutMode.value)
+        return;
     await resetCart();
     // بررسی حالت Scale
     if (showOrderPanel.value) { // پاک کردن سبد خرید
@@ -407,13 +426,18 @@ debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
 let __VLS_components;
 let __VLS_directives;
-if (__VLS_ctx.bootstrapped && __VLS_ctx.viewModeCode !== 3 && __VLS_ctx.showStandByVideo) {
+/** @type {__VLS_StyleScopedClasses['mobile-admin-shortcut']} */ ;
+/** @type {__VLS_StyleScopedClasses['mobile-admin-shortcut']} */ ;
+/** @type {__VLS_StyleScopedClasses['mobile-admin-shortcut']} */ ;
+// CSS variable injection 
+// CSS variable injection end 
+if (__VLS_ctx.bootstrapped && __VLS_ctx.viewModeCode !== 3 && __VLS_ctx.showStandByVideo && !__VLS_ctx.mobileAdminShortcutMode) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ onClick: (__VLS_ctx.handleClickCounterClick) },
         id: "click-counter",
     });
 }
-if (__VLS_ctx.bootstrapped && __VLS_ctx.viewModeCode !== 3 && __VLS_ctx.showStandByVideo) {
+if (__VLS_ctx.bootstrapped && __VLS_ctx.viewModeCode !== 3 && __VLS_ctx.showStandByVideo && !__VLS_ctx.mobileAdminShortcutMode) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ onClick: (__VLS_ctx.handleBackgroundClick) },
         id: "video-container",
@@ -432,7 +456,7 @@ if (__VLS_ctx.bootstrapped && __VLS_ctx.viewModeCode !== 3 && __VLS_ctx.showStan
     });
     /** @type {typeof __VLS_ctx.videoElement} */ ;
 }
-if (__VLS_ctx.bootstrapped && __VLS_ctx.viewModeCode !== 3 && __VLS_ctx.license) {
+if (__VLS_ctx.bootstrapped && __VLS_ctx.viewModeCode !== 3 && __VLS_ctx.license && !__VLS_ctx.mobileAdminShortcutMode) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "p-4" },
     });
@@ -475,7 +499,7 @@ if (__VLS_ctx.bootstrapped && __VLS_ctx.viewModeCode !== 3 && __VLS_ctx.license)
         if (__VLS_ctx.isScaleOrder) {
             __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
                 ...{ onClick: (...[$event]) => {
-                        if (!(__VLS_ctx.bootstrapped && __VLS_ctx.viewModeCode !== 3 && __VLS_ctx.license))
+                        if (!(__VLS_ctx.bootstrapped && __VLS_ctx.viewModeCode !== 3 && __VLS_ctx.license && !__VLS_ctx.mobileAdminShortcutMode))
                             return;
                         if (!(__VLS_ctx.showModeSelection))
                             return;
@@ -489,7 +513,7 @@ if (__VLS_ctx.bootstrapped && __VLS_ctx.viewModeCode !== 3 && __VLS_ctx.license)
         if (__VLS_ctx.isKioskOrder) {
             __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
                 ...{ onClick: (...[$event]) => {
-                        if (!(__VLS_ctx.bootstrapped && __VLS_ctx.viewModeCode !== 3 && __VLS_ctx.license))
+                        if (!(__VLS_ctx.bootstrapped && __VLS_ctx.viewModeCode !== 3 && __VLS_ctx.license && !__VLS_ctx.mobileAdminShortcutMode))
                             return;
                         if (!(__VLS_ctx.showModeSelection))
                             return;
@@ -602,7 +626,19 @@ if (__VLS_ctx.bootstrapped && __VLS_ctx.viewModeCode !== 3 && __VLS_ctx.license)
         const __VLS_35 = __VLS_34({}, ...__VLS_functionalComponentArgsRest(__VLS_34));
     }
 }
-else if (__VLS_ctx.bootstrapped && __VLS_ctx.viewModeCode !== 3) {
+if (__VLS_ctx.bootstrapped && __VLS_ctx.viewModeCode !== 3 && __VLS_ctx.mobileAdminShortcutMode && !__VLS_ctx.showAdminPanel) {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ onClick: (__VLS_ctx.handleLogoClick) },
+        ...{ class: "mobile-admin-shortcut" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.img, __VLS_intrinsicElements.img)({
+        src: "../src/assets/images/Logo-sm.png",
+        alt: "pargas Logo",
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.small, __VLS_intrinsicElements.small)({});
+}
+else if (__VLS_ctx.bootstrapped && __VLS_ctx.viewModeCode !== 3 && !__VLS_ctx.mobileAdminShortcutMode) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ onClick: (__VLS_ctx.handleLogoClick) },
         id: "error_license",
@@ -610,7 +646,7 @@ else if (__VLS_ctx.bootstrapped && __VLS_ctx.viewModeCode !== 3) {
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({});
 }
-if (__VLS_ctx.bootstrapped && __VLS_ctx.viewModeCode !== 3 && __VLS_ctx.showModeSelection) {
+if (__VLS_ctx.bootstrapped && __VLS_ctx.viewModeCode !== 3 && __VLS_ctx.showModeSelection && !__VLS_ctx.mobileAdminShortcutMode) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ onClick: (__VLS_ctx.handleLogoClick) },
         ...{ class: "hami_logo" },
@@ -651,7 +687,7 @@ if (__VLS_ctx.bootstrapped && __VLS_ctx.viewModeCode === 3) {
     const __VLS_45 = __VLS_asFunctionalComponent(__VLS_44, new __VLS_44({}));
     const __VLS_46 = __VLS_45({}, ...__VLS_functionalComponentArgsRest(__VLS_45));
 }
-if (__VLS_ctx.bootstrapped && __VLS_ctx.viewModeCode !== 3 && !__VLS_ctx.isFullscreen && !__VLS_ctx.isMobile) {
+if (__VLS_ctx.bootstrapped && __VLS_ctx.viewModeCode !== 3 && !__VLS_ctx.isFullscreen && !__VLS_ctx.isMobile && !__VLS_ctx.mobileAdminShortcutMode) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
         ...{ onClick: (__VLS_ctx.enterFullscreen) },
         ...{ style: {} },
@@ -670,6 +706,7 @@ if (__VLS_ctx.bootstrapped && __VLS_ctx.viewModeCode !== 3 && !__VLS_ctx.isFulls
 /** @type {__VLS_StyleScopedClasses['mode-button']} */ ;
 /** @type {__VLS_StyleScopedClasses['bg-blue-500']} */ ;
 /** @type {__VLS_StyleScopedClasses['text-white']} */ ;
+/** @type {__VLS_StyleScopedClasses['mobile-admin-shortcut']} */ ;
 /** @type {__VLS_StyleScopedClasses['error_license']} */ ;
 /** @type {__VLS_StyleScopedClasses['hami_logo']} */ ;
 // @ts-ignore
@@ -696,6 +733,7 @@ const __VLS_self = (await import('vue')).defineComponent({
             bootstrapped: bootstrapped,
             categoryListRef: categoryListRef,
             isFullscreen: isFullscreen,
+            mobileAdminShortcutMode: mobileAdminShortcutMode,
             isVideoPlaying: isVideoPlaying,
             videoElement: videoElement,
             isMobile: isMobile,
