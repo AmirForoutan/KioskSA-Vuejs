@@ -1,9 +1,9 @@
 <template>
   <!-- المان‌های ویدیو -->
-  <div v-if="bootstrapped && viewModeCode !== 3 && showStandByVideo" id="click-counter"
+  <div v-if="bootstrapped && viewModeCode !== 3 && showStandByVideo && !mobileAdminShortcutMode" id="click-counter"
     @click="handleClickCounterClick"></div>
 
-  <div v-if="bootstrapped && viewModeCode !== 3 && showStandByVideo" id="video-container" v-show="isVideoPlaying"
+  <div v-if="bootstrapped && viewModeCode !== 3 && showStandByVideo && !mobileAdminShortcutMode" id="video-container" v-show="isVideoPlaying"
     @click="handleBackgroundClick">
     <video src="/img/standby.mp4" id="fullscreen-video" ref="videoElement" @ended="restartVideo" muted loop playsinline
       webkit-playsinline x5-playsinline>
@@ -11,7 +11,7 @@
   </div>
 
   <!-- محتوای اصلی برنامه -->
-  <div v-if="bootstrapped && viewModeCode !== 3 && license" class="p-4">
+  <div v-if="bootstrapped && viewModeCode !== 3 && license && !mobileAdminShortcutMode" class="p-4">
     <!-- Made By Amirreza Foroutan For HamiPOS +989120496824 -->
     <div v-if="showModeSelection">
       <div class="images">
@@ -55,10 +55,18 @@
     <ScaleInvoice v-else-if="mode === 'scale'" @back="resetMode" />
     <Loader v-if="isLoading" />
   </div>
-  <div v-else-if="bootstrapped && viewModeCode !== 3" id="error_license" class="error_license" @click="handleLogoClick">
+
+  <div v-if="bootstrapped && viewModeCode !== 3 && mobileAdminShortcutMode && !showAdminPanel"
+    class="mobile-admin-shortcut" @click="handleLogoClick">
+    <img src="../src/assets/images/Logo-sm.png" alt="pargas Logo">
+    <label>نرم افزار سفارشگیر پرگاس</label>
+    <small>برای ورود به مدیریت، ۵ بار پشت سر هم لمس کنید</small>
+  </div>
+
+  <div v-else-if="bootstrapped && viewModeCode !== 3 && !mobileAdminShortcutMode" id="error_license" class="error_license" @click="handleLogoClick">
     <label>مجوزی برای شما یافت نشد، لطفا باز بودن سرویس یا داشتن لایسنس را بررسی بفرمائید</label>
   </div>
-  <div v-if="bootstrapped && viewModeCode !== 3 && showModeSelection" class="hami_logo" @click="handleLogoClick">
+  <div v-if="bootstrapped && viewModeCode !== 3 && showModeSelection && !mobileAdminShortcutMode" class="hami_logo" @click="handleLogoClick">
     <img src="../src/assets/images/Logo-sm.png" width="60px" alt="pargas Logo">
     <br>
     <label>نرم افزار سفارشگیر پرگاس</label>
@@ -69,7 +77,7 @@
   <RootView v-if="bootstrapped && viewModeCode === 3"></RootView>
 
   <!-- دکمه فعال‌سازی تمام‌صفحه -->
-  <button v-if="bootstrapped && viewModeCode !== 3 && !isFullscreen && !isMobile" @click="enterFullscreen"
+  <button v-if="bootstrapped && viewModeCode !== 3 && !isFullscreen && !isMobile && !mobileAdminShortcutMode" @click="enterFullscreen"
     style="position: fixed; bottom: 20px; right: 20px; z-index: 9999;">
     فعال‌سازی تمام‌صفحه
   </button>
@@ -103,6 +111,7 @@ const bootstrapped = ref(false);
 const inactivityTimer = ref(null);
 const categoryListRef = ref(null);
 const isFullscreen = ref(false)
+const mobileAdminShortcutMode = ref(false)
 
 // متغیرهای مربوط به ویدیو در حالت بی‌فعالی
 const isVideoPlaying = ref(false)
@@ -174,6 +183,27 @@ async function updateCart() {
 onMounted(async () => {
   try {
     await initConfig()
+    setupMobileDetection()
+    viewModeCode.value = await GetViewMode();
+
+    // اگر صفحه از موبایل باز شد، فقط میانبر ادمین را نشان بده و هیچ تایمر/ویدیو/صفحه سفارش را اجرا نکن
+    if (viewModeCode.value !== 3 && isMobile.value) {
+      mobileAdminShortcutMode.value = true
+      showStandByVideo.value = false
+      showModeSelection.value = false
+      mode.value = null
+      license.value = true
+      bootstrapped.value = true
+
+      window.addEventListener('keydown', (e) => {
+        if (e.ctrlKey && e.altKey && e.shiftKey && e.key === 'A') {
+          activateAdminPanel()
+        }
+      })
+
+      return
+    }
+
     await updateCart();
     IDLE_TIMEOUT.value = Number.parseInt(GetStandByTimer()) * 60000 // تبدیل به دقیقه
 
@@ -183,6 +213,7 @@ onMounted(async () => {
       license.value = true
     } else {
       license.value = false
+      bootstrapped.value = true
       return;
     }
 
@@ -190,8 +221,6 @@ onMounted(async () => {
     showOrderPanel.value = await OrderRegistrationStat()
     isScaleOrder.value = await IsScaleOrderStat()
     isKioskOrder.value = await IsKioskOrderStat()
-    // دریافت نوع نحوه نمایش
-    viewModeCode.value = await GetViewMode();
     showStandByVideo.value = ShowStandByVideo();
     bootstrapped.value = true;
 
@@ -200,9 +229,6 @@ onMounted(async () => {
       license.value = true
       return
     }
-
-    // راه‌اندازی تشخیص موبایل
-    const cleanup = setupMobileDetection()
 
     // استفاده از تایمر موجود برای پاک کردن سبد خرید و بازگشت به صفحه اصلی
     const timeout = await GetResetTimer() * 60000; // تبدیل به دقیقه
@@ -309,7 +335,7 @@ const ScaleInvoice = defineAsyncComponent(() =>
 
 // مدیریت ویدیو در حالت بی‌فعالی
 const startVideoMonitoring = () => {
-  if (!showStandByVideo.value) return
+  if (!showStandByVideo.value || mobileAdminShortcutMode.value) return
   resetIdleTimer()
   const events = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart']
   events.forEach(event => {
@@ -331,6 +357,7 @@ const handleClickCounterClick = (e) => {
 }
 
 const handleUserActivity = (e) => {
+  if (mobileAdminShortcutMode.value) return
   // فقط فعالیت‌های مهم را پردازش کنیم
   if (e.type === 'mousemove' && e.movementX === 0 && e.movementY === 0) {
     return
@@ -344,13 +371,13 @@ const handleUserActivity = (e) => {
 }
 
 const resetIdleTimer = () => {
-  if (!showStandByVideo.value) return
+  if (!showStandByVideo.value || mobileAdminShortcutMode.value) return
   clearTimeout(idleTimer.value)
   idleTimer.value = setTimeout(showVideo, IDLE_TIMEOUT.value)
 }
 
 const showVideo = async () => {
-  if (!showStandByVideo.value) return
+  if (!showStandByVideo.value || mobileAdminShortcutMode.value) return
   try {
     isVideoPlaying.value = true
     await nextTick()
@@ -440,6 +467,7 @@ function selectMode(selectedMode) {
 }
 
 async function resetMode() {
+  if (mobileAdminShortcutMode.value) return
 
   await resetCart();
 
@@ -531,3 +559,43 @@ function handleCategoriesBack() {
   }
 }
 </script>
+
+<style scoped>
+.mobile-admin-shortcut {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px;
+  direction: rtl;
+  text-align: center;
+  background: linear-gradient(135deg, #f8fafc 0%, #eef4ff 55%, #fff7ed 100%);
+  color: #0f172a;
+  cursor: pointer;
+  user-select: none;
+}
+
+.mobile-admin-shortcut img {
+  width: 86px;
+  max-width: 34vw;
+  filter: drop-shadow(0 14px 26px rgba(15, 23, 42, 0.18));
+}
+
+.mobile-admin-shortcut label {
+  font-size: clamp(20px, 6vw, 34px);
+  font-weight: 1000;
+  line-height: 1.6;
+}
+
+.mobile-admin-shortcut small {
+  max-width: 320px;
+  color: #64748b;
+  font-size: clamp(13px, 3.8vw, 17px);
+  font-weight: 800;
+  line-height: 1.8;
+}
+</style>
