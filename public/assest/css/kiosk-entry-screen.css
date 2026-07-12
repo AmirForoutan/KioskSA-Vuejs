@@ -242,11 +242,16 @@ body:has(.mode-selection) .hami_logo {
   left: 0 !important;
   right: 0 !important;
   bottom: 18px !important;
-  z-index: 60 !important;
+  z-index: 250 !important;
   width: 100% !important;
   color: #334155 !important;
-  pointer-events: none !important;
+  pointer-events: auto !important;
+  cursor: pointer !important;
   transform: none !important;
+}
+
+body:has(.mode-selection) .hami_logo * {
+  pointer-events: none !important;
 }
 
 body:has(.mode-selection) .hami_logo img {
@@ -415,15 +420,5 @@ body:has(.mode-selection) .hami_logo img {
 
   body:has(.mode-selection) .hami_logo {
     bottom: 12px !important;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-
-  body:has(.mode-selection) .p-4::before,
-  body:has(.mode-selection) .p-4::after,
-  body:has(.mode-selection)::before,
-  body:has(.mode-selection)::after {
-    animation: none !important;
   }
 }
