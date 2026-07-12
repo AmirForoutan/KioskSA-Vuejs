@@ -652,7 +652,7 @@ if (__VLS_ctx.bootstrapped && __VLS_ctx.viewModeCode !== 3 && !__VLS_ctx.license
 if (__VLS_ctx.bootstrapped && __VLS_ctx.viewModeCode !== 3 && __VLS_ctx.license && __VLS_ctx.showModeSelection && !__VLS_ctx.mobileAdminShortcutMode) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ onClick: (__VLS_ctx.handleLogoClick) },
-        ...{ class: "pargas Logo" },
+        ...{ class: "hami_logo" },
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.img, __VLS_intrinsicElements.img)({
         src: "../src/assets/images/Logo-sm.png",
@@ -711,8 +711,7 @@ if (__VLS_ctx.bootstrapped && __VLS_ctx.viewModeCode !== 3 && __VLS_ctx.license 
 /** @type {__VLS_StyleScopedClasses['text-white']} */ ;
 /** @type {__VLS_StyleScopedClasses['mobile-admin-shortcut']} */ ;
 /** @type {__VLS_StyleScopedClasses['error_license']} */ ;
-/** @type {__VLS_StyleScopedClasses['pargas']} */ ;
-/** @type {__VLS_StyleScopedClasses['Logo']} */ ;
+/** @type {__VLS_StyleScopedClasses['hami_logo']} */ ;
 // @ts-ignore
 var __VLS_22 = __VLS_21;
 var __VLS_dollars;
