@@ -56,17 +56,18 @@
     <Loader v-if="isLoading" />
   </div>
 
-  <div v-if="bootstrapped && viewModeCode !== 3 && mobileAdminShortcutMode && !showAdminPanel"
-    class="mobile-admin-shortcut" @click="handleLogoClick">
+  <div v-if="bootstrapped && viewModeCode !== 3 && license && mobileAdminShortcutMode && !showAdminPanel"
+    class="mobile-admin-shortcut" @click.stop="handleLogoClick">
     <img src="../src/assets/images/Logo-sm.png" alt="pargas Logo">
     <label>نرم افزار سفارشگیر پرگاس</label>
     <small>برای ورود به مدیریت، ۵ بار پشت سر هم لمس کنید</small>
   </div>
 
-  <div v-else-if="bootstrapped && viewModeCode !== 3 && !mobileAdminShortcutMode" id="error_license" class="error_license" @click="handleLogoClick">
+  <div v-if="bootstrapped && viewModeCode !== 3 && !license" id="error_license" class="error_license">
     <label>مجوزی برای شما یافت نشد، لطفا باز بودن سرویس یا داشتن لایسنس را بررسی بفرمائید</label>
   </div>
-  <div v-if="bootstrapped && viewModeCode !== 3 && showModeSelection && !mobileAdminShortcutMode" class="hami_logo" @click="handleLogoClick">
+
+  <div v-if="bootstrapped && viewModeCode !== 3 && license && showModeSelection && !mobileAdminShortcutMode" class="hami_logo" @click.stop="handleLogoClick">
     <img src="../src/assets/images/Logo-sm.png" width="60px" alt="pargas Logo">
     <br>
     <label>نرم افزار سفارشگیر پرگاس</label>
@@ -77,7 +78,7 @@
   <RootView v-if="bootstrapped && viewModeCode === 3"></RootView>
 
   <!-- دکمه فعال‌سازی تمام‌صفحه -->
-  <button v-if="bootstrapped && viewModeCode !== 3 && !isFullscreen && !isMobile && !mobileAdminShortcutMode" @click="enterFullscreen"
+  <button v-if="bootstrapped && viewModeCode !== 3 && license && !isFullscreen && !isMobile && !mobileAdminShortcutMode" @click="enterFullscreen"
     style="position: fixed; bottom: 20px; right: 20px; z-index: 9999;">
     فعال‌سازی تمام‌صفحه
   </button>
@@ -186,13 +187,25 @@ onMounted(async () => {
     setupMobileDetection()
     viewModeCode.value = await GetViewMode();
 
+    // لایسنس همیشه باید قبل از هر حالت دیگری بررسی شود
+    const check = await getKioskLicense()
+    if (check.status == true) {
+      license.value = true
+    } else {
+      license.value = false
+      mobileAdminShortcutMode.value = false
+      showModeSelection.value = false
+      mode.value = null
+      bootstrapped.value = true
+      return;
+    }
+
     // اگر صفحه از موبایل باز شد، فقط میانبر ادمین را نشان بده و هیچ تایمر/ویدیو/صفحه سفارش را اجرا نکن
     if (viewModeCode.value !== 3 && isMobile.value) {
       mobileAdminShortcutMode.value = true
       showStandByVideo.value = false
       showModeSelection.value = false
       mode.value = null
-      license.value = true
       bootstrapped.value = true
 
       window.addEventListener('keydown', (e) => {
@@ -206,16 +219,6 @@ onMounted(async () => {
 
     await updateCart();
     IDLE_TIMEOUT.value = Number.parseInt(GetStandByTimer()) * 60000 // تبدیل به دقیقه
-
-    // بررسی لایسنس
-    const check = await getKioskLicense()
-    if (check.status == true) {
-      license.value = true
-    } else {
-      license.value = false
-      bootstrapped.value = true
-      return;
-    }
 
     // بررسی وضعیت‌ها
     showOrderPanel.value = await OrderRegistrationStat()
@@ -456,6 +459,7 @@ function activateAdminPanel() {
     }
     showAdminPanel.value = true
     showModeSelection.value = false
+    mode.value = null
   } else {
     alert('کلید مدیریتی نامعتبر است')
   }
@@ -597,5 +601,11 @@ function handleCategoriesBack() {
   font-size: clamp(13px, 3.8vw, 17px);
   font-weight: 800;
   line-height: 1.8;
+}
+
+:global(.hami_logo) {
+  z-index: 200 !important;
+  pointer-events: auto !important;
+  cursor: pointer !important;
 }
 </style>
