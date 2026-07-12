@@ -84,13 +84,25 @@ onMounted(async () => {
         await initConfig();
         setupMobileDetection();
         viewModeCode.value = await GetViewMode();
+        // لایسنس همیشه باید قبل از هر حالت دیگری بررسی شود
+        const check = await getKioskLicense();
+        if (check.status == true) {
+            license.value = true;
+        }
+        else {
+            license.value = false;
+            mobileAdminShortcutMode.value = false;
+            showModeSelection.value = false;
+            mode.value = null;
+            bootstrapped.value = true;
+            return;
+        }
         // اگر صفحه از موبایل باز شد، فقط میانبر ادمین را نشان بده و هیچ تایمر/ویدیو/صفحه سفارش را اجرا نکن
         if (viewModeCode.value !== 3 && isMobile.value) {
             mobileAdminShortcutMode.value = true;
             showStandByVideo.value = false;
             showModeSelection.value = false;
             mode.value = null;
-            license.value = true;
             bootstrapped.value = true;
             window.addEventListener('keydown', (e) => {
                 if (e.ctrlKey && e.altKey && e.shiftKey && e.key === 'A') {
@@ -101,16 +113,6 @@ onMounted(async () => {
         }
         await updateCart();
         IDLE_TIMEOUT.value = Number.parseInt(GetStandByTimer()) * 60000; // تبدیل به دقیقه
-        // بررسی لایسنس
-        const check = await getKioskLicense();
-        if (check.status == true) {
-            license.value = true;
-        }
-        else {
-            license.value = false;
-            bootstrapped.value = true;
-            return;
-        }
         // بررسی وضعیت‌ها
         showOrderPanel.value = await OrderRegistrationStat();
         isScaleOrder.value = await IsScaleOrderStat();
@@ -331,6 +333,7 @@ function activateAdminPanel() {
         }
         showAdminPanel.value = true;
         showModeSelection.value = false;
+        mode.value = null;
     }
     else {
         alert('کلید مدیریتی نامعتبر است');
@@ -626,7 +629,7 @@ if (__VLS_ctx.bootstrapped && __VLS_ctx.viewModeCode !== 3 && __VLS_ctx.license 
         const __VLS_35 = __VLS_34({}, ...__VLS_functionalComponentArgsRest(__VLS_34));
     }
 }
-if (__VLS_ctx.bootstrapped && __VLS_ctx.viewModeCode !== 3 && __VLS_ctx.mobileAdminShortcutMode && !__VLS_ctx.showAdminPanel) {
+if (__VLS_ctx.bootstrapped && __VLS_ctx.viewModeCode !== 3 && __VLS_ctx.license && __VLS_ctx.mobileAdminShortcutMode && !__VLS_ctx.showAdminPanel) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ onClick: (__VLS_ctx.handleLogoClick) },
         ...{ class: "mobile-admin-shortcut" },
@@ -638,15 +641,14 @@ if (__VLS_ctx.bootstrapped && __VLS_ctx.viewModeCode !== 3 && __VLS_ctx.mobileAd
     __VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({});
     __VLS_asFunctionalElement(__VLS_intrinsicElements.small, __VLS_intrinsicElements.small)({});
 }
-else if (__VLS_ctx.bootstrapped && __VLS_ctx.viewModeCode !== 3 && !__VLS_ctx.mobileAdminShortcutMode) {
+if (__VLS_ctx.bootstrapped && __VLS_ctx.viewModeCode !== 3 && !__VLS_ctx.license) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ onClick: (__VLS_ctx.handleLogoClick) },
         id: "error_license",
         ...{ class: "error_license" },
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({});
 }
-if (__VLS_ctx.bootstrapped && __VLS_ctx.viewModeCode !== 3 && __VLS_ctx.showModeSelection && !__VLS_ctx.mobileAdminShortcutMode) {
+if (__VLS_ctx.bootstrapped && __VLS_ctx.viewModeCode !== 3 && __VLS_ctx.license && __VLS_ctx.showModeSelection && !__VLS_ctx.mobileAdminShortcutMode) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ onClick: (__VLS_ctx.handleLogoClick) },
         ...{ class: "hami_logo" },
@@ -687,7 +689,7 @@ if (__VLS_ctx.bootstrapped && __VLS_ctx.viewModeCode === 3) {
     const __VLS_45 = __VLS_asFunctionalComponent(__VLS_44, new __VLS_44({}));
     const __VLS_46 = __VLS_45({}, ...__VLS_functionalComponentArgsRest(__VLS_45));
 }
-if (__VLS_ctx.bootstrapped && __VLS_ctx.viewModeCode !== 3 && !__VLS_ctx.isFullscreen && !__VLS_ctx.isMobile && !__VLS_ctx.mobileAdminShortcutMode) {
+if (__VLS_ctx.bootstrapped && __VLS_ctx.viewModeCode !== 3 && __VLS_ctx.license && !__VLS_ctx.isFullscreen && !__VLS_ctx.isMobile && !__VLS_ctx.mobileAdminShortcutMode) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
         ...{ onClick: (__VLS_ctx.enterFullscreen) },
         ...{ style: {} },
