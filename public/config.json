@@ -8,7 +8,7 @@
     "IsTakeAway": false,
     "showTables": true,
     "TableSelectionRequired": true,
-    "KeepSalonTableOpenAfterSubmit": false,
+    "KeepSalonTableOpenAfterSubmit": true,
     "ShowKioskOrderTypeSelector": false,
     "IsCollapseCart": false,
     "ScaleAutoPay": false,
@@ -20,5 +20,5 @@
     "ServiceAddress": "http://localhost:5005",
     "ServiceAPIAddress": "http://localhost:5005",
     "ResetTimer": 1,
-    "viewMode": 1
+    "viewMode": 3
 }
