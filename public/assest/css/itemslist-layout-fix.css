@@ -2,10 +2,10 @@
    This file does not touch body, #app, main, or App.vue screens.
    It only applies when .layout directly contains .cart-panel. */
 
-.main-container > .layout:has(> .cart-panel) {
+.main-container>.layout:has(> .cart-panel) {
   display: grid;
   grid-template-columns: clamp(152px, 14vw, 224px) minmax(0, 1fr);
-  grid-template-rows: minmax(0, 1fr) clamp(128px, 17vh, 188px);
+  grid-template-rows: minmax(0, 1fr) clamp(210px, 17vh, 188px);
   gap: 10px;
   width: 100%;
   height: 100%;
@@ -19,9 +19,9 @@
     linear-gradient(135deg, rgba(248, 250, 252, 0.66), rgba(239, 246, 255, 0.42));
 }
 
-.main-container > .layout:has(> .cart-panel) > .categories-panel,
-.main-container > .layout:has(> .cart-panel) > .goods-panel,
-.main-container > .layout:has(> .cart-panel) > .cart-panel {
+.main-container>.layout:has(> .cart-panel)>.categories-panel,
+.main-container>.layout:has(> .cart-panel)>.goods-panel,
+.main-container>.layout:has(> .cart-panel)>.cart-panel {
   min-width: 0;
   min-height: 0;
   max-height: 100%;
@@ -33,7 +33,7 @@
   backdrop-filter: blur(10px);
 }
 
-.main-container > .layout:has(> .cart-panel) > .categories-panel {
+.main-container>.layout:has(> .cart-panel)>.categories-panel {
   grid-column: 1;
   grid-row: 1 / 3;
   display: flex;
@@ -44,7 +44,7 @@
   padding: 8px;
 }
 
-.main-container > .layout:has(> .cart-panel) > .categories-panel > .categories-vertical {
+.main-container>.layout:has(> .cart-panel)>.categories-panel>.categories-vertical {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
@@ -54,7 +54,7 @@
   padding: 2px;
 }
 
-.main-container > .layout:has(> .cart-panel) .category-item {
+.main-container>.layout:has(> .cart-panel) .category-item {
   width: 100%;
   min-width: 0;
   min-height: 106px;
@@ -72,20 +72,20 @@
   transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease;
 }
 
-.main-container > .layout:has(> .cart-panel) .category-item:hover {
+.main-container>.layout:has(> .cart-panel) .category-item:hover {
   transform: translateY(-2px);
   box-shadow: 0 10px 22px rgba(15, 23, 42, 0.10);
 }
 
-.main-container > .layout:has(> .cart-panel) .category-item.active {
+.main-container>.layout:has(> .cart-panel) .category-item.active {
   background: linear-gradient(145deg, rgba(219, 234, 254, 0.96), rgba(191, 219, 254, 0.88));
   border-color: rgba(37, 99, 235, 0.36);
   box-shadow: 0 10px 22px rgba(37, 99, 235, 0.16);
 }
 
-.main-container > .layout:has(> .cart-panel) .category-image {
-  width: clamp(58px, 5.8vw, 86px);
-  height: clamp(58px, 5.8vw, 86px);
+.main-container>.layout:has(> .cart-panel) .category-image {
+  width: clamp(70px, 5.8vw, 86px);
+  height: clamp(70px, 5.8vw, 86px);
   margin: 0 0 6px;
   padding: 5px;
   object-fit: contain;
@@ -95,10 +95,10 @@
   box-sizing: border-box;
 }
 
-.main-container > .layout:has(> .cart-panel) .category-name {
+.main-container>.layout:has(> .cart-panel) .category-name {
   width: 100%;
   color: #0f172a;
-  font-size: clamp(11px, 1vw, 14px);
+  font-size: clamp(15px, 1vw, 14px);
   font-weight: 900;
   line-height: 1.55;
   text-align: center;
@@ -106,7 +106,7 @@
   overflow-wrap: anywhere;
 }
 
-.main-container > .layout:has(> .cart-panel) .cart-body {
+.main-container>.layout:has(> .cart-panel) .cart-body {
   width: 100%;
   margin-top: 8px;
   padding: 8px;
@@ -117,12 +117,12 @@
   box-sizing: border-box;
 }
 
-.main-container > .layout:has(> .cart-panel) .cart-body .cart-items-list {
+.main-container>.layout:has(> .cart-panel) .cart-body .cart-items-list {
   max-height: none;
   overflow: visible;
 }
 
-.main-container > .layout:has(> .cart-panel) .cart-total {
+.main-container>.layout:has(> .cart-panel) .cart-total {
   width: 100%;
   max-width: 100%;
   margin: 0 0 8px;
@@ -138,38 +138,38 @@
   text-align: center;
 }
 
-.main-container > .layout:has(> .cart-panel) .cart-title {
+.main-container>.layout:has(> .cart-panel) .cart-title {
   color: #1d4ed8;
   font-size: clamp(12px, 1vw, 15px);
   font-weight: 1000;
   margin-bottom: 4px;
 }
 
-.main-container > .layout:has(> .cart-panel) .payment-method,
-.main-container > .layout:has(> .cart-panel) .credit-box,
-.main-container > .layout:has(> .cart-panel) .discount-card-box,
-.main-container > .layout:has(> .cart-panel) .kiosk-table-selection,
-.main-container > .layout:has(> .cart-panel) .kiosk-order-type-selector,
-.main-container > .layout:has(> .cart-panel) .kiosk-config-error {
+.main-container>.layout:has(> .cart-panel) .payment-method,
+.main-container>.layout:has(> .cart-panel) .credit-box,
+.main-container>.layout:has(> .cart-panel) .discount-card-box,
+.main-container>.layout:has(> .cart-panel) .kiosk-table-selection,
+.main-container>.layout:has(> .cart-panel) .kiosk-order-type-selector,
+.main-container>.layout:has(> .cart-panel) .kiosk-config-error {
   width: 100%;
   max-width: 100%;
   margin: 6px 0;
   box-sizing: border-box;
 }
 
-.main-container > .layout:has(> .cart-panel) .credit-box,
-.main-container > .layout:has(> .cart-panel) .discount-card-box,
-.main-container > .layout:has(> .cart-panel) .kiosk-table-selection,
-.main-container > .layout:has(> .cart-panel) .kiosk-order-type-selector {
+.main-container>.layout:has(> .cart-panel) .credit-box,
+.main-container>.layout:has(> .cart-panel) .discount-card-box,
+.main-container>.layout:has(> .cart-panel) .kiosk-table-selection,
+.main-container>.layout:has(> .cart-panel) .kiosk-order-type-selector {
   padding: 8px;
   border-radius: 14px;
   background: rgba(248, 250, 252, 0.94);
   border: 1px solid rgba(203, 213, 225, 0.86);
 }
 
-.main-container > .layout:has(> .cart-panel) .credit-box input,
-.main-container > .layout:has(> .cart-panel) .discount-card-box input,
-.main-container > .layout:has(> .cart-panel) .kiosk-table-selection select {
+.main-container>.layout:has(> .cart-panel) .credit-box input,
+.main-container>.layout:has(> .cart-panel) .discount-card-box input,
+.main-container>.layout:has(> .cart-panel) .kiosk-table-selection select {
   width: 100%;
   min-width: 0;
   max-width: 100%;
@@ -184,7 +184,7 @@
   font-size: 12px;
 }
 
-.main-container > .layout:has(> .cart-panel) .cart-actions-fixed {
+.main-container>.layout:has(> .cart-panel) .cart-actions-fixed {
   width: 100%;
   display: grid;
   grid-template-columns: 1fr;
@@ -194,11 +194,11 @@
   box-sizing: border-box;
 }
 
-.main-container > .layout:has(> .cart-panel) .checkout-btn,
-.main-container > .layout:has(> .cart-panel) .reset-cart-btn,
-.main-container > .layout:has(> .cart-panel) .back-button2,
-.main-container > .layout:has(> .cart-panel) .discount-card-box button,
-.main-container > .layout:has(> .cart-panel) .credit-box button {
+.main-container>.layout:has(> .cart-panel) .checkout-btn,
+.main-container>.layout:has(> .cart-panel) .reset-cart-btn,
+.main-container>.layout:has(> .cart-panel) .back-button2,
+.main-container>.layout:has(> .cart-panel) .discount-card-box button,
+.main-container>.layout:has(> .cart-panel) .credit-box button {
   width: 100%;
   min-width: 0;
   min-height: 38px;
@@ -214,22 +214,22 @@
   box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
 }
 
-.main-container > .layout:has(> .cart-panel) .checkout-btn,
-.main-container > .layout:has(> .cart-panel) .credit-box button,
-.main-container > .layout:has(> .cart-panel) .discount-card-box button:not(.clear-discount-btn) {
+.main-container>.layout:has(> .cart-panel) .checkout-btn,
+.main-container>.layout:has(> .cart-panel) .credit-box button,
+.main-container>.layout:has(> .cart-panel) .discount-card-box button:not(.clear-discount-btn) {
   background: linear-gradient(145deg, #22c55e, #16a34a);
 }
 
-.main-container > .layout:has(> .cart-panel) .reset-cart-btn,
-.main-container > .layout:has(> .cart-panel) .clear-discount-btn {
+.main-container>.layout:has(> .cart-panel) .reset-cart-btn,
+.main-container>.layout:has(> .cart-panel) .clear-discount-btn {
   background: linear-gradient(145deg, #ef4444, #dc2626) !important;
 }
 
-.main-container > .layout:has(> .cart-panel) .back-button2 {
+.main-container>.layout:has(> .cart-panel) .back-button2 {
   background: linear-gradient(145deg, #475569, #334155);
 }
 
-.main-container > .layout:has(> .cart-panel) > .goods-panel {
+.main-container>.layout:has(> .cart-panel)>.goods-panel {
   grid-column: 2;
   grid-row: 1;
   overflow-y: auto;
@@ -239,7 +239,7 @@
   padding: 10px;
 }
 
-.main-container > .layout:has(> .cart-panel) > .goods-panel .goods-grid {
+.main-container>.layout:has(> .cart-panel)>.goods-panel .goods-grid {
   margin: 0;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(178px, 1fr));
@@ -247,9 +247,9 @@
   align-content: start;
 }
 
-.main-container > .layout:has(> .cart-panel) > .goods-panel .goods-item {
+.main-container>.layout:has(> .cart-panel)>.goods-panel .goods-item {
   min-width: 0;
-  min-height: 232px;
+  min-height: 280px;
   margin: 0;
   padding: 12px 10px 56px;
   border-radius: 18px;
@@ -260,12 +260,12 @@
   overflow: hidden;
 }
 
-.main-container > .layout:has(> .cart-panel) > .goods-panel .goods-item:hover {
+.main-container>.layout:has(> .cart-panel)>.goods-panel .goods-item:hover {
   transform: translateY(-3px);
   box-shadow: 0 14px 28px rgba(15, 23, 42, 0.12);
 }
 
-.main-container > .layout:has(> .cart-panel) > .goods-panel .goods-image {
+.main-container>.layout:has(> .cart-panel)>.goods-panel .goods-image {
   width: 112px;
   height: 112px;
   margin: 0 auto 8px;
@@ -277,15 +277,15 @@
   box-sizing: border-box;
 }
 
-.main-container > .layout:has(> .cart-panel) > .goods-panel .goods-item h3 {
+.main-container>.layout:has(> .cart-panel)>.goods-panel .goods-item h3 {
   margin: 4px 0;
   color: #0f172a;
-  font-size: clamp(14px, 1.15vw, 18px);
+  font-size: clamp(18px, 1.15vw, 18px);
   font-weight: 1000;
   line-height: 1.55;
 }
 
-.main-container > .layout:has(> .cart-panel) > .goods-panel .goods-item h5 {
+.main-container>.layout:has(> .cart-panel)>.goods-panel .goods-item h5 {
   margin: 0 0 5px;
   color: #64748b;
   font-size: clamp(10px, 0.9vw, 13px);
@@ -294,14 +294,14 @@
   min-height: 18px;
 }
 
-.main-container > .layout:has(> .cart-panel) > .goods-panel .goods-item p {
+.main-container>.layout:has(> .cart-panel)>.goods-panel .goods-item p {
   margin: 0;
   color: #2563eb;
-  font-size: clamp(12px, 1vw, 15px);
+  font-size: clamp(15px, 1vw, 15px);
   font-weight: 1000;
 }
 
-.main-container > .layout:has(> .cart-panel) > .cart-panel {
+.main-container>.layout:has(> .cart-panel)>.cart-panel {
   grid-column: 2;
   grid-row: 2;
   display: flex;
@@ -312,7 +312,7 @@
   padding: 8px;
 }
 
-.main-container > .layout:has(> .cart-panel) > .cart-panel > .cart-items-list {
+.main-container>.layout:has(> .cart-panel)>.cart-panel>.cart-items-list {
   flex: 1 1 auto;
   min-height: 0;
   max-height: 100%;
@@ -325,7 +325,7 @@
   padding: 2px 4px 4px;
 }
 
-.main-container > .layout:has(> .cart-panel) > .cart-panel .cart-items {
+.main-container>.layout:has(> .cart-panel)>.cart-panel .cart-items {
   min-height: 0;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -334,7 +334,7 @@
   direction: rtl;
 }
 
-.main-container > .layout:has(> .cart-panel) > .cart-panel .cart-item-summary {
+.main-container>.layout:has(> .cart-panel)>.cart-panel .cart-item-summary {
   width: 100%;
   max-width: 100%;
   min-width: 0;
@@ -352,7 +352,7 @@
   box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
 }
 
-.main-container > .layout:has(> .cart-panel) > .cart-panel .cart-item-image {
+.main-container>.layout:has(> .cart-panel)>.cart-panel .cart-item-image {
   width: 52px;
   height: 52px;
   min-width: 52px;
@@ -365,14 +365,15 @@
   box-sizing: border-box;
 }
 
-.main-container > .layout:has(> .cart-panel) > .cart-panel .cart-item-details {
+.main-container>.layout:has(> .cart-panel)>.cart-panel .cart-item-details {
   min-width: 0;
   align-items: flex-start;
   text-align: right;
   overflow: hidden;
+  padding-right: 15px;
 }
 
-.main-container > .layout:has(> .cart-panel) > .cart-panel .cart-item-name {
+.main-container>.layout:has(> .cart-panel)>.cart-panel .cart-item-name {
   width: 100%;
   margin: 0 0 4px;
   color: #0f172a;
@@ -384,7 +385,7 @@
   text-overflow: ellipsis;
 }
 
-.main-container > .layout:has(> .cart-panel) > .cart-panel .price-display {
+.main-container>.layout:has(> .cart-panel)>.cart-panel .price-display {
   width: 100%;
   color: #2563eb;
   font-size: clamp(11px, 1vw, 14px);
@@ -396,7 +397,7 @@
   text-align: right;
 }
 
-.main-container > .layout:has(> .cart-panel) > .cart-panel .cart-item-toppings {
+.main-container>.layout:has(> .cart-panel)>.cart-panel .cart-item-toppings {
   width: 100%;
   justify-content: flex-start;
   gap: 4px;
@@ -405,7 +406,7 @@
   overflow: hidden;
 }
 
-.main-container > .layout:has(> .cart-panel) > .cart-panel .topping-badge {
+.main-container>.layout:has(> .cart-panel)>.cart-panel .topping-badge {
   max-width: 100%;
   font-size: 10px;
   line-height: 1.4;
@@ -414,7 +415,7 @@
   text-overflow: ellipsis;
 }
 
-.main-container > .layout:has(> .cart-panel) > .cart-panel .cart-item-quantity {
+.main-container>.layout:has(> .cart-panel)>.cart-panel .cart-item-quantity {
   display: grid;
   grid-template-columns: 32px 28px 32px;
   align-items: center;
@@ -423,7 +424,7 @@
   min-width: 92px;
 }
 
-.main-container > .layout:has(> .cart-panel) > .cart-panel .cart-item-quantity button {
+.main-container>.layout:has(> .cart-panel)>.cart-panel .cart-item-quantity button {
   width: 32px;
   height: 32px;
   min-width: 32px;
@@ -442,7 +443,7 @@
   line-height: 1;
 }
 
-.main-container > .layout:has(> .cart-panel) > .cart-panel .cart-item-quantity span {
+.main-container>.layout:has(> .cart-panel)>.cart-panel .cart-item-quantity span {
   color: #0f172a;
   font-size: 18px;
   font-weight: 1000;
@@ -450,7 +451,7 @@
   text-align: center;
 }
 
-.main-container > .layout:has(> .cart-panel) > .cart-panel .remove-item {
+.main-container>.layout:has(> .cart-panel)>.cart-panel .remove-item {
   width: 40px;
   height: 40px;
   min-width: 40px;
@@ -469,13 +470,13 @@
   line-height: 1;
 }
 
-.main-container > .layout:has(> .cart-panel) > .cart-panel .remove-item:hover,
-.main-container > .layout:has(> .cart-panel) > .cart-panel .remove-item:active {
+.main-container>.layout:has(> .cart-panel)>.cart-panel .remove-item:hover,
+.main-container>.layout:has(> .cart-panel)>.cart-panel .remove-item:active {
   background: linear-gradient(145deg, #dc2626, #b91c1c);
   transform: translateY(-1px);
 }
 
-.main-container > .layout:has(> .cart-panel) > .cart-panel .empty-cart-centered {
+.main-container>.layout:has(> .cart-panel)>.cart-panel .empty-cart-centered {
   min-height: 100%;
   display: grid;
   place-items: center;
@@ -484,48 +485,48 @@
   font-weight: 1000;
 }
 
-.main-container > .layout:has(> .cart-panel) .categories-panel::-webkit-scrollbar,
-.main-container > .layout:has(> .cart-panel) .categories-vertical::-webkit-scrollbar,
-.main-container > .layout:has(> .cart-panel) .goods-panel::-webkit-scrollbar,
-.main-container > .layout:has(> .cart-panel) > .cart-panel > .cart-items-list::-webkit-scrollbar {
+.main-container>.layout:has(> .cart-panel) .categories-panel::-webkit-scrollbar,
+.main-container>.layout:has(> .cart-panel) .categories-vertical::-webkit-scrollbar,
+.main-container>.layout:has(> .cart-panel) .goods-panel::-webkit-scrollbar,
+.main-container>.layout:has(> .cart-panel)>.cart-panel>.cart-items-list::-webkit-scrollbar {
   display: none;
 }
 
-.main-container > .layout:has(> .cart-panel) .categories-panel,
-.main-container > .layout:has(> .cart-panel) .categories-vertical,
-.main-container > .layout:has(> .cart-panel) .goods-panel,
-.main-container > .layout:has(> .cart-panel) > .cart-panel > .cart-items-list {
+.main-container>.layout:has(> .cart-panel) .categories-panel,
+.main-container>.layout:has(> .cart-panel) .categories-vertical,
+.main-container>.layout:has(> .cart-panel) .goods-panel,
+.main-container>.layout:has(> .cart-panel)>.cart-panel>.cart-items-list {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
 
 @media (max-width: 1280px) {
-  .main-container > .layout:has(> .cart-panel) {
+  .main-container>.layout:has(> .cart-panel) {
     grid-template-columns: clamp(140px, 14vw, 190px) minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr) clamp(128px, 18vh, 198px);
   }
 
-  .main-container > .layout:has(> .cart-panel) > .cart-panel .cart-items {
-    grid-template-columns: 1fr;
+  .main-container>.layout:has(> .cart-panel)>.cart-panel .cart-items {
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   }
 }
 
 @media (max-width: 1100px) {
-  .main-container > .layout:has(> .cart-panel) {
-    grid-template-columns: clamp(128px, 15vw, 168px) minmax(0, 1fr);
+  .main-container>.layout:has(> .cart-panel) {
+    grid-template-columns: clamp(180px, 15vw, 168px) minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr) clamp(120px, 18vh, 186px);
   }
 
-  .main-container > .layout:has(> .cart-panel) > .cart-panel .cart-item-summary {
+  .main-container>.layout:has(> .cart-panel)>.cart-panel .cart-item-summary {
     grid-template-columns: 48px minmax(0, 1fr) auto 40px;
   }
 
-  .main-container > .layout:has(> .cart-panel) > .cart-panel .cart-item-quantity {
+  .main-container>.layout:has(> .cart-panel)>.cart-panel .cart-item-quantity {
     grid-template-columns: 30px 26px 30px;
     min-width: 86px;
   }
 
-  .main-container > .layout:has(> .cart-panel) > .cart-panel .cart-item-quantity button {
+  .main-container>.layout:has(> .cart-panel)>.cart-panel .cart-item-quantity button {
     width: 30px;
     height: 30px;
     min-width: 30px;
