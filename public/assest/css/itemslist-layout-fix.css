@@ -1,0 +1,94 @@
+/* Scoped layout fix for ItemsList.vue only.
+   This file does not touch body, #app, main, or App.vue screens.
+   It only applies when .layout directly contains .cart-panel. */
+
+.main-container > .layout:has(> .cart-panel) {
+  display: grid;
+  grid-template-columns: clamp(120px, 12vw, 180px) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) clamp(118px, 18vh, 190px);
+  gap: 10px;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  direction: rtl;
+  box-sizing: border-box;
+}
+
+.main-container > .layout:has(> .cart-panel) > .categories-panel {
+  grid-column: 1;
+  grid-row: 1 / 3;
+  min-width: 0;
+  min-height: 0;
+  max-height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.main-container > .layout:has(> .cart-panel) > .goods-panel {
+  grid-column: 2;
+  grid-row: 1;
+  min-width: 0;
+  min-height: 0;
+  max-height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.main-container > .layout:has(> .cart-panel) > .cart-panel {
+  grid-column: 2;
+  grid-row: 2;
+  min-width: 0;
+  min-height: 0;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  overscroll-behavior: contain;
+  box-sizing: border-box;
+}
+
+.main-container > .layout:has(> .cart-panel) > .cart-panel > .cart-items-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+  box-sizing: border-box;
+}
+
+.main-container > .layout:has(> .cart-panel) > .cart-panel .cart-items {
+  min-height: 0;
+}
+
+.main-container > .layout:has(> .cart-panel) > .cart-panel .cart-item-summary {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.main-container > .layout:has(> .cart-panel) > .cart-panel .empty-cart-centered {
+  min-height: 100%;
+  display: grid;
+  place-items: center;
+}
+
+.main-container > .layout:has(> .cart-panel) .categories-panel::-webkit-scrollbar,
+.main-container > .layout:has(> .cart-panel) .goods-panel::-webkit-scrollbar,
+.main-container > .layout:has(> .cart-panel) > .cart-panel > .cart-items-list::-webkit-scrollbar {
+  display: none;
+}
+
+.main-container > .layout:has(> .cart-panel) .categories-panel,
+.main-container > .layout:has(> .cart-panel) .goods-panel,
+.main-container > .layout:has(> .cart-panel) > .cart-panel > .cart-items-list {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
