@@ -77,13 +77,34 @@
 .main-container>.layout:has(> .cart-panel)>.cart-panel .cart-item-quantity,
 .main-container>.layout:has(> .cart-panel)>.cart-panel .remove-item {
   position: relative;
-  top: -3px;
+  top: 0;
 }
 
 .main-container>.layout:has(> .cart-panel)>.cart-panel .cart-item-quantity button,
-.main-container>.layout:has(> .cart-panel)>.cart-panel .cart-item-quantity span,
 .main-container>.layout:has(> .cart-panel)>.cart-panel .remove-item {
-  display: grid;
-  place-items: center;
-  line-height: 1;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-family: Arial, Helvetica, sans-serif !important;
+  line-height: 0 !important;
+  padding: 0 0 4px 0 !important;
+  text-align: center !important;
+  vertical-align: middle !important;
+}
+
+.main-container>.layout:has(> .cart-panel)>.cart-panel .cart-item-quantity button {
+  font-size: 25px !important;
+}
+
+.main-container>.layout:has(> .cart-panel)>.cart-panel .remove-item {
+  font-size: 34px !important;
+  padding-bottom: 6px !important;
+}
+
+.main-container>.layout:has(> .cart-panel)>.cart-panel .cart-item-quantity span {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  line-height: 1 !important;
+  padding: 0 !important;
 }
