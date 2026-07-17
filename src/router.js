@@ -1,12 +1,16 @@
 // src/router.js
 import { createRouter, createWebHistory } from "vue-router";
-
+import RootView from "./views/RootView.vue";
+import Categories from "./components/CategoryList.vue";
+import GoodsList from "./components/GoodsList.vue";
+import AdminImageUpload from "./components/AdminImageUpload.vue";
+import DiscountsTab from "./views/desktop/tabs/DiscountsTab.vue";
 const routes = [
-    { path: "/", component: () => import("./views/RootView.vue") },
-    { path: "/categories", component: () => import("./components/CategoryList.vue") },
-    { path: "/goods/:groupId", component: () => import("./components/GoodsList.vue"), props: true },
-    { path: "/admin/upload", name: "admin-upload", component: () => import("./components/AdminImageUpload.vue") },
-    { path: "/desktop/discounts", name: "desktop-discounts", component: () => import("./views/desktop/tabs/DiscountsTab.vue") },
+    { path: "/", component: RootView },
+    { path: "/categories", component: Categories },
+    { path: "/goods/:groupId", component: GoodsList, props: true },
+    { path: "/admin/upload", name: "admin-upload", component: AdminImageUpload },
+    { path: "/desktop/discounts", name: "desktop-discounts", component: DiscountsTab },
 ];
 const router = createRouter({
     history: createWebHistory(),
