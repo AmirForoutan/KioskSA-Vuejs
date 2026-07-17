@@ -1,14 +1,14 @@
 /* Small alignment patch for ItemsList kiosk UI.
    Loaded after itemslist-layout-fix.css. */
 
-.main-container > .layout:has(> .cart-panel) > .goods-panel .goods-item {
+.main-container>.layout:has(> .cart-panel)>.goods-panel .goods-item {
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
 }
 
-.main-container > .layout:has(> .cart-panel) > .goods-panel .goods-item .add-btn {
+.main-container>.layout:has(> .cart-panel)>.goods-panel .goods-item .add-btn {
   position: absolute;
   left: 50%;
   right: auto;
@@ -26,7 +26,7 @@
   background: transparent;
 }
 
-.main-container > .layout:has(> .cart-panel) > .goods-panel .goods-item .add-to-cart-btn {
+.main-container>.layout:has(> .cart-panel)>.goods-panel .goods-item .add-to-cart-btn {
   width: 150px;
   max-width: 100%;
   min-height: 42px;
@@ -44,11 +44,11 @@
   box-shadow: 0 8px 18px rgba(22, 163, 74, 0.22);
 }
 
-.main-container > .layout:has(> .cart-panel) > .goods-panel .goods-item .quantity-control {
+.main-container>.layout:has(> .cart-panel)>.goods-panel .goods-item .quantity-control {
   position: absolute;
   left: 50%;
   right: auto;
-  bottom: 12px;
+  bottom: 3px;
   margin: 0;
   display: flex;
   align-items: center;
@@ -57,32 +57,32 @@
   transform: translateX(-50%);
 }
 
-.main-container > .layout:has(> .cart-panel) > .goods-panel .goods-item .quantity-control button,
-.main-container > .layout:has(> .cart-panel) > .goods-panel .goods-item .quantity-control span {
+.main-container>.layout:has(> .cart-panel)>.goods-panel .goods-item .quantity-control button,
+.main-container>.layout:has(> .cart-panel)>.goods-panel .goods-item .quantity-control span {
   margin: 0;
 }
 
-.main-container > .layout:has(> .cart-panel) > .cart-panel .cart-item-summary {
+.main-container>.layout:has(> .cart-panel)>.cart-panel .cart-item-summary {
   align-items: center;
   place-items: center stretch;
 }
 
-.main-container > .layout:has(> .cart-panel) > .cart-panel .cart-item-image,
-.main-container > .layout:has(> .cart-panel) > .cart-panel .cart-item-details,
-.main-container > .layout:has(> .cart-panel) > .cart-panel .cart-item-quantity,
-.main-container > .layout:has(> .cart-panel) > .cart-panel .remove-item {
+.main-container>.layout:has(> .cart-panel)>.cart-panel .cart-item-image,
+.main-container>.layout:has(> .cart-panel)>.cart-panel .cart-item-details,
+.main-container>.layout:has(> .cart-panel)>.cart-panel .cart-item-quantity,
+.main-container>.layout:has(> .cart-panel)>.cart-panel .remove-item {
   align-self: center;
 }
 
-.main-container > .layout:has(> .cart-panel) > .cart-panel .cart-item-quantity,
-.main-container > .layout:has(> .cart-panel) > .cart-panel .remove-item {
+.main-container>.layout:has(> .cart-panel)>.cart-panel .cart-item-quantity,
+.main-container>.layout:has(> .cart-panel)>.cart-panel .remove-item {
   position: relative;
   top: -3px;
 }
 
-.main-container > .layout:has(> .cart-panel) > .cart-panel .cart-item-quantity button,
-.main-container > .layout:has(> .cart-panel) > .cart-panel .cart-item-quantity span,
-.main-container > .layout:has(> .cart-panel) > .cart-panel .remove-item {
+.main-container>.layout:has(> .cart-panel)>.cart-panel .cart-item-quantity button,
+.main-container>.layout:has(> .cart-panel)>.cart-panel .cart-item-quantity span,
+.main-container>.layout:has(> .cart-panel)>.cart-panel .remove-item {
   display: grid;
   place-items: center;
   line-height: 1;
