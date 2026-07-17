@@ -1,10 +1,17 @@
 (function () {
   const ENHANCED_CLASS = 'enhanced-table-picker';
-  let activeSelection = null;
   let selectedGroupName = '';
+  let scanScheduled = false;
+  let observer = null;
 
   function normalizeText(value) {
     return String(value || '').replace(/\s+/g, ' ').trim();
+  }
+
+  function setTextIfChanged(element, value) {
+    if (element && element.textContent !== value) {
+      element.textContent = value;
+    }
   }
 
   function stripOccupied(text) {
@@ -52,7 +59,7 @@
   }
 
   function ensureUi(selection) {
-    if (selection.classList.contains(ENHANCED_CLASS)) return;
+    if (!selection || selection.classList.contains(ENHANCED_CLASS)) return;
 
     const select = selection.querySelector('select');
     if (!select) return;
@@ -91,12 +98,12 @@
     const selected = findSelectedTable(select);
     if (selected) {
       selection.classList.add('has-selected-table');
-      title.textContent = `میز انتخاب شده: ${selected.title}${selected.code ? ' - ' + selected.code : ''}`;
-      button.textContent = 'تغییر میز';
+      setTextIfChanged(title, `میز انتخاب شده: ${selected.title}${selected.code ? ' - ' + selected.code : ''}`);
+      setTextIfChanged(button, 'تغییر میز');
     } else {
       selection.classList.remove('has-selected-table');
-      title.textContent = '';
-      button.textContent = 'انتخاب میز';
+      setTextIfChanged(title, '');
+      setTextIfChanged(button, 'انتخاب میز');
     }
   }
 
@@ -137,6 +144,7 @@
         tab.className = 'kiosk-table-group-tab' + (group === selectedGroupName ? ' active' : '');
         tab.textContent = group;
         tab.addEventListener('click', function () {
+          if (selectedGroupName === group) return;
           selectedGroupName = group;
           renderTabs();
           renderTables();
@@ -205,7 +213,6 @@
 
   function openModal(selection) {
     closeModal();
-    activeSelection = selection;
     const modal = buildModal(selection);
     document.body.appendChild(modal);
   }
@@ -213,20 +220,50 @@
   function closeModal() {
     const existing = document.querySelector('.kiosk-table-modal-overlay');
     if (existing) existing.remove();
-    activeSelection = null;
   }
 
   function enhanceAll() {
-    document.querySelectorAll('.kiosk-table-selection').forEach(ensureUi);
+    document.querySelectorAll('.kiosk-table-selection').forEach(selection => {
+      ensureUi(selection);
+      updateSelectionUi(selection);
+    });
+  }
+
+  function scheduleEnhance() {
+    if (scanScheduled) return;
+    scanScheduled = true;
+
+    window.requestAnimationFrame(function () {
+      scanScheduled = false;
+      if (observer) observer.disconnect();
+      enhanceAll();
+      if (observer) {
+        observer.observe(document.body, {
+          childList: true,
+          subtree: true,
+        });
+      }
+    });
   }
 
   document.addEventListener('keydown', function (event) {
     if (event.key === 'Escape') closeModal();
   });
 
-  const observer = new MutationObserver(function () {
-    enhanceAll();
-    document.querySelectorAll('.kiosk-table-selection.enhanced-table-picker').forEach(updateSelectionUi);
+  observer = new MutationObserver(function (mutations) {
+    const shouldScan = mutations.some(mutation => {
+      if (mutation.target && mutation.target.closest && mutation.target.closest('.kiosk-table-modal-overlay')) {
+        return false;
+      }
+
+      return Array.from(mutation.addedNodes || []).some(node => {
+        if (!node || node.nodeType !== 1) return false;
+        if (node.classList && node.classList.contains('kiosk-table-modal-overlay')) return false;
+        return node.matches?.('.kiosk-table-selection') || node.querySelector?.('.kiosk-table-selection');
+      });
+    });
+
+    if (shouldScan) scheduleEnhance();
   });
 
   function init() {
@@ -235,7 +272,7 @@
   }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
+    document.addEventListener('DOMContentLoaded', init, { once: true });
   } else {
     init();
   }
