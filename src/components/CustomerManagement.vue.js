@@ -455,13 +455,17 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['deactivate-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['delete-customer-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['delete-customer-btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['modal-header']} */ ;
 /** @type {__VLS_StyleScopedClasses['form-group']} */ ;
 /** @type {__VLS_StyleScopedClasses['save-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['cancel-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['form-row']} */ ;
 /** @type {__VLS_StyleScopedClasses['customer-actions']} */ ;
 /** @type {__VLS_StyleScopedClasses['modal-content']} */ ;
+/** @type {__VLS_StyleScopedClasses['customer-info-section']} */ ;
 /** @type {__VLS_StyleScopedClasses['info-item']} */ ;
+/** @type {__VLS_StyleScopedClasses['info-item']} */ ;
+/** @type {__VLS_StyleScopedClasses['transactions-section']} */ ;
 /** @type {__VLS_StyleScopedClasses['transactions-table']} */ ;
 /** @type {__VLS_StyleScopedClasses['transactions-table']} */ ;
 /** @type {__VLS_StyleScopedClasses['transactions-table']} */ ;
@@ -593,6 +597,7 @@ for (const [customer] of __VLS_getVForSourceType((__VLS_ctx.filteredCustomers)))
                 __VLS_ctx.showCustomerModal(customer);
             } },
         ...{ class: "edit-btn" },
+        title: "ویرایش",
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.i, __VLS_intrinsicElements.i)({
         ...{ class: "fas fa-edit" },
@@ -602,6 +607,7 @@ for (const [customer] of __VLS_getVForSourceType((__VLS_ctx.filteredCustomers)))
                 __VLS_ctx.toggleCustomerStatus(customer);
             } },
         ...{ class: (customer.IsActive ? 'deactivate-btn' : 'activate-btn') },
+        title: (customer.IsActive ? 'غیرفعال کردن' : 'فعال کردن'),
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.i, __VLS_intrinsicElements.i)({
         ...{ class: (customer.IsActive ? 'fas fa-ban' : 'fas fa-check') },
@@ -611,6 +617,7 @@ for (const [customer] of __VLS_getVForSourceType((__VLS_ctx.filteredCustomers)))
                 __VLS_ctx.showCustomerDetails(customer);
             } },
         ...{ class: "view-details-btn" },
+        title: "مشاهده سابقه",
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.i, __VLS_intrinsicElements.i)({
         ...{ class: "fas fa-eye" },

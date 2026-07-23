@@ -47,14 +47,16 @@
                         <td>{{ formatPrice(customer.CreditBalance || 0) }}</td>
                         <td>
                             <div class="customer-actions">
-                                <button @click="showCustomerModal(customer)" class="edit-btn">
+                                <button @click="showCustomerModal(customer)" class="edit-btn" title="ویرایش">
                                     <i class="fas fa-edit"></i>
                                 </button>
                                 <button @click="toggleCustomerStatus(customer)"
-                                    :class="customer.IsActive ? 'deactivate-btn' : 'activate-btn'">
+                                    :class="customer.IsActive ? 'deactivate-btn' : 'activate-btn'"
+                                    :title="customer.IsActive ? 'غیرفعال کردن' : 'فعال کردن'">
                                     <i :class="customer.IsActive ? 'fas fa-ban' : 'fas fa-check'"></i>
                                 </button>
-                                <button @click="showCustomerDetails(customer)" class="view-details-btn">
+                                <button @click="showCustomerDetails(customer)" class="view-details-btn"
+                                    title="مشاهده سابقه">
                                     <i class="fas fa-eye"></i>
                                 </button>
                                 <button @click="deleteCustomer(customer)" class="delete-customer-btn"
@@ -843,6 +845,10 @@ function handleFilterInputFocus(columnKey) {
     align-items: center;
 }
 
+.modal-header h3 {
+    color: black;
+}
+
 .modal-close-btn {
     background: none;
     border: none;
@@ -870,13 +876,15 @@ function handleFilterInputFocus(columnKey) {
 .form-group label {
     margin-bottom: 5px;
     font-weight: bold;
+    color: #252525;
 }
 
 .form-input,
 .form-select {
-    border: 1px solid #ddd;
+    border: 1px solid #4d2ff8 !important;
     border-radius: 4px;
     font-family: 'Vazirmatn', sans-serif;
+    color: #000000 !important;
 }
 
 .modal-actions {
@@ -932,6 +940,10 @@ function handleFilterInputFocus(columnKey) {
     margin-bottom: 20px;
 }
 
+.customer-info-section h4 {
+    color: #353535;
+}
+
 .info-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -952,8 +964,17 @@ function handleFilterInputFocus(columnKey) {
     color: #555;
 }
 
+.info-item span {
+    color: #555;
+    width: 80%;
+}
+
 .transactions-section {
     margin-top: 20px;
+}
+
+.transactions-section h4 {
+    color: #353535;
 }
 
 .transactions-table {
@@ -1033,5 +1054,9 @@ function handleFilterInputFocus(columnKey) {
     .transactions-table td {
         padding: 6px 8px;
     }
+}
+
+tr {
+    color: #353535;
 }
 </style>

@@ -630,7 +630,7 @@ if (__VLS_ctx.bootstrapped && __VLS_ctx.viewModeCode !== 3 && __VLS_ctx.license 
         const __VLS_35 = __VLS_34({}, ...__VLS_functionalComponentArgsRest(__VLS_34));
     }
 }
-if (__VLS_ctx.bootstrapped && __VLS_ctx.viewModeCode !== 3 && __VLS_ctx.license && __VLS_ctx.mobileAdminShortcutMode && !__VLS_ctx.showAdminPanel) {
+if (__VLS_ctx.bootstrapped && __VLS_ctx.viewModeCode !== 3 && __VLS_ctx.mobileAdminShortcutMode && !__VLS_ctx.showAdminPanel) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ onClick: (__VLS_ctx.handleLogoClick) },
         ...{ class: "mobile-admin-shortcut" },
@@ -644,6 +644,7 @@ if (__VLS_ctx.bootstrapped && __VLS_ctx.viewModeCode !== 3 && __VLS_ctx.license 
 }
 if (__VLS_ctx.bootstrapped && __VLS_ctx.viewModeCode !== 3 && !__VLS_ctx.license) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ onClick: (__VLS_ctx.handleLogoClick) },
         id: "error_license",
         ...{ class: "error_license" },
     });

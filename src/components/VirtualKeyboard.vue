@@ -230,7 +230,7 @@ function handleKeyPress(key, event) {
     background: #f0f0f0;
     padding: 10px;
     border-top: 1px solid #ccc;
-    z-index: 1000;
+    z-index: 2501;
 }
 
 .keyboard-header {

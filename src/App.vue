@@ -56,14 +56,15 @@
     <Loader v-if="isLoading" />
   </div>
 
-  <div v-if="bootstrapped && viewModeCode !== 3 && license && mobileAdminShortcutMode && !showAdminPanel"
+  <div v-if="bootstrapped && viewModeCode !== 3 && mobileAdminShortcutMode && !showAdminPanel"
     class="mobile-admin-shortcut" @click.stop="handleLogoClick">
     <img src="../src/assets/images/Logo-sm.png" alt="pargas Logo">
     <label>نرم افزار سفارشگیر پرگاس</label>
     <small>برای ورود به مدیریت، ۵ بار پشت سر هم لمس کنید</small>
   </div>
 
-  <div v-if="bootstrapped && viewModeCode !== 3 && !license" id="error_license" class="error_license">
+  <div v-if="bootstrapped && viewModeCode !== 3 && !license" id="error_license" class="error_license"
+    @click.stop="handleLogoClick">
     <label>مجوزی برای شما یافت نشد، لطفا باز بودن سرویس یا داشتن لایسنس را بررسی بفرمائید</label>
   </div>
 

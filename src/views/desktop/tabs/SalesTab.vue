@@ -1742,7 +1742,7 @@ function currentTime() {
               <span v-if="table.IsOccupied" class="table-card-money">{{ formatMoney(money(table.Payable)) }} {{
                 currencyLabel }}</span>
               <span v-if="table.IsOccupied" class="table-card-time">{{ formatOccupiedDuration(table.OccupiedMinutes)
-              }}</span>
+                }}</span>
               <b>{{ table.TableTitle }}</b>
               <small>{{ table.TableCode }}</small>
             </button>
@@ -2236,7 +2236,7 @@ function currentTime() {
 
 .qty-control {
   display: grid;
-  grid-template-columns: 32px 1fr 32px;
+  grid-template-columns: 55px 1fr 55px;
   align-items: center;
   gap: 5px;
 }
@@ -2252,7 +2252,7 @@ function currentTime() {
 
 .qty-control span,
 .row-price {
-  text-align: center;
+  text-align: end;
   font-weight: 900;
   padding: 0;
 }
@@ -2527,7 +2527,7 @@ function currentTime() {
 }
 
 .topping-qty {
-  grid-template-columns: 32px 1fr 32px;
+  grid-template-columns: 55px 1fr 55px;
 }
 
 .checkout-section {

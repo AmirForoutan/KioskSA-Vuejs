@@ -61,25 +61,25 @@ const localProduct = ref({
     GoodsGroupId: 0,
     StockInventory: 0,
     IsActive: true,
-    Saturday: false,
+    Saturday: true,
     FromTimeSaturday: '00:00',
     ToTimeSaturday: '23:59',
-    Sunday: false,
+    Sunday: true,
     FromTimeSunday: '00:00',
     ToTimeSunday: '23:59',
-    Monday: false,
+    Monday: true,
     FromTimeMonday: '00:00',
     ToTimeMonday: '23:59',
-    Tuesday: false,
+    Tuesday: true,
     FromTimeTuesday: '00:00',
     ToTimeTuesday: '23:59',
-    Wednesday: false,
+    Wednesday: true,
     FromTimeWednesday: '00:00',
     ToTimeWednesday: '23:59',
-    Thursday: false,
+    Thursday: true,
     FromTimeThursday: '00:00',
     ToTimeThursday: '23:59',
-    Friday: false,
+    Friday: true,
     FromTimeFriday: '00:00',
     ToTimeFriday: '23:59'
 });
@@ -122,7 +122,8 @@ function loadDatePicker() {
                     time: true,
                     hasSecond: false,
                     showEmptyBtn: false,
-                    initTime: '00:00'
+                    initTime: '00:00',
+                    zIndex: 2502
                 });
             }
             else if (this.hasAttribute("data-jdp-option-2")) {
@@ -131,7 +132,8 @@ function loadDatePicker() {
                     time: true,
                     hasSecond: false,
                     showEmptyBtn: false,
-                    initTime: '23:59'
+                    initTime: '23:59',
+                    zIndex: 2502
                 });
             }
             jalaliDatepicker.show(this);

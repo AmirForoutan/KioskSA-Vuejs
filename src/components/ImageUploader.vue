@@ -14,14 +14,7 @@
     </div>
 
     <div class="upload-controls">
-      <input
-        :id="inputId"
-        ref="fileInput"
-        type="file"
-        accept="image/*"
-        class="file-input"
-        @change="handleFileChange"
-      />
+      <input :id="inputId" ref="fileInput" type="file" accept="image/*" class="file-input" @change="handleFileChange" />
       <label :for="inputId" class="upload-btn">
         {{ uploading ? "در حال آپلود..." : "انتخاب تصویر" }}
       </label>
@@ -266,10 +259,11 @@ function resetInput() {
   padding: 7px 12px;
   border: 1px solid rgba(20, 184, 166, 0.34);
   background: rgba(20, 184, 166, 0.16);
-  color: #eef2ff;
+  color: #000000;
   cursor: pointer;
   font-size: 13px;
   font-weight: 800;
+  align-content: center;
 }
 
 .delete-btn {
