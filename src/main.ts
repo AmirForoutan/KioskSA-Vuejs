@@ -3,14 +3,21 @@ import App from './App.vue'
 import "./style.css"
 import { createPinia } from "pinia"
 import router from './router'
-import { initConfig } from './utilities' 
+import { initConfig } from './utilities'
 import { registerSW } from 'virtual:pwa-register'
 import Toast, { PluginOptions } from "vue-toastification";
 import "vue-toastification/dist/index.css";
 import { seedDesktopUser } from './components/stores/auth.store'
-// @ts-ignore - jalalidatepicker package does not ship complete TypeScript declarations in all versions.
-import jalaliDatepicker from "@majidh1/jalalidatepicker";
+import "@majidh1/jalalidatepicker";
 import "@majidh1/jalalidatepicker/dist/jalalidatepicker.min.css";
+
+declare global {
+  interface Window {
+    jalaliDatepicker?: {
+      startWatch: (options?: Record<string, unknown>) => void;
+    };
+  }
+}
 
 registerSW({
   onOfflineReady() {
@@ -20,7 +27,7 @@ registerSW({
 
 function startPersianDatePicker() {
   try {
-    jalaliDatepicker.startWatch({
+    window.jalaliDatepicker?.startWatch({
       selector: "[data-jdp]",
       time: false,
       autoHide: true,
@@ -36,10 +43,10 @@ async function bootstrap() {
   // 1. ابتدا تنظیمات را بارگذاری می‌کنیم
   await initConfig()
   seedDesktopUser()
-  
+
   // 2. سپس نمونه برنامه Vue را ایجاد می‌کنیم
   const app = createApp(App)
-  
+
   const options: PluginOptions = {
     // You can set your default options here
   };
@@ -59,7 +66,7 @@ async function bootstrap() {
     }
     setTimeout(startPersianDatePicker, 100)
   })
-  
+
   // 5. نصب برنامه
   app.mount("#app")
   setTimeout(startPersianDatePicker, 250)
