@@ -4,7 +4,9 @@
 
   const originalFetch = window.fetch.bind(window);
   let cachedBootstrap = null;
+  let cachedAnalysis = null;
   let cachedAt = 0;
+  let cachedAnalysisAt = 0;
   const cacheMs = 15000;
 
   function isTargetUrl(input, suffix) {
@@ -67,6 +69,20 @@
     return cachedBootstrap;
   }
 
+  async function getAnalysis(serviceUrl) {
+    const now = Date.now();
+    if (cachedAnalysis && now - cachedAnalysisAt < cacheMs) return cachedAnalysis;
+
+    const response = await originalFetch(buildAnalysisBaseFromServiceUrl(serviceUrl) + '/bootstrap', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    cachedAnalysis = await response.json();
+    cachedAnalysisAt = now;
+    return cachedAnalysis;
+  }
+
   function shouldBlockOnStock(bootstrap) {
     const data = bootstrap && bootstrap.result ? bootstrap.result : {};
     const settings = data.settings || data.Settings || {};
@@ -104,6 +120,43 @@
       try { return await input.clone().text(); } catch (_error) { return ''; }
     }
     return '';
+  }
+
+  function shouldFilterKioskGoods() {
+    const path = (window.location.pathname || '').toLowerCase();
+    return !path.includes('/desktop') && !path.includes('/admin');
+  }
+
+  function filterGoodsPayload(payload, usageMap) {
+    function isVisible(item) {
+      const usage = usageMap.get(Number(item.GoodsId || item.goodsId || 0));
+      return !usage || usage.IsKioskVisible !== false;
+    }
+
+    if (Array.isArray(payload)) return payload.filter(isVisible);
+    if (payload && Array.isArray(payload.goods)) return { ...payload, goods: payload.goods.filter(isVisible) };
+    if (payload && Array.isArray(payload.Goods)) return { ...payload, Goods: payload.Goods.filter(isVisible) };
+    return payload;
+  }
+
+  async function handleGetGoods(input, init) {
+    const response = await originalFetch(input, init);
+    if (!shouldFilterKioskGoods()) return response;
+
+    try {
+      const serviceUrl = typeof input === 'string' ? input : input.url;
+      const analysis = await getAnalysis(serviceUrl);
+      const goodsUsage = Array.isArray(analysis.goods) ? analysis.goods : [];
+      const usageMap = new Map();
+      goodsUsage.forEach(function (item) {
+        usageMap.set(Number(item.GoodsId), item);
+      });
+
+      const payload = await response.clone().json();
+      return jsonResponse(filterGoodsPayload(payload, usageMap), response.status);
+    } catch (_error) {
+      return response;
+    }
   }
 
   async function handleHaveStock(input, init) {
@@ -166,6 +219,7 @@
   window.fetch = function (input, init) {
     if (isTargetUrl(input, '/havestock')) return handleHaveStock(input, init);
     if (isTargetUrl(input, '/checkstock')) return handleCheckStock(input, init);
+    if (isTargetUrl(input, '/getgoods')) return handleGetGoods(input, init);
     return originalFetch(input, init);
   };
 })();
