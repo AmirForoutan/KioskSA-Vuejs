@@ -18,6 +18,36 @@ async function buildServiceAddress(offset: number, path: string) {
   }
 }
 
+function getPersianYear(date: Date) {
+  const parts = new Intl.DateTimeFormat("fa-IR-u-nu-latn", { year: "numeric" }).formatToParts(date);
+  return Number(parts.find((part) => part.type === "year")?.value || 0);
+}
+
+function normalizeFiscalYear(row: FiscalYear): FiscalYear {
+  const titleYear = Number(String(row.Title || "").match(/\d{4}/)?.[0] || 0);
+  const startYear = Number(String(row.StartDate || "").split("/")[0] || 0);
+  const yearCandidate = titleYear || startYear;
+
+  if (!yearCandidate || yearCandidate < 1700) return row;
+
+  const persianYear = getPersianYear(new Date(yearCandidate, 6, 1));
+  if (!persianYear) return row;
+
+  return {
+    ...row,
+    Title: `سال مالی ${persianYear}`,
+    StartDate: `${persianYear}/01/01`,
+    EndDate: `${persianYear}/12/29`,
+  };
+}
+
+function normalizeInventoryBootstrap(data: InventoryBootstrap): InventoryBootstrap {
+  return {
+    ...data,
+    fiscalYears: (data.fiscalYears || []).map(normalizeFiscalYear),
+  };
+}
+
 async function getInventoryApiAddress() {
   return buildServiceAddress(1, "/inventory");
 }
@@ -202,8 +232,9 @@ export type InventoryChangeLogRow = {
   FiscalYearId?: number;
 };
 
-export function loadInventoryBootstrap() {
-  return postInventory<InventoryBootstrap>("bootstrap");
+export async function loadInventoryBootstrap() {
+  const data = await postInventory<InventoryBootstrap>("bootstrap");
+  return normalizeInventoryBootstrap(data);
 }
 
 export function saveInventorySettings(data: InventorySettings) {
