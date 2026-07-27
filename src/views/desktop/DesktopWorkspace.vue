@@ -13,15 +13,52 @@ import { INVOICE_EDIT_REQUEST_EVENT } from "../../components/stores/invoice-edit
 import { TABLE_ORDER_REQUEST_EVENT } from "../../components/stores/table-order.store";
 import { logoutDesktop } from "../../services/desktopApi";
 import { logoutDesktopUser, useAuthState } from "../../components/stores/auth.store";
+import { GetApiAddress } from "../../utilities";
 
 type Tab = { key: string; title: string; icon?: string };
+
+const hasStockLicense = ref(false);
 
 function canOpenDiscounts() {
     return can("view.discounts") || can("manage.discounts") || can("manage.discountCards") || can("sales.discount.percent") || can("sales.discount.amount");
 }
 
-function canOpenInventory() {
+function canOpenInventoryByPermission() {
     return can("view.inventory") || can("manage.inventory") || can("view.reports") || can("view.settings");
+}
+
+async function getInventoryBootstrapAddress() {
+    const serviceAdd = await GetApiAddress();
+    try {
+        const url = new URL(serviceAdd);
+        const currentPort = Number(url.port || (url.protocol === "https:" ? 443 : 80));
+        url.port = String(currentPort + 1);
+        url.pathname = "/inventory/bootstrap";
+        url.search = "";
+        url.hash = "";
+        return url.toString();
+    } catch {
+        return String(serviceAdd).replace(/:(\d+)(\/?$)/, (_match, port) => `:${Number(port) + 1}/inventory/bootstrap`);
+    }
+}
+
+async function checkInventoryLicense() {
+    try {
+        const response = await fetch(await getInventoryBootstrapAddress(), {
+            method: "POST",
+            headers: { "Content-Type": "application/json; charset=utf-8" },
+            body: JSON.stringify({}),
+        });
+        const result = await response.json();
+        hasStockLicense.value = result?.status === true && result?.haveStockLicense === true;
+    } catch {
+        hasStockLicense.value = false;
+    }
+    ensureActiveTabIsAvailable();
+}
+
+function canOpenInventory() {
+    return canOpenInventoryByPermission() && hasStockLicense.value;
 }
 
 const availableTabs = computed<Tab[]>(() => {
@@ -39,6 +76,12 @@ const availableTabs = computed<Tab[]>(() => {
 
 const activeKey = ref<string>(availableTabs.value[0].key);
 
+function ensureActiveTabIsAvailable() {
+    if (!availableTabs.value.some((tab) => tab.key === activeKey.value)) {
+        activeKey.value = availableTabs.value[0]?.key || "sales";
+    }
+}
+
 const activeComponent = computed(() => {
     switch (activeKey.value) {
         case "base":
@@ -46,9 +89,9 @@ const activeComponent = computed(() => {
         case "discounts":
             return DiscountsTab;
         case "inventory":
-            return InventoryTab;
+            return canOpenInventory() ? InventoryTab : SalesTab;
         case "inventoryAnalysis":
-            return InventoryAnalysisTab;
+            return canOpenInventory() ? InventoryAnalysisTab : SalesTab;
         case "reports":
             return ReportsTab;
         case "settings":
@@ -67,6 +110,7 @@ const auth = useAuthState();
 onMounted(() => {
     window.addEventListener(INVOICE_EDIT_REQUEST_EVENT, openSalesForInvoiceEdit);
     window.addEventListener(TABLE_ORDER_REQUEST_EVENT, openSalesForTableOrder);
+    void checkInventoryLicense();
 });
 
 onUnmounted(() => {
