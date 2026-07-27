@@ -1,0 +1,77 @@
+.inventory-tab .inventory-supplier-search-enhancer {
+  position: relative;
+  min-width: 220px;
+  z-index: 25;
+}
+
+.inventory-tab .inventory-supplier-search-input {
+  padding-left: 38px !important;
+}
+
+.inventory-tab .inventory-supplier-search-clear {
+  position: absolute;
+  top: 7px;
+  left: 7px;
+  width: 28px !important;
+  height: 28px !important;
+  min-height: 28px !important;
+  padding: 0 !important;
+  border-radius: 999px !important;
+  line-height: 1 !important;
+  z-index: 2;
+}
+
+.inventory-tab .inventory-supplier-search-helper {
+  margin-top: 5px;
+  min-height: 18px;
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.inventory-tab .inventory-supplier-search-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  left: 0;
+  max-height: 280px;
+  overflow: auto;
+  padding: 8px;
+  border-radius: 16px;
+  background: rgba(15, 23, 42, 0.98);
+  border: 1px solid rgba(45, 212, 191, 0.3);
+  box-shadow: 0 22px 48px rgba(2, 6, 23, 0.45);
+  z-index: 80;
+}
+
+.inventory-tab .inventory-supplier-search-result {
+  width: 100%;
+  display: grid;
+  gap: 4px;
+  text-align: right;
+  margin: 0 0 6px !important;
+  border-radius: 12px !important;
+  background: rgba(255, 255, 255, 0.045) !important;
+  border-color: rgba(148, 163, 184, 0.14) !important;
+}
+
+.inventory-tab .inventory-supplier-search-result:hover {
+  background: rgba(20, 184, 166, 0.14) !important;
+}
+
+.inventory-tab .inventory-supplier-search-result strong {
+  color: #f8fafc;
+  font-size: 13px;
+}
+
+.inventory-tab .inventory-supplier-search-result small {
+  color: #99f6e4;
+  font-size: 11px;
+}
+
+.inventory-tab .inventory-supplier-search-empty {
+  padding: 10px;
+  border-radius: 12px;
+  color: #fde68a;
+  text-align: center;
+  background: rgba(245, 158, 11, 0.1);
+}
