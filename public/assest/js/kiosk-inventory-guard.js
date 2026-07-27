@@ -12,20 +12,28 @@
     return typeof url === 'string' && url.toLowerCase().replace(/\/+$/, '').endsWith(suffix);
   }
 
-  function buildInventoryBaseFromServiceUrl(serviceUrl) {
+  function buildServiceBaseFromUrl(serviceUrl, offset, path) {
     try {
       const url = new URL(serviceUrl, window.location.href);
       const currentPort = Number(url.port || (url.protocol === 'https:' ? 443 : 80));
-      url.port = String(currentPort + 1);
-      url.pathname = '/inventory';
+      url.port = String(currentPort + offset);
+      url.pathname = path;
       url.search = '';
       url.hash = '';
       return url.toString().replace(/\/$/, '');
     } catch (_error) {
       return String(serviceUrl).replace(/:(\d+)(\/?$)/, function (_match, port) {
-        return ':' + (Number(port) + 1) + '/inventory';
+        return ':' + (Number(port) + offset) + path;
       });
     }
+  }
+
+  function buildInventoryBaseFromServiceUrl(serviceUrl) {
+    return buildServiceBaseFromUrl(serviceUrl, 1, '/inventory');
+  }
+
+  function buildAnalysisBaseFromServiceUrl(serviceUrl) {
+    return buildServiceBaseFromUrl(serviceUrl, 2, '/inventory-analysis');
   }
 
   function jsonResponse(payload, status) {
@@ -42,6 +50,7 @@
     if (cachedBootstrap && now - cachedAt < cacheMs) return cachedBootstrap;
 
     const inventoryBase = buildInventoryBaseFromServiceUrl(serviceUrl);
+    const analysisBase = buildAnalysisBaseFromServiceUrl(serviceUrl);
     const response = await originalFetch(inventoryBase + '/bootstrap', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -51,6 +60,7 @@
     const result = await response.json();
     cachedBootstrap = {
       inventoryBase: inventoryBase,
+      analysisBase: analysisBase,
       result: result || {},
     };
     cachedAt = now;
@@ -67,13 +77,6 @@
     const data = bootstrap && bootstrap.result ? bootstrap.result : {};
     const settings = data.settings || data.Settings || {};
     return Boolean(data.haveStockLicense) && settings.IsWarehouseEnabled === true && settings.AllowNegativeStockSale === true;
-  }
-
-  function getActiveFiscalYearId(bootstrap) {
-    const years = bootstrap && bootstrap.result && Array.isArray(bootstrap.result.fiscalYears)
-      ? bootstrap.result.fiscalYears
-      : [];
-    return years[0] && years[0].FiscalYearId ? years[0].FiscalYearId : 0;
   }
 
   function normalizeItemsFromBody(bodyText) {
@@ -103,21 +106,6 @@
     return '';
   }
 
-  async function loadStockRows(bootstrap) {
-    const response = await originalFetch(bootstrap.inventoryBase + '/report/stock', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        FiscalYearId: getActiveFiscalYearId(bootstrap),
-        WarehouseId: 0,
-        FromDate: '',
-        ToDate: '',
-      }),
-    });
-    const result = await response.json();
-    return result && Array.isArray(result.rows) ? result.rows : [];
-  }
-
   async function handleHaveStock(input, init) {
     const serviceUrl = typeof input === 'string' ? input : input.url;
     try {
@@ -141,30 +129,35 @@
     const serviceUrl = typeof input === 'string' ? input : input.url;
     try {
       const bootstrap = await getBootstrap(serviceUrl);
-      if (!shouldBlockOnStock(bootstrap)) {
+      const requestedItems = normalizeItemsFromBody(await readRequestBody(input, init));
+      const response = await originalFetch(bootstrap.analysisBase + '/check-invoice-stock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ Items: requestedItems }),
+      });
+      const result = await response.json();
+      const shortages = Array.isArray(result.shortages) ? result.shortages : [];
+
+      if (!result.shouldCheck) {
         return jsonResponse({ status: true, data: [] });
       }
 
-      const requestedItems = normalizeItemsFromBody(await readRequestBody(input, init));
-      const stockRows = await loadStockRows(bootstrap);
-      const stockMap = new Map();
-
-      stockRows.forEach(function (row) {
-        stockMap.set(Number(row.GoodsId), row);
-      });
-
-      const data = requestedItems.map(function (item) {
-        const row = stockMap.get(Number(item.GoodsId));
-        const currentStock = Number(row && row.CurrentQuantity ? row.CurrentQuantity : 0);
+      const data = shortages.map(function (item) {
         return {
           GoodsId: item.GoodsId,
-          GoodsName: row && row.GoodsName ? row.GoodsName : 'کالا',
-          CurrentStock: currentStock,
-          HaveInventory: currentStock >= Number(item.Quantity || 0),
+          GoodsName: item.GoodsName,
+          CurrentStock: item.CurrentQuantity,
+          RequiredQuantity: item.RequiredQuantity,
+          ShortageQuantity: item.ShortageQuantity,
+          HaveInventory: false,
         };
       });
 
-      return jsonResponse({ status: true, data: data });
+      if (result.canSubmit) {
+        return jsonResponse({ status: true, warningOnly: result.warningOnly === true, data: data, message: result.message });
+      }
+
+      return jsonResponse({ status: true, data: data, message: result.message });
     } catch (_error) {
       return originalFetch(input, init);
     }
