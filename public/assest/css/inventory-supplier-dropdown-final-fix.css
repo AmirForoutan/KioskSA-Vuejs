@@ -1,0 +1,44 @@
+.inventory-tab .inventory-supplier-search-enhancer {
+  position: relative !important;
+  z-index: 20000 !important;
+  isolation: isolate !important;
+}
+
+.inventory-tab .inventory-supplier-search-enhancer:focus-within {
+  z-index: 30000 !important;
+}
+
+.inventory-tab .inventory-supplier-search-dropdown {
+  position: fixed !important;
+  top: 150px !important;
+  right: max(24px, 6vw) !important;
+  left: max(24px, 6vw) !important;
+  max-width: 760px !important;
+  margin: 0 auto !important;
+  max-height: min(420px, 58vh) !important;
+  z-index: 2147483000 !important;
+  overflow: auto !important;
+  background: rgba(15, 23, 42, 0.99) !important;
+  border: 1px solid rgba(45, 212, 191, 0.55) !important;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.62), 0 0 0 9999px rgba(2, 6, 23, 0.26) !important;
+}
+
+.inventory-tab .inventory-supplier-search-result {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+
+.inventory-tab .inv-card,
+.inventory-tab .inv-form-grid,
+.inventory-tab .inv-form-row {
+  overflow: visible !important;
+}
+
+@media (max-width: 700px) {
+  .inventory-tab .inventory-supplier-search-dropdown {
+    top: 96px !important;
+    right: 12px !important;
+    left: 12px !important;
+    max-height: 65vh !important;
+  }
+}
