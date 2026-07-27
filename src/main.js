@@ -8,8 +8,7 @@ import { registerSW } from 'virtual:pwa-register';
 import Toast from "vue-toastification";
 import "vue-toastification/dist/index.css";
 import { seedDesktopUser } from './components/stores/auth.store';
-// @ts-ignore - jalalidatepicker package does not ship complete TypeScript declarations in all versions.
-import jalaliDatepicker from "@majidh1/jalalidatepicker";
+import "@majidh1/jalalidatepicker";
 import "@majidh1/jalalidatepicker/dist/jalalidatepicker.min.css";
 registerSW({
     onOfflineReady() {
@@ -18,7 +17,7 @@ registerSW({
 });
 function startPersianDatePicker() {
     try {
-        jalaliDatepicker.startWatch({
+        window.jalaliDatepicker?.startWatch({
             selector: "[data-jdp]",
             time: false,
             autoHide: true,
