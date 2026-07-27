@@ -25,9 +25,31 @@ type StockTakingRow = InventoryStockReportRow & {
   DifferenceQuantity: number;
 };
 
+type Supplier = {
+  SupplierId: number;
+  SupplierCode: string;
+  SupplierTitle: string;
+  Phone?: string;
+  Address?: string;
+  Description?: string;
+  IsActive: boolean;
+};
+
+type SupplierLedgerRow = {
+  SupplierId: number;
+  SupplierTitle: string;
+  DocumentNumber: string;
+  DocumentDate: string;
+  PurchaseAmount: number;
+  PaidAmount: number;
+  BalanceAmount: number;
+  StatusTitle: string;
+  Description?: string;
+};
+
 const loading = ref(false);
 const message = ref("");
-const activeTab = ref<"settings" | "documents" | "reports" | "kardex" | "stocktaking" | "history">("settings");
+const activeTab = ref<"settings" | "documents" | "reports" | "kardex" | "stocktaking" | "suppliers" | "history">("settings");
 const haveStockLicense = ref(false);
 const warehouses = ref<Warehouse[]>([]);
 const fiscalYears = ref<FiscalYear[]>([]);
@@ -39,6 +61,8 @@ const kardexRows = ref<InventoryKardexRow[]>([]);
 const changeLogRows = ref<InventoryChangeLogRow[]>([]);
 const stockTakingRows = ref<StockTakingRow[]>([]);
 const goodsSearch = ref("");
+const suppliers = ref<Supplier[]>(loadSuppliersFromStorage());
+const supplierLedger = ref<SupplierLedgerRow[]>(loadSupplierLedgerFromStorage());
 
 const settings = reactive<InventorySettings>({
   IsWarehouseEnabled: true,
@@ -60,6 +84,16 @@ const warehouseForm = reactive<Partial<Warehouse>>({
   Description: "",
 });
 
+const supplierForm = reactive<Partial<Supplier>>({
+  SupplierId: 0,
+  SupplierCode: "",
+  SupplierTitle: "",
+  Phone: "",
+  Address: "",
+  Description: "",
+  IsActive: true,
+});
+
 const documentForm = reactive({
   DocumentId: 0,
   DocumentType: 1,
@@ -67,7 +101,11 @@ const documentForm = reactive({
   DocumentDate: todayFa(),
   FiscalYearId: 0,
   WarehouseId: 0,
+  PersonId: 0,
   PersonTitle: "",
+  PurchaseAmount: 0,
+  PaidAmount: 0,
+  PaymentDescription: "",
   Description: "",
 });
 
@@ -83,6 +121,11 @@ const reportFilter = reactive({
   GoodsId: 0,
 });
 
+const historyFilter = reactive({
+  FromDate: "",
+  ToDate: "",
+});
+
 const filteredGoods = computed(() => {
   const q = goodsSearch.value.trim().toLowerCase();
   if (!q) return goods.value;
@@ -92,6 +135,20 @@ const filteredGoods = computed(() => {
 const selectedFiscalYear = computed(() => fiscalYears.value.find((f) => f.FiscalYearId === Number(reportFilter.FiscalYearId)) || fiscalYears.value[0]);
 const selectedWarehouseTitle = computed(() => warehouses.value.find((w) => w.WarehouseId === Number(reportFilter.WarehouseId))?.WarehouseTitle || "همه انبارها");
 const defaultWarehouseId = computed(() => warehouses.value.find((w) => w.IsDefault)?.WarehouseId || warehouses.value[0]?.WarehouseId || 0);
+
+const supplierBalanceRows = computed(() => suppliers.value.map((supplier) => {
+  const rows = supplierLedger.value.filter((row) => row.SupplierId === supplier.SupplierId);
+  const purchaseAmount = rows.reduce((sum, row) => sum + Number(row.PurchaseAmount || 0), 0);
+  const paidAmount = rows.reduce((sum, row) => sum + Number(row.PaidAmount || 0), 0);
+  return {
+    ...supplier,
+    PurchaseAmount: purchaseAmount,
+    PaidAmount: paidAmount,
+    BalanceAmount: purchaseAmount - paidAmount,
+  };
+}));
+
+const filteredChangeLogRows = computed(() => filterRowsByDate(changeLogRows.value, (row) => String(row.ChangedAt || "").split("-")[0], historyFilter.FromDate, historyFilter.ToDate));
 
 onMounted(loadAll);
 
@@ -104,6 +161,42 @@ function showMessage(text: string) {
   window.setTimeout(() => {
     if (message.value === text) message.value = "";
   }, 3500);
+}
+
+function compareDateText(value: string, fromDate?: string, toDate?: string) {
+  const date = String(value || "").trim();
+  if (!date) return true;
+  if (fromDate && date < fromDate) return false;
+  if (toDate && date > toDate) return false;
+  return true;
+}
+
+function filterRowsByDate<T>(rows: T[], dateSelector: (row: T) => string, fromDate?: string, toDate?: string) {
+  return rows.filter((row) => compareDateText(dateSelector(row), fromDate, toDate));
+}
+
+function loadSuppliersFromStorage(): Supplier[] {
+  try {
+    return JSON.parse(localStorage.getItem("pargas_inventory_suppliers") || "[]");
+  } catch {
+    return [];
+  }
+}
+
+function saveSuppliersToStorage() {
+  localStorage.setItem("pargas_inventory_suppliers", JSON.stringify(suppliers.value));
+}
+
+function loadSupplierLedgerFromStorage(): SupplierLedgerRow[] {
+  try {
+    return JSON.parse(localStorage.getItem("pargas_inventory_supplier_ledger") || "[]");
+  } catch {
+    return [];
+  }
+}
+
+function saveSupplierLedgerToStorage() {
+  localStorage.setItem("pargas_inventory_supplier_ledger", JSON.stringify(supplierLedger.value));
 }
 
 async function loadAll() {
@@ -152,6 +245,72 @@ function editWarehouse(row: Warehouse) {
   Object.assign(warehouseForm, row);
 }
 
+function submitSupplier() {
+  if (!supplierForm.SupplierTitle?.trim()) {
+    showMessage("عنوان تأمین‌کننده الزامی است");
+    return;
+  }
+
+  if (Number(supplierForm.SupplierId) > 0) {
+    const index = suppliers.value.findIndex((item) => item.SupplierId === Number(supplierForm.SupplierId));
+    if (index >= 0) suppliers.value[index] = { ...(supplierForm as Supplier) };
+  } else {
+    const nextId = Math.max(0, ...suppliers.value.map((item) => item.SupplierId)) + 1;
+    suppliers.value.push({
+      SupplierId: nextId,
+      SupplierCode: supplierForm.SupplierCode?.trim() || `SUP-${nextId}`,
+      SupplierTitle: supplierForm.SupplierTitle.trim(),
+      Phone: supplierForm.Phone || "",
+      Address: supplierForm.Address || "",
+      Description: supplierForm.Description || "",
+      IsActive: supplierForm.IsActive !== false,
+    });
+  }
+
+  saveSuppliersToStorage();
+  Object.assign(supplierForm, { SupplierId: 0, SupplierCode: "", SupplierTitle: "", Phone: "", Address: "", Description: "", IsActive: true });
+  showMessage("تأمین‌کننده ذخیره شد");
+}
+
+function editSupplier(row: Supplier) {
+  Object.assign(supplierForm, row);
+  activeTab.value = "suppliers";
+}
+
+function onSupplierChange() {
+  const supplier = suppliers.value.find((item) => item.SupplierId === Number(documentForm.PersonId));
+  documentForm.PersonTitle = supplier?.SupplierTitle || "";
+}
+
+function getPaymentStatusTitle(purchaseAmount: number, paidAmount: number) {
+  if (paidAmount === purchaseAmount) return "تسویه شده";
+  if (paidAmount < purchaseAmount) return "بدهکار به تأمین‌کننده";
+  return "پرداخت بیشتر / طلبکار";
+}
+
+function recordSupplierLedger(documentNumber: string) {
+  if (Number(documentForm.DocumentType) !== 3 || !Number(documentForm.PersonId)) return;
+  const supplier = suppliers.value.find((item) => item.SupplierId === Number(documentForm.PersonId));
+  if (!supplier) return;
+
+  const purchaseAmount = Number(documentForm.PurchaseAmount || 0);
+  const paidAmount = Number(documentForm.PaidAmount || 0);
+  if (purchaseAmount <= 0 && paidAmount <= 0) return;
+
+  supplierLedger.value.unshift({
+    SupplierId: supplier.SupplierId,
+    SupplierTitle: supplier.SupplierTitle,
+    DocumentNumber: documentNumber,
+    DocumentDate: documentForm.DocumentDate,
+    PurchaseAmount: purchaseAmount,
+    PaidAmount: paidAmount,
+    BalanceAmount: purchaseAmount - paidAmount,
+    StatusTitle: getPaymentStatusTitle(purchaseAmount, paidAmount),
+    Description: documentForm.PaymentDescription || documentForm.Description,
+  });
+  saveSupplierLedgerToStorage();
+}
+
 async function saveLimits() {
   try {
     const result = await saveGoodsLimits(goods.value);
@@ -174,9 +333,14 @@ async function submitDocument() {
   try {
     const items = documentItems.value.filter((item) => Number(item.GoodsId) > 0 && Number(item.Quantity) > 0);
     const result = await saveInventoryDocument({ ...documentForm, Items: items });
+    recordSupplierLedger(result.DocumentNumber || documentForm.DocumentNumber || "-");
     showMessage(result.message || "سند انبار ذخیره شد");
     documentForm.DocumentNumber = "";
+    documentForm.PersonId = 0;
     documentForm.PersonTitle = "";
+    documentForm.PurchaseAmount = 0;
+    documentForm.PaidAmount = 0;
+    documentForm.PaymentDescription = "";
     documentForm.Description = "";
     documentItems.value = [{ GoodsId: 0, Quantity: 1, UnitPrice: 0, Description: "" }];
     await loadStock();
@@ -198,7 +362,7 @@ async function loadStock() {
 async function loadKardex() {
   try {
     const result = await loadKardexReport(reportFilter);
-    kardexRows.value = result.rows || [];
+    kardexRows.value = filterRowsByDate(result.rows || [], (row) => row.DocumentDate, reportFilter.FromDate, reportFilter.ToDate);
     activeTab.value = "kardex";
   } catch (error) {
     showMessage(error instanceof Error ? error.message : "خطا در کاردکس کالا");
@@ -268,9 +432,17 @@ function updateStockTakingDiff(row: StockTakingRow) {
   row.DifferenceQuantity = Number(row.RealQuantity || 0) - Number(row.CurrentQuantity || 0);
 }
 
+function toInventoryUnitPrice(row: StockTakingRow) {
+  return Math.round(Number(row.LastPurchasePrice || row.AveragePrice || 0));
+}
+
 async function applyStockTaking() {
   if (!Number(reportFilter.WarehouseId)) {
     showMessage("برای ثبت انبارگردانی باید انبار مشخص باشد");
+    return;
+  }
+  if (!stockTakingRows.value.length) {
+    showMessage("ابتدا موجودی سیستم را بارگذاری کنید");
     return;
   }
 
@@ -279,7 +451,7 @@ async function applyStockTaking() {
     .map((row) => ({
       GoodsId: row.GoodsId,
       Quantity: Number(row.DifferenceQuantity),
-      UnitPrice: Number(row.LastPurchasePrice || row.AveragePrice || 0),
+      UnitPrice: toInventoryUnitPrice(row),
       Description: `انبارگردانی - موجودی سیستمی ${row.CurrentQuantity} / موجودی واقعی ${row.RealQuantity}`,
     }));
 
@@ -288,7 +460,7 @@ async function applyStockTaking() {
     .map((row) => ({
       GoodsId: row.GoodsId,
       Quantity: Math.abs(Number(row.DifferenceQuantity)),
-      UnitPrice: Number(row.LastPurchasePrice || row.AveragePrice || 0),
+      UnitPrice: toInventoryUnitPrice(row),
       Description: `انبارگردانی - موجودی سیستمی ${row.CurrentQuantity} / موجودی واقعی ${row.RealQuantity}`,
     }));
 
@@ -323,7 +495,6 @@ async function applyStockTaking() {
     }
 
     showMessage("انبارگردانی ثبت شد و اسناد اصلاحی ایجاد شدند");
-    await rebuildBalances();
     await prepareStockTaking();
   } catch (error) {
     showMessage(error instanceof Error ? error.message : "خطا در ثبت انبارگردانی");
@@ -410,6 +581,7 @@ function printKardexReport(mode: "a4" | "a5" | "receipt") {
       <button :class="{ active: activeTab === 'reports' }" @click="activeTab = 'reports'">گزارش موجودی</button>
       <button :class="{ active: activeTab === 'kardex' }" @click="activeTab = 'kardex'">کاردکس کالا</button>
       <button :class="{ active: activeTab === 'stocktaking' }" @click="openStockTaking">انبارگردانی</button>
+      <button :class="{ active: activeTab === 'suppliers' }" @click="activeTab = 'suppliers'">تأمین‌کننده‌ها</button>
       <button :class="{ active: activeTab === 'history' }" @click="loadHistory">سابقه تغییرات</button>
     </nav>
 
@@ -481,10 +653,19 @@ function printKardexReport(mode: "a4" | "a5" | "receipt") {
       <div class="inv-form-grid">
         <select v-model.number="documentForm.DocumentType"><option v-for="t in documentTypes" :key="t.id" :value="t.id">{{ t.title }}</option></select>
         <input v-model="documentForm.DocumentNumber" placeholder="شماره سند؛ خالی یعنی خودکار" />
-        <input v-model="documentForm.DocumentDate" placeholder="تاریخ" />
+        <input v-model="documentForm.DocumentDate" placeholder="تاریخ" data-jdp />
         <select v-model.number="documentForm.WarehouseId"><option v-for="w in warehouses" :key="w.WarehouseId" :value="w.WarehouseId">{{ w.WarehouseTitle }}</option></select>
-        <input v-model="documentForm.PersonTitle" placeholder="تامین‌کننده/شخص" />
+        <select v-model.number="documentForm.PersonId" @change="onSupplierChange">
+          <option :value="0">انتخاب تأمین‌کننده/شخص</option>
+          <option v-for="s in suppliers.filter(x => x.IsActive)" :key="s.SupplierId" :value="s.SupplierId">{{ s.SupplierTitle }}</option>
+        </select>
+        <input v-model="documentForm.PersonTitle" placeholder="تأمین‌کننده/شخص" />
         <input v-model="documentForm.Description" placeholder="توضیحات" />
+      </div>
+      <div v-if="Number(documentForm.DocumentType) === 3" class="inv-form-grid">
+        <input type="number" v-model.number="documentForm.PurchaseAmount" placeholder="مبلغ خرید" />
+        <input type="number" v-model.number="documentForm.PaidAmount" placeholder="مبلغ پرداختی" />
+        <input v-model="documentForm.PaymentDescription" placeholder="شرح پرداخت / حساب تامین‌کننده" />
       </div>
       <div class="inv-table-wrap">
         <table>
@@ -509,8 +690,8 @@ function printKardexReport(mode: "a4" | "a5" | "receipt") {
       <div class="inv-form-grid">
         <select v-model.number="reportFilter.FiscalYearId"><option v-for="f in fiscalYears" :key="f.FiscalYearId" :value="f.FiscalYearId">{{ f.Title }}</option></select>
         <select v-model.number="reportFilter.WarehouseId"><option :value="0">همه انبارها</option><option v-for="w in warehouses" :key="w.WarehouseId" :value="w.WarehouseId">{{ w.WarehouseTitle }}</option></select>
-        <input v-model="reportFilter.FromDate" placeholder="از تاریخ" />
-        <input v-model="reportFilter.ToDate" placeholder="تا تاریخ" />
+        <input v-model="reportFilter.FromDate" placeholder="از تاریخ" data-jdp />
+        <input v-model="reportFilter.ToDate" placeholder="تا تاریخ" data-jdp />
       </div>
       <button class="inv-primary" @click="loadStock">نمایش گزارش</button>
       <button @click="exportStockCsv">خروجی اکسل/CSV</button>
@@ -536,6 +717,8 @@ function printKardexReport(mode: "a4" | "a5" | "receipt") {
         <select v-model.number="reportFilter.FiscalYearId"><option v-for="f in fiscalYears" :key="f.FiscalYearId" :value="f.FiscalYearId">{{ f.Title }}</option></select>
         <select v-model.number="reportFilter.WarehouseId"><option :value="0">همه انبارها</option><option v-for="w in warehouses" :key="w.WarehouseId" :value="w.WarehouseId">{{ w.WarehouseTitle }}</option></select>
         <select v-model.number="reportFilter.GoodsId"><option :value="0">همه کالاها</option><option v-for="g in goods" :key="g.GoodsId" :value="g.GoodsId">{{ g.GoodsCode }} - {{ g.GoodsName }}</option></select>
+        <input v-model="reportFilter.FromDate" placeholder="از تاریخ" data-jdp />
+        <input v-model="reportFilter.ToDate" placeholder="تا تاریخ" data-jdp />
       </div>
       <button class="inv-primary" @click="loadKardex">نمایش کاردکس</button>
       <button @click="printKardexReport('a4')">چاپ A4</button>
@@ -591,14 +774,52 @@ function printKardexReport(mode: "a4" | "a5" | "receipt") {
       </div>
     </div>
 
+    <div v-if="activeTab === 'suppliers'" class="inv-card">
+      <h3>تعریف تأمین‌کننده‌ها و حساب خرید</h3>
+      <div class="inv-form-grid">
+        <input v-model="supplierForm.SupplierCode" placeholder="کد تأمین‌کننده" />
+        <input v-model="supplierForm.SupplierTitle" placeholder="نام تأمین‌کننده" />
+        <input v-model="supplierForm.Phone" placeholder="تلفن" />
+        <input v-model="supplierForm.Address" placeholder="آدرس" />
+        <input v-model="supplierForm.Description" placeholder="توضیحات" />
+        <label><input type="checkbox" v-model="supplierForm.IsActive" /> فعال</label>
+      </div>
+      <button class="inv-primary" @click="submitSupplier">ذخیره تأمین‌کننده</button>
+      <div class="inv-table-wrap">
+        <table>
+          <thead><tr><th>کد</th><th>نام</th><th>تلفن</th><th>جمع خرید</th><th>جمع پرداخت</th><th>مانده</th><th></th></tr></thead>
+          <tbody>
+            <tr v-for="s in supplierBalanceRows" :key="s.SupplierId">
+              <td>{{ s.SupplierCode }}</td><td>{{ s.SupplierTitle }}</td><td>{{ s.Phone }}</td><td>{{ s.PurchaseAmount.toLocaleString() }}</td><td>{{ s.PaidAmount.toLocaleString() }}</td><td>{{ s.BalanceAmount.toLocaleString() }}</td><td><button @click="editSupplier(s)">ویرایش</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <h3>سابقه حساب تأمین‌کننده‌ها</h3>
+      <div class="inv-table-wrap">
+        <table>
+          <thead><tr><th>تاریخ</th><th>تأمین‌کننده</th><th>سند</th><th>خرید</th><th>پرداخت</th><th>مانده</th><th>وضعیت</th><th>شرح</th></tr></thead>
+          <tbody>
+            <tr v-for="row in supplierLedger" :key="`${row.SupplierId}-${row.DocumentNumber}-${row.DocumentDate}`">
+              <td>{{ row.DocumentDate }}</td><td>{{ row.SupplierTitle }}</td><td>{{ row.DocumentNumber }}</td><td>{{ row.PurchaseAmount.toLocaleString() }}</td><td>{{ row.PaidAmount.toLocaleString() }}</td><td>{{ row.BalanceAmount.toLocaleString() }}</td><td>{{ row.StatusTitle }}</td><td>{{ row.Description }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
     <div v-if="activeTab === 'history'" class="inv-card">
       <h3>سابقه تغییرات رسیدها و فاکتورهای انبار</h3>
+      <div class="inv-form-grid">
+        <input v-model="historyFilter.FromDate" placeholder="از تاریخ" data-jdp />
+        <input v-model="historyFilter.ToDate" placeholder="تا تاریخ" data-jdp />
+      </div>
       <button class="inv-primary" @click="loadHistory">بروزرسانی سابقه</button>
       <div class="inv-table-wrap">
         <table>
           <thead><tr><th>زمان</th><th>کاربر</th><th>نوع سند</th><th>شماره سند</th><th>عملیات</th><th>شرح</th></tr></thead>
           <tbody>
-            <tr v-for="r in changeLogRows" :key="r.ChangeLogId">
+            <tr v-for="r in filteredChangeLogRows" :key="r.ChangeLogId">
               <td>{{ r.ChangedAt }}</td><td>{{ r.ChangedBy }}</td><td>{{ r.DocumentType }}</td><td>{{ r.DocumentNumber }}</td><td>{{ r.ActionType }}</td><td>{{ r.Description }}</td>
             </tr>
           </tbody>
