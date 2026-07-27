@@ -24,7 +24,11 @@ function canOpenDiscounts() {
 }
 
 function canOpenInventoryByPermission() {
-    return can("view.inventory") || can("manage.inventory") || can("view.reports") || can("view.settings");
+    return can("view.inventory") || can("manage.inventory");
+}
+
+function canOpenInventoryAnalysisByPermission() {
+    return can("view.inventoryAnalysis") || can("manage.inventoryAnalysis") || can("manage.inventory");
 }
 
 async function getInventoryBootstrapAddress() {
@@ -61,6 +65,10 @@ function canOpenInventory() {
     return canOpenInventoryByPermission() && hasStockLicense.value;
 }
 
+function canOpenInventoryAnalysis() {
+    return canOpenInventoryAnalysisByPermission() && hasStockLicense.value;
+}
+
 const availableTabs = computed<Tab[]>(() => {
     const t: Tab[] = [];
     if (can("view.sales")) t.push({ key: "sales", title: "سفارشگیری" });
@@ -68,7 +76,7 @@ const availableTabs = computed<Tab[]>(() => {
     if (can("view.baseInfo")) t.push({ key: "base", title: "کالاها و پایه" });
     if (canOpenDiscounts()) t.push({ key: "discounts", title: "تخفیف‌ها" });
     if (canOpenInventory()) t.push({ key: "inventory", title: "انبار" });
-    if (canOpenInventory()) t.push({ key: "inventoryAnalysis", title: "آنالیز کالا" });
+    if (canOpenInventoryAnalysis()) t.push({ key: "inventoryAnalysis", title: "آنالیز کالا" });
     if (can("view.reports")) t.push({ key: "reports", title: "گزارشگیری" });
     if (can("view.settings")) t.push({ key: "settings", title: "تنظیمات" });
     return t.length ? t : [{ key: "sales", title: "سفارشگیری" }];
@@ -91,7 +99,7 @@ const activeComponent = computed(() => {
         case "inventory":
             return canOpenInventory() ? InventoryTab : SalesTab;
         case "inventoryAnalysis":
-            return canOpenInventory() ? InventoryAnalysisTab : SalesTab;
+            return canOpenInventoryAnalysis() ? InventoryAnalysisTab : SalesTab;
         case "reports":
             return ReportsTab;
         case "settings":
