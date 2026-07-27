@@ -5,6 +5,7 @@ import BaseInfoTab from "./tabs/BaseInfoTab.vue";
 import ReportsTab from "./tabs/ReportsTab.vue";
 import SettingsTab from "./tabs/SettingsTab.vue";
 import DiscountsTab from "./tabs/DiscountsTab.vue";
+import InventoryTab from "./tabs/InventoryTab.vue";
 import { can } from "../../components/acl/can";
 import { INVOICE_EDIT_REQUEST_EVENT } from "../../components/stores/invoice-edit.store";
 import { TABLE_ORDER_REQUEST_EVENT } from "../../components/stores/table-order.store";
@@ -12,6 +13,9 @@ import { logoutDesktop } from "../../services/desktopApi";
 import { logoutDesktopUser, useAuthState } from "../../components/stores/auth.store";
 function canOpenDiscounts() {
     return can("view.discounts") || can("manage.discounts") || can("manage.discountCards") || can("sales.discount.percent") || can("sales.discount.amount");
+}
+function canOpenInventory() {
+    return can("view.inventory") || can("manage.inventory") || can("view.reports") || can("view.settings");
 }
 const availableTabs = computed(() => {
     const t = [];
@@ -23,6 +27,8 @@ const availableTabs = computed(() => {
         t.push({ key: "base", title: "کالاها و پایه" });
     if (canOpenDiscounts())
         t.push({ key: "discounts", title: "تخفیف‌ها" });
+    if (canOpenInventory())
+        t.push({ key: "inventory", title: "انبار" });
     if (can("view.reports"))
         t.push({ key: "reports", title: "گزارشگیری" });
     if (can("view.settings"))
@@ -36,6 +42,8 @@ const activeComponent = computed(() => {
             return BaseInfoTab;
         case "discounts":
             return DiscountsTab;
+        case "inventory":
+            return InventoryTab;
         case "reports":
             return ReportsTab;
         case "settings":
