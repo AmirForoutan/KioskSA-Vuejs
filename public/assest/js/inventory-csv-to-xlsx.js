@@ -30,28 +30,16 @@
       var name = encoder.encode(file.name);
       var data = encoder.encode(file.content);
       var crc = crc32(data);
-      var local = new Uint8Array([].concat(
-        u32(0x04034b50), u16(20), u16(0), u16(0), u16(0), u16(0),
-        u32(crc), u32(data.length), u32(data.length), u16(name.length), u16(0)
-      ));
+      var local = new Uint8Array([].concat(u32(0x04034b50), u16(20), u16(0), u16(0), u16(0), u16(0), u32(crc), u32(data.length), u32(data.length), u16(name.length), u16(0)));
       chunks.push(local, name, data);
-
-      var centralHeader = new Uint8Array([].concat(
-        u32(0x02014b50), u16(20), u16(20), u16(0), u16(0), u16(0), u16(0),
-        u32(crc), u32(data.length), u32(data.length), u16(name.length), u16(0), u16(0),
-        u16(0), u16(0), u32(0), u32(offset)
-      ));
+      var centralHeader = new Uint8Array([].concat(u32(0x02014b50), u16(20), u16(20), u16(0), u16(0), u16(0), u16(0), u32(crc), u32(data.length), u32(data.length), u16(name.length), u16(0), u16(0), u16(0), u16(0), u32(0), u32(offset)));
       central.push(centralHeader, name);
       offset += local.length + name.length + data.length;
     });
 
     var centralSize = central.reduce(function (sum, item) { return sum + item.length; }, 0);
     var centralOffset = offset;
-    var end = new Uint8Array([].concat(
-      u32(0x06054b50), u16(0), u16(0), u16(files.length), u16(files.length),
-      u32(centralSize), u32(centralOffset), u16(0)
-    ));
-
+    var end = new Uint8Array([].concat(u32(0x06054b50), u16(0), u16(0), u16(files.length), u16(files.length), u32(centralSize), u32(centralOffset), u16(0)));
     var all = chunks.concat(central).concat([end]);
     var total = all.reduce(function (sum, item) { return sum + item.length; }, 0);
     var out = new Uint8Array(total);
@@ -61,12 +49,7 @@
   }
 
   function escapeXml(value) {
-    return String(value == null ? '' : value)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&apos;');
+    return String(value == null ? '' : value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
   }
 
   function parseCsv(text) {
@@ -96,8 +79,7 @@
       }).join('');
       return '<row r="' + (rIndex + 1) + '">' + cells + '</row>';
     }).join('');
-    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-      '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" rightToLeft="1"><sheetData>' + body + '</sheetData></worksheet>';
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" rightToLeft="1"><sheetData>' + body + '</sheetData></worksheet>';
   }
 
   function workbookFiles(rows) {
@@ -110,29 +92,41 @@
     ];
   }
 
-  document.addEventListener('click', function (event) {
-    var a = event.target && event.target.closest ? event.target.closest('a[download$=".csv"]') : null;
-    if (!a || !a.href || a.dataset.xlsxConverted === '1') return;
-    event.preventDefault();
-    event.stopPropagation();
+  function convertAnchor(anchor, nativeClick) {
+    if (!anchor || anchor.dataset.xlsxConverted === '1') return false;
+    if (!String(anchor.download || '').toLowerCase().endsWith('.csv')) return false;
+    if (!String(anchor.href || '').startsWith('blob:')) return false;
 
-    fetch(a.href).then(function (response) { return response.text(); }).then(function (csv) {
+    anchor.dataset.xlsxConverted = '1';
+    fetch(anchor.href).then(function (response) { return response.text(); }).then(function (csv) {
       var rows = parseCsv(csv);
       var zip = makeZip(workbookFiles(rows));
       var blob = new Blob([zip], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       var xlsx = document.createElement('a');
       xlsx.href = URL.createObjectURL(blob);
-      xlsx.download = String(a.download || 'inventory-report.csv').replace(/\.csv$/i, '.xlsx');
+      xlsx.download = String(anchor.download || 'inventory-report.csv').replace(/\.csv$/i, '.xlsx');
       xlsx.dataset.xlsxConverted = '1';
       document.body.appendChild(xlsx);
-      xlsx.click();
-      window.setTimeout(function () {
-        URL.revokeObjectURL(xlsx.href);
-        xlsx.remove();
-      }, 1000);
+      nativeClick.call(xlsx);
+      window.setTimeout(function () { URL.revokeObjectURL(xlsx.href); xlsx.remove(); }, 1000);
     }).catch(function () {
-      a.dataset.xlsxConverted = '1';
-      a.click();
+      nativeClick.call(anchor);
     });
+    return true;
+  }
+
+  var nativeClick = HTMLAnchorElement.prototype.click;
+  HTMLAnchorElement.prototype.click = function () {
+    if (convertAnchor(this, nativeClick)) return;
+    return nativeClick.apply(this, arguments);
+  };
+
+  document.addEventListener('click', function (event) {
+    var a = event.target && event.target.closest ? event.target.closest('a[download$=".csv"]') : null;
+    if (!a) return;
+    if (convertAnchor(a, nativeClick)) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
   }, true);
 })();
