@@ -60,6 +60,7 @@ const filteredGoods = computed(() => {
 });
 const selectedFiscalYear = computed(() => fiscalYears.value.find((f) => f.FiscalYearId === Number(reportFilter.FiscalYearId)) || fiscalYears.value[0]);
 const selectedWarehouseTitle = computed(() => warehouses.value.find((w) => w.WarehouseId === Number(reportFilter.WarehouseId))?.WarehouseTitle || "همه انبارها");
+const defaultWarehouseId = computed(() => warehouses.value.find((w) => w.IsDefault)?.WarehouseId || warehouses.value[0]?.WarehouseId || 0);
 onMounted(loadAll);
 function todayFa() {
     return new Date().toLocaleDateString("fa-IR-u-nu-latn").replace(/-/g, "/");
@@ -82,7 +83,7 @@ async function loadAll() {
         goods.value = data.goods || [];
         valuationMethods.value = data.valuationMethods || [];
         documentTypes.value = data.documentTypes || [];
-        documentForm.WarehouseId = warehouses.value.find((w) => w.IsDefault)?.WarehouseId || warehouses.value[0]?.WarehouseId || 0;
+        documentForm.WarehouseId = defaultWarehouseId.value;
         documentForm.FiscalYearId = fiscalYears.value[0]?.FiscalYearId || 0;
         reportFilter.FiscalYearId = fiscalYears.value[0]?.FiscalYearId || 0;
     }
@@ -188,13 +189,28 @@ async function rebuildBalances() {
         showMessage(error instanceof Error ? error.message : "خطا در بازسازی موجودی");
     }
 }
+async function openStockTaking() {
+    activeTab.value = "stocktaking";
+    if (!Number(reportFilter.WarehouseId)) {
+        reportFilter.WarehouseId = defaultWarehouseId.value;
+    }
+    if (!Number(reportFilter.WarehouseId)) {
+        showMessage("ابتدا از بخش تنظیمات و کالاها، حداقل یک انبار تعریف کنید");
+        return;
+    }
+    await prepareStockTaking();
+}
 async function prepareStockTaking() {
+    activeTab.value = "stocktaking";
     if (!settings.EnableStockTaking) {
         showMessage("انبارگردانی در تنظیمات غیرفعال است");
         return;
     }
     if (!Number(reportFilter.WarehouseId)) {
-        showMessage("برای انبارگردانی باید یک انبار مشخص انتخاب کنید");
+        reportFilter.WarehouseId = defaultWarehouseId.value;
+    }
+    if (!Number(reportFilter.WarehouseId)) {
+        showMessage("برای انبارگردانی باید از همین بخش، یک انبار مشخص انتخاب کنید");
         return;
     }
     const result = await loadStockReport({ ...reportFilter, FromDate: "", ToDate: "" });
@@ -203,7 +219,6 @@ async function prepareStockTaking() {
         RealQuantity: Number(row.CurrentQuantity || 0),
         DifferenceQuantity: 0,
     }));
-    activeTab.value = "stocktaking";
 }
 function updateStockTakingDiff(row) {
     row.DifferenceQuantity = Number(row.RealQuantity || 0) - Number(row.CurrentQuantity || 0);
@@ -394,7 +409,7 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElement
     ...{ class: ({ active: __VLS_ctx.activeTab === 'kardex' }) },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-    ...{ onClick: (__VLS_ctx.prepareStockTaking) },
+    ...{ onClick: (__VLS_ctx.openStockTaking) },
     ...{ class: ({ active: __VLS_ctx.activeTab === 'stocktaking' }) },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
@@ -904,15 +919,16 @@ if (__VLS_ctx.activeTab === 'kardex') {
 }
 if (__VLS_ctx.activeTab === 'stocktaking') {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "inv-card" },
+        ...{ class: "inv-card stocktaking-card" },
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.h3, __VLS_intrinsicElements.h3)({});
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "inv-warning" },
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "inv-form-grid" },
+        ...{ class: "inv-form-grid stocktaking-filter" },
     });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({});
     __VLS_asFunctionalElement(__VLS_intrinsicElements.select, __VLS_intrinsicElements.select)({
         value: (__VLS_ctx.reportFilter.FiscalYearId),
     });
@@ -923,7 +939,9 @@ if (__VLS_ctx.activeTab === 'stocktaking') {
         });
         (f.Title);
     }
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({});
     __VLS_asFunctionalElement(__VLS_intrinsicElements.select, __VLS_intrinsicElements.select)({
+        ...{ onChange: (__VLS_ctx.prepareStockTaking) },
         value: (__VLS_ctx.reportFilter.WarehouseId),
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.option, __VLS_intrinsicElements.option)({
@@ -944,44 +962,53 @@ if (__VLS_ctx.activeTab === 'stocktaking') {
         ...{ onClick: (__VLS_ctx.applyStockTaking) },
         ...{ class: "inv-danger" },
     });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "inv-table-wrap" },
-    });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.table, __VLS_intrinsicElements.table)({});
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.thead, __VLS_intrinsicElements.thead)({});
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.tr, __VLS_intrinsicElements.tr)({});
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.tbody, __VLS_intrinsicElements.tbody)({});
-    for (const [r] of __VLS_getVForSourceType((__VLS_ctx.stockTakingRows))) {
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.tr, __VLS_intrinsicElements.tr)({
-            key: (r.GoodsId),
-            ...{ class: ({ diff: Number(r.DifferenceQuantity) !== 0 }) },
+    if (!__VLS_ctx.stockTakingRows.length) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "inv-warning" },
         });
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
-        (r.GoodsCode);
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
-        (r.GoodsName);
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
-        (r.CurrentQuantity);
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
-            ...{ onInput: (...[$event]) => {
-                    if (!(__VLS_ctx.activeTab === 'stocktaking'))
-                        return;
-                    __VLS_ctx.updateStockTakingDiff(r);
-                } },
-            type: "number",
+    }
+    else {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "inv-table-wrap" },
         });
-        (r.RealQuantity);
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
-        (r.DifferenceQuantity);
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
-        (Number(r.LastPurchasePrice || r.AveragePrice || 0).toLocaleString());
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.table, __VLS_intrinsicElements.table)({});
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.thead, __VLS_intrinsicElements.thead)({});
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.tr, __VLS_intrinsicElements.tr)({});
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.tbody, __VLS_intrinsicElements.tbody)({});
+        for (const [r] of __VLS_getVForSourceType((__VLS_ctx.stockTakingRows))) {
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.tr, __VLS_intrinsicElements.tr)({
+                key: (r.GoodsId),
+                ...{ class: ({ diff: Number(r.DifferenceQuantity) !== 0 }) },
+            });
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
+            (r.GoodsCode);
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
+            (r.GoodsName);
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
+            (r.CurrentQuantity);
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+                ...{ onInput: (...[$event]) => {
+                        if (!(__VLS_ctx.activeTab === 'stocktaking'))
+                            return;
+                        if (!!(!__VLS_ctx.stockTakingRows.length))
+                            return;
+                        __VLS_ctx.updateStockTakingDiff(r);
+                    } },
+                type: "number",
+            });
+            (r.RealQuantity);
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
+            (r.DifferenceQuantity);
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
+            (Number(r.LastPurchasePrice || r.AveragePrice || 0).toLocaleString());
+        }
     }
 }
 if (__VLS_ctx.activeTab === 'history') {
@@ -1061,10 +1088,13 @@ if (__VLS_ctx.activeTab === 'history') {
 /** @type {__VLS_StyleScopedClasses['inv-primary']} */ ;
 /** @type {__VLS_StyleScopedClasses['inv-table-wrap']} */ ;
 /** @type {__VLS_StyleScopedClasses['inv-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['stocktaking-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['inv-warning']} */ ;
 /** @type {__VLS_StyleScopedClasses['inv-form-grid']} */ ;
+/** @type {__VLS_StyleScopedClasses['stocktaking-filter']} */ ;
 /** @type {__VLS_StyleScopedClasses['inv-primary']} */ ;
 /** @type {__VLS_StyleScopedClasses['inv-danger']} */ ;
+/** @type {__VLS_StyleScopedClasses['inv-warning']} */ ;
 /** @type {__VLS_StyleScopedClasses['inv-table-wrap']} */ ;
 /** @type {__VLS_StyleScopedClasses['diff']} */ ;
 /** @type {__VLS_StyleScopedClasses['inv-card']} */ ;
@@ -1106,6 +1136,7 @@ const __VLS_self = (await import('vue')).defineComponent({
             loadKardex: loadKardex,
             loadHistory: loadHistory,
             rebuildBalances: rebuildBalances,
+            openStockTaking: openStockTaking,
             prepareStockTaking: prepareStockTaking,
             updateStockTakingDiff: updateStockTakingDiff,
             applyStockTaking: applyStockTaking,

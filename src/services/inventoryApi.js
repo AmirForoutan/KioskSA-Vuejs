@@ -15,6 +15,32 @@ async function buildServiceAddress(offset, path) {
         return String(serviceAdd).replace(/:(\d+)(\/?$)/, (_match, port) => `:${Number(port) + offset}${path}`);
     }
 }
+function getPersianYear(date) {
+    const parts = new Intl.DateTimeFormat("fa-IR-u-nu-latn", { year: "numeric" }).formatToParts(date);
+    return Number(parts.find((part) => part.type === "year")?.value || 0);
+}
+function normalizeFiscalYear(row) {
+    const titleYear = Number(String(row.Title || "").match(/\d{4}/)?.[0] || 0);
+    const startYear = Number(String(row.StartDate || "").split("/")[0] || 0);
+    const yearCandidate = titleYear || startYear;
+    if (!yearCandidate || yearCandidate < 1700)
+        return row;
+    const persianYear = getPersianYear(new Date(yearCandidate, 6, 1));
+    if (!persianYear)
+        return row;
+    return {
+        ...row,
+        Title: `سال مالی ${persianYear}`,
+        StartDate: `${persianYear}/01/01`,
+        EndDate: `${persianYear}/12/29`,
+    };
+}
+function normalizeInventoryBootstrap(data) {
+    return {
+        ...data,
+        fiscalYears: (data.fiscalYears || []).map(normalizeFiscalYear),
+    };
+}
 async function getInventoryApiAddress() {
     return buildServiceAddress(1, "/inventory");
 }
@@ -47,8 +73,9 @@ async function postInventoryAnalysis(path, data = {}) {
     }
     return result;
 }
-export function loadInventoryBootstrap() {
-    return postInventory("bootstrap");
+export async function loadInventoryBootstrap() {
+    const data = await postInventory("bootstrap");
+    return normalizeInventoryBootstrap(data);
 }
 export function saveInventorySettings(data) {
     return postInventory("settings/save", data);
