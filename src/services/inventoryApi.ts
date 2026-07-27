@@ -1,8 +1,24 @@
 import { GetApiAddress } from "../utilities";
 
-async function postInventory<T>(path: string, data: unknown = {}): Promise<T> {
+async function getInventoryApiAddress() {
   const serviceAdd = await GetApiAddress();
-  const response = await fetch(`${serviceAdd}/inventory/${path}`, {
+
+  try {
+    const url = new URL(serviceAdd);
+    const currentPort = Number(url.port || (url.protocol === "https:" ? 443 : 80));
+    url.port = String(currentPort + 1);
+    url.pathname = "/inventory";
+    url.search = "";
+    url.hash = "";
+    return url.toString().replace(/\/$/, "");
+  } catch {
+    return String(serviceAdd).replace(/:(\d+)(\/?$)/, (_match, port) => `:${Number(port) + 1}/inventory`);
+  }
+}
+
+async function postInventory<T>(path: string, data: unknown = {}): Promise<T> {
+  const inventoryAdd = await getInventoryApiAddress();
+  const response = await fetch(`${inventoryAdd}/${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -121,6 +137,18 @@ export type InventoryKardexRow = {
   Description?: string;
 };
 
+export type InventoryChangeLogRow = {
+  ChangeLogId: number;
+  DocumentType: string;
+  DocumentId: number;
+  DocumentNumber?: string;
+  ActionType: string;
+  Description?: string;
+  ChangedAt?: string;
+  ChangedBy?: string;
+  FiscalYearId?: number;
+};
+
 export function loadInventoryBootstrap() {
   return postInventory<InventoryBootstrap>("bootstrap");
 }
@@ -151,6 +179,10 @@ export function loadStockReport(filters: Record<string, unknown>) {
 
 export function loadKardexReport(filters: Record<string, unknown>) {
   return postInventory<{ status: boolean; rows: InventoryKardexRow[] }>("report/kardex", filters);
+}
+
+export function loadInventoryChangeLogs() {
+  return postInventory<{ status: boolean; rows: InventoryChangeLogRow[] }>("change-logs");
 }
 
 export function rebuildInventoryBalances(fiscalYearId?: number) {
