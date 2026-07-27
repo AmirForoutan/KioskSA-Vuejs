@@ -1,3 +1,4 @@
+/// <reference types="../../node_modules/.vue-global-types/vue_3.5_0_0_0.d.ts" />
 import { computed, onMounted, onUnmounted, watch } from "vue";
 import { GetViewMode } from "../utilities"; // موجود است:contentReference[oaicite:7]{index=7}
 import DesktopWorkspace from "./desktop/DesktopWorkspace.vue";

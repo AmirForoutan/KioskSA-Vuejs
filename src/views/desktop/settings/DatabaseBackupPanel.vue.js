@@ -1,3 +1,4 @@
+/// <reference types="../../../../node_modules/.vue-global-types/vue_3.5_0_0_0.d.ts" />
 import { onMounted, ref } from "vue";
 import { can } from "../../../components/acl/can";
 import { createDbBackup, getDbBackupPath, saveDbBackupPath, selectDbBackupPath } from "../../../services/dbBackupApi";

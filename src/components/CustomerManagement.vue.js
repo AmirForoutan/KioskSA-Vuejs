@@ -1,3 +1,4 @@
+/// <reference types="../../node_modules/.vue-global-types/vue_3.5_0_0_0.d.ts" />
 import { ref, computed, onMounted } from 'vue';
 import { useToast } from 'vue-toastification';
 import { fetchCustomersApi, saveCustomerApi, updateCustomerStatusApi, deleteTransactionApi, updateTransactionApi, manageCredit, deleteCustomerApi } from '../services/apiService';

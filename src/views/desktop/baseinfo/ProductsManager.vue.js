@@ -1,3 +1,4 @@
+/// <reference types="../../../../node_modules/.vue-global-types/vue_3.5_0_0_0.d.ts" />
 import { computed, onMounted, ref } from "vue";
 import CatalogImageModal from "../../../components/CatalogImageModal.vue";
 import ProductModal from "../../../components/ProductModal.vue";

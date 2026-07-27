@@ -1,3 +1,4 @@
+/// <reference types="../../../node_modules/.vue-global-types/vue_3.5_0_0_0.d.ts" />
 import { computed, nextTick, onMounted, onUnmounted, ref } from "vue";
 import SalesTab from "./tabs/SalesTab.vue";
 import TablesTab from "./tabs/TablesTab.vue";
@@ -6,6 +7,7 @@ import ReportsTab from "./tabs/ReportsTab.vue";
 import SettingsTab from "./tabs/SettingsTab.vue";
 import DiscountsTab from "./tabs/DiscountsTab.vue";
 import InventoryTab from "./tabs/InventoryTab.vue";
+import InventoryAnalysisTab from "./tabs/InventoryAnalysisTab.vue";
 import { can } from "../../components/acl/can";
 import { INVOICE_EDIT_REQUEST_EVENT } from "../../components/stores/invoice-edit.store";
 import { TABLE_ORDER_REQUEST_EVENT } from "../../components/stores/table-order.store";
@@ -29,11 +31,13 @@ const availableTabs = computed(() => {
         t.push({ key: "discounts", title: "تخفیف‌ها" });
     if (canOpenInventory())
         t.push({ key: "inventory", title: "انبار" });
+    if (canOpenInventory())
+        t.push({ key: "inventoryAnalysis", title: "آنالیز کالا" });
     if (can("view.reports"))
         t.push({ key: "reports", title: "گزارشگیری" });
     if (can("view.settings"))
         t.push({ key: "settings", title: "تنظیمات" });
-    return t.length ? t : [{ key: "sales", title: "سفارشگیری" }]; // fallback
+    return t.length ? t : [{ key: "sales", title: "سفارشگیری" }];
 });
 const activeKey = ref(availableTabs.value[0].key);
 const activeComponent = computed(() => {
@@ -44,6 +48,8 @@ const activeComponent = computed(() => {
             return DiscountsTab;
         case "inventory":
             return InventoryTab;
+        case "inventoryAnalysis":
+            return InventoryAnalysisTab;
         case "reports":
             return ReportsTab;
         case "settings":

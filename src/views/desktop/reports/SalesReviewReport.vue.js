@@ -1,3 +1,4 @@
+/// <reference types="../../../../node_modules/.vue-global-types/vue_3.5_0_0_0.d.ts" />
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { can } from "../../../components/acl/can";
 import { requestInvoiceEdit } from "../../../components/stores/invoice-edit.store";
