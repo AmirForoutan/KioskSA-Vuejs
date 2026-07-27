@@ -20,9 +20,14 @@ import {
   type Warehouse,
 } from "../../../services/inventoryApi";
 
+type StockTakingRow = InventoryStockReportRow & {
+  RealQuantity: number;
+  DifferenceQuantity: number;
+};
+
 const loading = ref(false);
 const message = ref("");
-const activeTab = ref<"settings" | "documents" | "reports" | "kardex" | "history">("settings");
+const activeTab = ref<"settings" | "documents" | "reports" | "kardex" | "stocktaking" | "history">("settings");
 const haveStockLicense = ref(false);
 const warehouses = ref<Warehouse[]>([]);
 const fiscalYears = ref<FiscalYear[]>([]);
@@ -32,6 +37,7 @@ const documentTypes = ref<{ id: number; title: string }[]>([]);
 const stockRows = ref<InventoryStockReportRow[]>([]);
 const kardexRows = ref<InventoryKardexRow[]>([]);
 const changeLogRows = ref<InventoryChangeLogRow[]>([]);
+const stockTakingRows = ref<StockTakingRow[]>([]);
 const goodsSearch = ref("");
 
 const settings = reactive<InventorySettings>({
@@ -84,8 +90,13 @@ const filteredGoods = computed(() => {
 });
 
 const selectedFiscalYear = computed(() => fiscalYears.value.find((f) => f.FiscalYearId === Number(reportFilter.FiscalYearId)) || fiscalYears.value[0]);
+const selectedWarehouseTitle = computed(() => warehouses.value.find((w) => w.WarehouseId === Number(reportFilter.WarehouseId))?.WarehouseTitle || "همه انبارها");
 
 onMounted(loadAll);
+
+function todayFa() {
+  return new Date().toLocaleDateString("fa-IR-u-nu-latn").replace(/-/g, "/");
+}
 
 function showMessage(text: string) {
   message.value = text;
@@ -216,6 +227,91 @@ async function rebuildBalances() {
   }
 }
 
+async function prepareStockTaking() {
+  if (!settings.EnableStockTaking) {
+    showMessage("انبارگردانی در تنظیمات غیرفعال است");
+    return;
+  }
+  if (!Number(reportFilter.WarehouseId)) {
+    showMessage("برای انبارگردانی باید یک انبار مشخص انتخاب کنید");
+    return;
+  }
+
+  const result = await loadStockReport({ ...reportFilter, FromDate: "", ToDate: "" });
+  stockTakingRows.value = (result.rows || []).map((row) => ({
+    ...row,
+    RealQuantity: Number(row.CurrentQuantity || 0),
+    DifferenceQuantity: 0,
+  }));
+  activeTab.value = "stocktaking";
+}
+
+function updateStockTakingDiff(row: StockTakingRow) {
+  row.DifferenceQuantity = Number(row.RealQuantity || 0) - Number(row.CurrentQuantity || 0);
+}
+
+async function applyStockTaking() {
+  if (!Number(reportFilter.WarehouseId)) {
+    showMessage("برای ثبت انبارگردانی باید انبار مشخص باشد");
+    return;
+  }
+
+  const increases = stockTakingRows.value
+    .filter((row) => Number(row.DifferenceQuantity) > 0)
+    .map((row) => ({
+      GoodsId: row.GoodsId,
+      Quantity: Number(row.DifferenceQuantity),
+      UnitPrice: Number(row.LastPurchasePrice || row.AveragePrice || 0),
+      Description: `انبارگردانی - موجودی سیستمی ${row.CurrentQuantity} / موجودی واقعی ${row.RealQuantity}`,
+    }));
+
+  const decreases = stockTakingRows.value
+    .filter((row) => Number(row.DifferenceQuantity) < 0)
+    .map((row) => ({
+      GoodsId: row.GoodsId,
+      Quantity: Math.abs(Number(row.DifferenceQuantity)),
+      UnitPrice: Number(row.LastPurchasePrice || row.AveragePrice || 0),
+      Description: `انبارگردانی - موجودی سیستمی ${row.CurrentQuantity} / موجودی واقعی ${row.RealQuantity}`,
+    }));
+
+  if (!increases.length && !decreases.length) {
+    showMessage("اختلافی برای ثبت انبارگردانی وجود ندارد");
+    return;
+  }
+
+  try {
+    if (increases.length) {
+      await saveInventoryDocument({
+        DocumentType: 6,
+        DocumentDate: todayFa(),
+        FiscalYearId: Number(reportFilter.FiscalYearId || selectedFiscalYear.value?.FiscalYearId || 0),
+        WarehouseId: Number(reportFilter.WarehouseId),
+        PersonTitle: "سیستم",
+        Description: "ثبت خودکار اختلاف افزایشی انبارگردانی",
+        Items: increases,
+      });
+    }
+
+    if (decreases.length) {
+      await saveInventoryDocument({
+        DocumentType: 8,
+        DocumentDate: todayFa(),
+        FiscalYearId: Number(reportFilter.FiscalYearId || selectedFiscalYear.value?.FiscalYearId || 0),
+        WarehouseId: Number(reportFilter.WarehouseId),
+        PersonTitle: "سیستم",
+        Description: "ثبت خودکار اختلاف کاهشی انبارگردانی",
+        Items: decreases,
+      });
+    }
+
+    showMessage("انبارگردانی ثبت شد و اسناد اصلاحی ایجاد شدند");
+    await rebuildBalances();
+    await prepareStockTaking();
+  } catch (error) {
+    showMessage(error instanceof Error ? error.message : "خطا در ثبت انبارگردانی");
+  }
+}
+
 function exportStockCsv() {
   const header = ["کد کالا", "نام کالا", "موجودی حال حاضر", "ورود بازه", "خروج بازه", "ارزش موجودی", "آخرین خرید", "میانگین", "حداقل", "حداکثر"];
   const lines = stockRows.value.map((r) => [r.GoodsCode, r.GoodsName, r.CurrentQuantity, r.PeriodInQuantity, r.PeriodOutQuantity, r.InventoryValue, r.LastPurchasePrice, r.AveragePrice, r.MinStock, r.MaxStock].join(","));
@@ -225,6 +321,53 @@ function exportStockCsv() {
   a.download = "inventory-stock-report.csv";
   a.click();
 }
+
+function printHtml(title: string, tableHtml: string, mode: "a4" | "a5" | "receipt") {
+  const win = window.open("", "_blank", "width=900,height=700");
+  if (!win) return;
+  const pageSize = mode === "receipt" ? "70mm auto" : mode === "a5" ? "A5" : "A4";
+  const bodyClass = mode === "receipt" ? "receipt" : "paper";
+  win.document.write(`
+    <html lang="fa" dir="rtl">
+    <head>
+      <title>${title}</title>
+      <style>
+        @page { size: ${pageSize}; margin: ${mode === "receipt" ? "3mm" : "10mm"}; }
+        body { font-family: Tahoma, Arial, sans-serif; color:#111827; margin:0; direction:rtl; }
+        .paper { padding: 12px; }
+        .receipt { width: 70mm; padding: 2mm; font-size: 11px; }
+        h2 { margin: 0 0 8px; text-align:center; }
+        .meta { margin: 0 0 10px; text-align:center; color:#4b5563; }
+        table { width:100%; border-collapse: collapse; }
+        th, td { border:1px solid #d1d5db; padding:6px; text-align:right; }
+        .receipt th, .receipt td { border-bottom:1px dashed #9ca3af; border-left:0; border-right:0; border-top:0; padding:4px 2px; }
+      </style>
+    </head>
+    <body class="${bodyClass}">
+      <h2>${title}</h2>
+      <div class="meta">دوره مالی: ${selectedFiscalYear.value?.Title || "-"} | انبار: ${selectedWarehouseTitle.value} | تاریخ چاپ: ${todayFa()}</div>
+      ${tableHtml}
+      <script>window.onload=function(){window.print();}</script>
+    </body>
+    </html>`);
+  win.document.close();
+}
+
+function printStockReport(mode: "a4" | "a5" | "receipt") {
+  const rows = stockRows.value.map((r) => `
+    <tr>
+      <td>${r.GoodsCode}</td><td>${r.GoodsName}</td><td>${r.CurrentQuantity}</td><td>${r.PeriodInQuantity}</td><td>${r.PeriodOutQuantity}</td><td>${Number(r.InventoryValue).toLocaleString()}</td>
+    </tr>`).join("");
+  printHtml("گزارش موجودی انبار", `<table><thead><tr><th>کد</th><th>کالا</th><th>موجودی</th><th>ورود</th><th>خروج</th><th>ارزش</th></tr></thead><tbody>${rows}</tbody></table>`, mode);
+}
+
+function printKardexReport(mode: "a4" | "a5" | "receipt") {
+  const rows = kardexRows.value.map((r) => `
+    <tr>
+      <td>${r.DocumentDate}</td><td>${r.DocumentNumber}</td><td>${r.GoodsName}</td><td>${r.InQuantity}</td><td>${r.OutQuantity}</td><td>${r.BalanceAfter}</td>
+    </tr>`).join("");
+  printHtml("کاردکس کالا", `<table><thead><tr><th>تاریخ</th><th>سند</th><th>کالا</th><th>ورود</th><th>خروج</th><th>مانده</th></tr></thead><tbody>${rows}</tbody></table>`, mode);
+}
 </script>
 
 <template>
@@ -232,7 +375,7 @@ function exportStockCsv() {
     <header class="inventory-header">
       <div>
         <h2>انبار</h2>
-        <p>فاکتور خرید، رسید ورود و خروج، اصلاح موجودی، گزارش موجودی و کاردکس کالا</p>
+        <p>فاکتور خرید، رسید ورود و خروج، اصلاح موجودی، انبارگردانی، گزارش موجودی و کاردکس کالا</p>
       </div>
       <button class="inv-primary" @click="loadAll" :disabled="loading">بروزرسانی</button>
     </header>
@@ -245,6 +388,7 @@ function exportStockCsv() {
       <button :class="{ active: activeTab === 'documents' }" @click="activeTab = 'documents'">اسناد انبار</button>
       <button :class="{ active: activeTab === 'reports' }" @click="activeTab = 'reports'">گزارش موجودی</button>
       <button :class="{ active: activeTab === 'kardex' }" @click="activeTab = 'kardex'">کاردکس کالا</button>
+      <button :class="{ active: activeTab === 'stocktaking' }" @click="prepareStockTaking">انبارگردانی</button>
       <button :class="{ active: activeTab === 'history' }" @click="loadHistory">سابقه تغییرات</button>
     </nav>
 
@@ -349,6 +493,9 @@ function exportStockCsv() {
       </div>
       <button class="inv-primary" @click="loadStock">نمایش گزارش</button>
       <button @click="exportStockCsv">خروجی اکسل/CSV</button>
+      <button @click="printStockReport('a4')">چاپ A4</button>
+      <button @click="printStockReport('a5')">چاپ A5</button>
+      <button @click="printStockReport('receipt')">چاپ فیش ۷ سانت</button>
       <button class="inv-danger" @click="rebuildBalances">بازسازی موجودی از کاردکس</button>
       <div class="inv-table-wrap">
         <table>
@@ -370,12 +517,41 @@ function exportStockCsv() {
         <select v-model.number="reportFilter.GoodsId"><option :value="0">همه کالاها</option><option v-for="g in goods" :key="g.GoodsId" :value="g.GoodsId">{{ g.GoodsCode }} - {{ g.GoodsName }}</option></select>
       </div>
       <button class="inv-primary" @click="loadKardex">نمایش کاردکس</button>
+      <button @click="printKardexReport('a4')">چاپ A4</button>
+      <button @click="printKardexReport('a5')">چاپ A5</button>
+      <button @click="printKardexReport('receipt')">چاپ فیش ۷ سانت</button>
       <div class="inv-table-wrap">
         <table>
           <thead><tr><th>تاریخ</th><th>سند</th><th>انبار</th><th>کالا</th><th>ورود</th><th>خروج</th><th>مانده</th><th>قیمت</th><th>مبلغ</th></tr></thead>
           <tbody>
             <tr v-for="r in kardexRows" :key="r.LedgerId">
               <td>{{ r.DocumentDate }}</td><td>{{ r.DocumentNumber }}</td><td>{{ r.WarehouseTitle }}</td><td>{{ r.GoodsName }}</td><td>{{ r.InQuantity }}</td><td>{{ r.OutQuantity }}</td><td>{{ r.BalanceAfter }}</td><td>{{ Number(r.UnitPrice).toLocaleString() }}</td><td>{{ Number(r.Amount).toLocaleString() }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div v-if="activeTab === 'stocktaking'" class="inv-card">
+      <h3>انبارگردانی</h3>
+      <div class="inv-warning">برای انبارگردانی، یک انبار مشخص انتخاب کنید، سپس موجودی واقعی را وارد کنید. سیستم اختلاف را به سند اصلاحی ورود یا خروج تبدیل می‌کند.</div>
+      <div class="inv-form-grid">
+        <select v-model.number="reportFilter.FiscalYearId"><option v-for="f in fiscalYears" :key="f.FiscalYearId" :value="f.FiscalYearId">{{ f.Title }}</option></select>
+        <select v-model.number="reportFilter.WarehouseId"><option :value="0">انتخاب انبار</option><option v-for="w in warehouses" :key="w.WarehouseId" :value="w.WarehouseId">{{ w.WarehouseTitle }}</option></select>
+      </div>
+      <button class="inv-primary" @click="prepareStockTaking">بارگذاری موجودی سیستم</button>
+      <button class="inv-danger" @click="applyStockTaking">ثبت اختلاف انبارگردانی</button>
+      <div class="inv-table-wrap">
+        <table>
+          <thead><tr><th>کد</th><th>کالا</th><th>موجودی سیستم</th><th>موجودی واقعی</th><th>اختلاف</th><th>آخرین خرید</th></tr></thead>
+          <tbody>
+            <tr v-for="r in stockTakingRows" :key="r.GoodsId" :class="{ diff: Number(r.DifferenceQuantity) !== 0 }">
+              <td>{{ r.GoodsCode }}</td>
+              <td>{{ r.GoodsName }}</td>
+              <td>{{ r.CurrentQuantity }}</td>
+              <td><input type="number" v-model.number="r.RealQuantity" @input="updateStockTakingDiff(r)" /></td>
+              <td>{{ r.DifferenceQuantity }}</td>
+              <td>{{ Number(r.LastPurchasePrice || r.AveragePrice || 0).toLocaleString() }}</td>
             </tr>
           </tbody>
         </table>
@@ -405,7 +581,7 @@ function exportStockCsv() {
 .inventory-header h2 { margin: 0; font-size: 24px; }
 .inventory-header p { margin: 4px 0 0; color: #94a3b8; }
 .inv-tabs { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
-.inv-tabs button, .inventory-tab button { border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.05); color: #e5e7eb; border-radius: 10px; padding: 9px 12px; cursor: pointer; }
+.inv-tabs button, .inventory-tab button { border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.05); color: #e5e7eb; border-radius: 10px; padding: 9px 12px; cursor: pointer; margin: 3px; }
 .inv-tabs button.active, .inv-primary { background: rgba(20,184,166,.18) !important; border-color: rgba(20,184,166,.45) !important; color: #ccfbf1 !important; }
 .inv-danger { background: rgba(239,68,68,.16) !important; border-color: rgba(239,68,68,.35) !important; color: #fecaca !important; }
 .inv-message, .inv-warning { padding: 10px 12px; border-radius: 12px; margin-bottom: 10px; }
@@ -422,5 +598,6 @@ function exportStockCsv() {
 table { width: 100%; border-collapse: collapse; min-width: 820px; }
 th, td { padding: 9px 10px; border-bottom: 1px solid rgba(255,255,255,.07); text-align: right; }
 th { position: sticky; top: 0; background: #151b27; z-index: 1; color: #cbd5e1; }
+tr.diff { background: rgba(245,158,11,.1); }
 @media (max-width: 900px) { .inv-grid.two { grid-template-columns: 1fr; } }
 </style>
