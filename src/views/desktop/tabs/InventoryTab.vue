@@ -8,6 +8,7 @@ import {
   saveInventoryDocument,
   loadStockReport,
   loadKardexReport,
+  loadInventoryChangeLogs,
   rebuildInventoryBalances,
   type FiscalYear,
   type InventoryDocumentItem,
@@ -15,12 +16,13 @@ import {
   type InventorySettings,
   type InventoryStockReportRow,
   type InventoryKardexRow,
+  type InventoryChangeLogRow,
   type Warehouse,
 } from "../../../services/inventoryApi";
 
 const loading = ref(false);
 const message = ref("");
-const activeTab = ref<"settings" | "documents" | "reports" | "kardex">("settings");
+const activeTab = ref<"settings" | "documents" | "reports" | "kardex" | "history">("settings");
 const haveStockLicense = ref(false);
 const warehouses = ref<Warehouse[]>([]);
 const fiscalYears = ref<FiscalYear[]>([]);
@@ -29,6 +31,7 @@ const valuationMethods = ref<{ id: number; title: string }[]>([]);
 const documentTypes = ref<{ id: number; title: string }[]>([]);
 const stockRows = ref<InventoryStockReportRow[]>([]);
 const kardexRows = ref<InventoryKardexRow[]>([]);
+const changeLogRows = ref<InventoryChangeLogRow[]>([]);
 const goodsSearch = ref("");
 
 const settings = reactive<InventorySettings>({
@@ -81,7 +84,6 @@ const filteredGoods = computed(() => {
 });
 
 const selectedFiscalYear = computed(() => fiscalYears.value.find((f) => f.FiscalYearId === Number(reportFilter.FiscalYearId)) || fiscalYears.value[0]);
-const selectedWarehouse = computed(() => warehouses.value.find((w) => w.WarehouseId === Number(documentForm.WarehouseId)) || warehouses.value.find((w) => w.IsDefault));
 
 onMounted(loadAll);
 
@@ -194,6 +196,16 @@ async function loadKardex() {
   }
 }
 
+async function loadHistory() {
+  try {
+    const result = await loadInventoryChangeLogs();
+    changeLogRows.value = result.rows || [];
+    activeTab.value = "history";
+  } catch (error) {
+    showMessage(error instanceof Error ? error.message : "خطا در دریافت سابقه تغییرات");
+  }
+}
+
 async function rebuildBalances() {
   try {
     const result = await rebuildInventoryBalances(reportFilter.FiscalYearId || selectedFiscalYear.value?.FiscalYearId);
@@ -233,6 +245,7 @@ function exportStockCsv() {
       <button :class="{ active: activeTab === 'documents' }" @click="activeTab = 'documents'">اسناد انبار</button>
       <button :class="{ active: activeTab === 'reports' }" @click="activeTab = 'reports'">گزارش موجودی</button>
       <button :class="{ active: activeTab === 'kardex' }" @click="activeTab = 'kardex'">کاردکس کالا</button>
+      <button :class="{ active: activeTab === 'history' }" @click="loadHistory">سابقه تغییرات</button>
     </nav>
 
     <div v-if="activeTab === 'settings'" class="inv-grid two">
@@ -368,6 +381,21 @@ function exportStockCsv() {
         </table>
       </div>
     </div>
+
+    <div v-if="activeTab === 'history'" class="inv-card">
+      <h3>سابقه تغییرات رسیدها و فاکتورهای انبار</h3>
+      <button class="inv-primary" @click="loadHistory">بروزرسانی سابقه</button>
+      <div class="inv-table-wrap">
+        <table>
+          <thead><tr><th>زمان</th><th>کاربر</th><th>نوع سند</th><th>شماره سند</th><th>عملیات</th><th>شرح</th></tr></thead>
+          <tbody>
+            <tr v-for="r in changeLogRows" :key="r.ChangeLogId">
+              <td>{{ r.ChangedAt }}</td><td>{{ r.ChangedBy }}</td><td>{{ r.DocumentType }}</td><td>{{ r.DocumentNumber }}</td><td>{{ r.ActionType }}</td><td>{{ r.Description }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
   </section>
 </template>
 
@@ -376,7 +404,7 @@ function exportStockCsv() {
 .inventory-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .inventory-header h2 { margin: 0; font-size: 24px; }
 .inventory-header p { margin: 4px 0 0; color: #94a3b8; }
-.inv-tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+.inv-tabs { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
 .inv-tabs button, .inventory-tab button { border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.05); color: #e5e7eb; border-radius: 10px; padding: 9px 12px; cursor: pointer; }
 .inv-tabs button.active, .inv-primary { background: rgba(20,184,166,.18) !important; border-color: rgba(20,184,166,.45) !important; color: #ccfbf1 !important; }
 .inv-danger { background: rgba(239,68,68,.16) !important; border-color: rgba(239,68,68,.35) !important; color: #fecaca !important; }
