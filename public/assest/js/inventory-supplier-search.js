@@ -4,6 +4,7 @@
 
   var SEARCH_DELAY_MS = 3000;
   var MIN_SEARCH_LENGTH = 3;
+  var activeWrapper = null;
 
   function isSupplierSelect(select) {
     if (!select || select.dataset.supplierSearchEnhanced === '1') return false;
@@ -25,6 +26,14 @@
   function dispatchVueChange(select) {
     select.dispatchEvent(new Event('change', { bubbles: true }));
     select.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+
+  function closeAllExcept(wrapper) {
+    Array.prototype.slice.call(document.querySelectorAll('.inventory-supplier-search-dropdown')).forEach(function (dropdown) {
+      if (!wrapper || !wrapper.contains(dropdown)) {
+        dropdown.style.display = 'none';
+      }
+    });
   }
 
   function enhanceSelect(select) {
@@ -87,6 +96,8 @@
         return item.text.toLowerCase().indexOf(q) >= 0 || String(item.value).indexOf(q) >= 0;
       }).slice(0, 12);
 
+      activeWrapper = wrapper;
+      closeAllExcept(wrapper);
       dropdown.innerHTML = '';
 
       if (!rows.length) {
@@ -103,7 +114,12 @@
         button.type = 'button';
         button.className = 'inventory-supplier-search-result';
         button.innerHTML = '<strong>' + item.text + '</strong><small>کد/شناسه: ' + item.value + '</small>';
-        button.addEventListener('click', function () {
+        button.addEventListener('mousedown', function (event) {
+          event.preventDefault();
+        });
+        button.addEventListener('click', function (event) {
+          event.preventDefault();
+          event.stopPropagation();
           select.value = item.value;
           input.value = item.text;
           clearButton.style.display = 'block';
@@ -133,18 +149,23 @@
 
       helper.textContent = '۳ ثانیه بعد جستجو شروع می‌شود...';
       timer = window.setTimeout(function () {
-        helper.textContent = 'نتایج جستجو';
+        helper.textContent = 'نتایج جستجو؛ برای انتخاب روی مورد بزن';
         renderResults(value);
       }, SEARCH_DELAY_MS);
     });
 
     input.addEventListener('focus', function () {
-      if (input.value.trim().length >= MIN_SEARCH_LENGTH && dropdown.children.length) {
-        dropdown.style.display = 'block';
+      activeWrapper = wrapper;
+      closeAllExcept(wrapper);
+      if (input.value.trim().length >= MIN_SEARCH_LENGTH) {
+        if (dropdown.children.length) dropdown.style.display = 'block';
+        else renderResults(input.value.trim());
       }
     });
 
-    clearButton.addEventListener('click', function () {
+    clearButton.addEventListener('click', function (event) {
+      event.preventDefault();
+      event.stopPropagation();
       input.value = '';
       select.value = '0';
       clearButton.style.display = 'none';
@@ -155,13 +176,18 @@
       input.focus();
     });
 
-    wrapper.addEventListener('mouseleave', function () {
-      window.setTimeout(closeDropdown, 220);
+    wrapper.addEventListener('click', function (event) {
+      event.stopPropagation();
     });
 
     select.addEventListener('change', syncFromSelect);
     syncFromSelect();
   }
+
+  document.addEventListener('click', function (event) {
+    if (activeWrapper && event.target && activeWrapper.contains(event.target)) return;
+    closeAllExcept(null);
+  }, true);
 
   function scan() {
     var inventory = document.querySelector('.inventory-tab');
