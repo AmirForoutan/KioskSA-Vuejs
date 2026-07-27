@@ -1,19 +1,27 @@
 import { GetApiAddress } from "../utilities";
 
-async function getInventoryApiAddress() {
+async function buildServiceAddress(offset: number, path: string) {
   const serviceAdd = await GetApiAddress();
 
   try {
     const url = new URL(serviceAdd);
     const currentPort = Number(url.port || (url.protocol === "https:" ? 443 : 80));
-    url.port = String(currentPort + 1);
-    url.pathname = "/inventory";
+    url.port = String(currentPort + offset);
+    url.pathname = path;
     url.search = "";
     url.hash = "";
     return url.toString().replace(/\/$/, "");
   } catch {
-    return String(serviceAdd).replace(/:(\d+)(\/?$)/, (_match, port) => `:${Number(port) + 1}/inventory`);
+    return String(serviceAdd).replace(/:(\d+)(\/?$)/, (_match, port) => `:${Number(port) + offset}${path}`);
   }
+}
+
+async function getInventoryApiAddress() {
+  return buildServiceAddress(1, "/inventory");
+}
+
+async function getInventoryAnalysisApiAddress() {
+  return buildServiceAddress(2, "/inventory-analysis");
 }
 
 async function postInventory<T>(path: string, data: unknown = {}): Promise<T> {
@@ -27,6 +35,21 @@ async function postInventory<T>(path: string, data: unknown = {}): Promise<T> {
   const result = await response.json();
   if (!result?.status) {
     throw new Error(result?.message || "خطا در عملیات انبار");
+  }
+  return result as T;
+}
+
+async function postInventoryAnalysis<T>(path: string, data: unknown = {}): Promise<T> {
+  const inventoryAdd = await getInventoryAnalysisApiAddress();
+  const response = await fetch(`${inventoryAdd}/${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+
+  const result = await response.json();
+  if (!result?.status) {
+    throw new Error(result?.message || "خطا در عملیات آنالیز کالا");
   }
   return result as T;
 }
@@ -71,6 +94,34 @@ export type InventoryGoods = {
   MaxStock: number;
   ReorderPoint: number;
   DefaultWarehouseId?: number | null;
+  IsPurchasable?: boolean;
+  IsSellable?: boolean;
+  IsKioskVisible?: boolean;
+};
+
+export type GoodsUsage = {
+  GoodsId: number;
+  GoodsCode: number;
+  GoodsName: string;
+  GoodsGroupId: number;
+  IsPurchasable: boolean;
+  IsSellable: boolean;
+  IsKioskVisible: boolean;
+};
+
+export type RecipeItem = {
+  ProductGoodsId?: number;
+  IngredientGoodsId: number;
+  IngredientGoodsCode?: number;
+  IngredientGoodsName?: string;
+  Quantity: number;
+  WastePercent: number;
+};
+
+export type InventoryAnalysisBootstrap = {
+  status: boolean;
+  goods: GoodsUsage[];
+  recipes: RecipeItem[];
 };
 
 export type InventoryDocumentItem = {
@@ -187,4 +238,30 @@ export function loadInventoryChangeLogs() {
 
 export function rebuildInventoryBalances(fiscalYearId?: number) {
   return postInventory<{ status: boolean; message: string }>("rebuild-balances", { FiscalYearId: fiscalYearId || 0 });
+}
+
+export function loadInventoryAnalysisBootstrap() {
+  return postInventoryAnalysis<InventoryAnalysisBootstrap>("bootstrap");
+}
+
+export function saveGoodsUsage(items: Partial<GoodsUsage>[]) {
+  return postInventoryAnalysis<{ status: boolean; message: string }>("goods-usage/save", { Items: items });
+}
+
+export function saveGoodsRecipe(productGoodsId: number, items: RecipeItem[]) {
+  return postInventoryAnalysis<{ status: boolean; message: string }>("recipe/save", {
+    ProductGoodsId: productGoodsId,
+    Items: items,
+  });
+}
+
+export function checkInvoiceStockByRecipe(items: { GoodsId: number; Quantity: number }[]) {
+  return postInventoryAnalysis<{
+    status: boolean;
+    canSubmit: boolean;
+    warningOnly?: boolean;
+    shouldCheck: boolean;
+    message: string;
+    shortages: { GoodsId: number; GoodsName: string; RequiredQuantity: number; CurrentQuantity: number; ShortageQuantity: number }[];
+  }>("check-invoice-stock", { Items: items });
 }
