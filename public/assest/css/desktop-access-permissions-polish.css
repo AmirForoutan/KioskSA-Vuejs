@@ -1,24 +1,64 @@
 /* Users and permissions visibility fixes - scoped to desktop workspace */
 
+.dw-content .u-grid {
+  grid-template-columns: minmax(520px, 1.18fr) minmax(360px, .82fr) !important;
+  align-items: stretch !important;
+}
+
+.dw-content .u-card {
+  min-width: 0 !important;
+}
+
+.dw-content .u-card:first-child {
+  overflow: hidden !important;
+}
+
+.dw-content .u-row {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  align-items: end !important;
+}
+
+.dw-content .u-input,
+.dw-content .u-select {
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+.dw-content .u-perms {
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)) !important;
+  gap: 10px !important;
+  padding: 2px 2px 8px !important;
+  overflow: auto !important;
+  align-content: start !important;
+}
+
 .dw-content .u-perms .perm {
   position: relative !important;
   display: flex !important;
-  align-items: center !important;
-  justify-content: space-between !important;
-  gap: 10px !important;
-  min-height: 52px !important;
-  padding: 10px 12px !important;
-  border-radius: 14px !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  min-height: 74px !important;
+  padding: 12px 14px 12px 46px !important;
+  border-radius: 16px !important;
   text-align: right !important;
+  line-height: 1.75 !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+  word-break: normal !important;
   transition: transform .15s ease, border-color .15s ease, background .15s ease, opacity .15s ease !important;
 }
 
 .dw-content .u-perms .perm::after {
   content: 'ندارد';
+  align-self: flex-start;
   flex: 0 0 auto;
-  padding: 4px 9px;
+  padding: 4px 10px;
   border-radius: 999px;
   font-size: 11px;
+  line-height: 1.4;
   font-weight: 950;
   color: #cbd5e1;
   background: rgba(100, 116, 139, 0.18);
@@ -39,12 +79,15 @@
 .dw-content .u-perms .perm.pargas-access-on::before,
 .dw-content .u-perms .perm[aria-pressed='true']::before {
   content: '✓';
+  position: absolute;
+  left: 12px;
+  top: 12px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
-  margin-left: 6px;
+  width: 24px;
+  height: 24px;
+  margin: 0;
   border-radius: 999px;
   color: #042f2e;
   background: #5eead4;
@@ -62,7 +105,7 @@
 }
 
 .dw-content .u-perms .perm:not(.on):not(.pargas-access-on):not([aria-pressed='true']) {
-  opacity: .62 !important;
+  opacity: .66 !important;
   color: #cbd5e1 !important;
   background: rgba(15, 23, 42, 0.48) !important;
   border-color: rgba(148, 163, 184, 0.14) !important;
@@ -137,22 +180,56 @@
   color: #99f6e4 !important;
 }
 
+@media (max-width: 1450px) {
+  .dw-content .u-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .dw-content .u-card:first-child {
+    min-height: 520px !important;
+  }
+
+  .dw-content .u-perms {
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)) !important;
+  }
+}
+
 @media (max-width: 900px) {
   .dw-content .u-grid {
     grid-template-columns: 1fr !important;
   }
 
+  .dw-content .u-head,
+  .dw-content .u-card-head,
+  .dw-content .u-actions {
+    flex-wrap: wrap !important;
+  }
+
+  .dw-content .u-row {
+    grid-template-columns: 1fr !important;
+  }
+
   .dw-content .u-perms {
-    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)) !important;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)) !important;
+  }
+
+  .dw-content .u-table {
+    min-width: 720px !important;
   }
 }
 
-@media (max-width: 520px) {
+@media (max-width: 620px) {
   .dw-content .u-perms {
     grid-template-columns: 1fr !important;
   }
 
   .dw-content .u-perms .perm {
-    min-height: 48px !important;
+    min-height: 68px !important;
+    padding: 11px 12px 11px 42px !important;
+    font-size: 13px !important;
+  }
+
+  .dw-content .u-perms .perm::after {
+    font-size: 10.5px !important;
   }
 }
