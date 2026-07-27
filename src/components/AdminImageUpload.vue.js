@@ -1,4 +1,3 @@
-/// <reference types="../../node_modules/.vue-global-types/vue_3.5_0_0_0.d.ts" />
 import { ref, computed, onMounted, watch } from 'vue';
 import { fetchCategoriesApi, fetchGoodsApi, fetchToppingItemsApi, fetchToppingLevelsApi, fetchProductToppingsApi, saveCategoryApi, saveProductApi, saveToppingItemApi, saveToppingLevelApi, saveProductToppingApi, Delete, fetchInvoicesApi, fetchInvoiceItemsApi } from '../services/apiService';
 import { useToast } from 'vue-toastification';

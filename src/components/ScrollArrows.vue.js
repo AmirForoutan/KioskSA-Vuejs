@@ -1,4 +1,3 @@
-/// <reference types="../../node_modules/.vue-global-types/vue_3.5_0_0_0.d.ts" />
 import { ref, computed, nextTick, watchEffect, unref, onBeforeUnmount } from 'vue';
 const props = defineProps({
     containerRef: { type: [Object, HTMLElement], default: null },

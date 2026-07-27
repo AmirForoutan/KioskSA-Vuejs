@@ -1,4 +1,3 @@
-/// <reference types="../../../../node_modules/.vue-global-types/vue_3.5_0_0_0.d.ts" />
 import { computed, ref } from "vue";
 import { can } from "../../../components/acl/can";
 import ProductsManager from "../baseinfo/ProductsManager.vue";

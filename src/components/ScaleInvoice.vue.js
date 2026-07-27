@@ -1,4 +1,3 @@
-/// <reference types="../../node_modules/.vue-global-types/vue_3.5_0_0_0.d.ts" />
 import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { getScaleInvoice, sendToPOS, sendInvoicescale, fetchScaleCategories, fetchScaleGoods, sendInvoice } from '../services/apiService';
 import { getData, removeData, saveData } from '../services/storageService';

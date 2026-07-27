@@ -1,4 +1,3 @@
-/// <reference types="../../node_modules/.vue-global-types/vue_3.5_0_0_0.d.ts" />
 import { ref, computed, onMounted, nextTick, watch, inject, toRaw } from 'vue';
 import { getData, saveData, removeData } from '../services/storageService';
 import { getCurrency, IsClubStat, OrderRegistrationStat, IsSalonOrderStat, IsTakeAwayOrderStat, GetIsCollapseCart, IsShowTables, IsShowDiscountCart, IsTableSelectionRequired, KeepSalonTableOpenAfterSubmit, ShowKioskOrderTypeSelector } from '../utilities';
