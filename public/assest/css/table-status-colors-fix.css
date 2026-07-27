@@ -1,0 +1,101 @@
+/* Restore hall/table status colors after desktop polish styles.
+   Scoped to desktop/table areas and loaded after shared polish CSS. */
+
+.dw-content .table-status-free,
+.dw-content .table-status-available,
+.dw-content .table-free,
+.dw-content .table-available,
+.dw-content .free-table,
+.dw-content .available-table,
+.dw-content .is-free,
+.dw-content .is-available,
+.dw-content .pargas-table-status-free,
+.dw-content [data-table-status='free'],
+.dw-content [data-status='free'],
+.dw-content [data-status='available'] {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.34), rgba(21, 128, 61, 0.22)) !important;
+  border-color: rgba(74, 222, 128, 0.62) !important;
+  color: #dcfce7 !important;
+  box-shadow: 0 12px 28px rgba(22, 163, 74, 0.24) !important;
+}
+
+.dw-content .table-status-busy,
+.dw-content .table-status-occupied,
+.dw-content .table-busy,
+.dw-content .table-occupied,
+.dw-content .busy-table,
+.dw-content .occupied-table,
+.dw-content .is-busy,
+.dw-content .is-occupied,
+.dw-content .pargas-table-status-occupied,
+.dw-content [data-table-status='busy'],
+.dw-content [data-table-status='occupied'],
+.dw-content [data-status='busy'],
+.dw-content [data-status='occupied'] {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.44), rgba(153, 27, 27, 0.28)) !important;
+  border-color: rgba(248, 113, 113, 0.72) !important;
+  color: #fee2e2 !important;
+  box-shadow: 0 14px 32px rgba(220, 38, 38, 0.28) !important;
+}
+
+.dw-content .table-status-reserved,
+.dw-content .table-reserved,
+.dw-content .reserved-table,
+.dw-content .is-reserved,
+.dw-content .pargas-table-status-reserved,
+.dw-content [data-table-status='reserved'],
+.dw-content [data-status='reserved'] {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.42), rgba(180, 83, 9, 0.26)) !important;
+  border-color: rgba(251, 191, 36, 0.7) !important;
+  color: #fef3c7 !important;
+  box-shadow: 0 14px 32px rgba(217, 119, 6, 0.22) !important;
+}
+
+.dw-content .table-status-disabled,
+.dw-content .table-disabled,
+.dw-content .disabled-table,
+.dw-content .is-disabled,
+.dw-content .pargas-table-status-disabled,
+.dw-content [data-table-status='disabled'],
+.dw-content [data-status='disabled'] {
+  background: linear-gradient(135deg, rgba(100, 116, 139, 0.34), rgba(51, 65, 85, 0.26)) !important;
+  border-color: rgba(148, 163, 184, 0.42) !important;
+  color: #cbd5e1 !important;
+  opacity: 0.82 !important;
+}
+
+.dw-content .pargas-table-status-free *,
+.dw-content .pargas-table-status-occupied *,
+.dw-content .pargas-table-status-reserved *,
+.dw-content .pargas-table-status-disabled *,
+.dw-content .table-status-free *,
+.dw-content .table-status-available *,
+.dw-content .table-status-busy *,
+.dw-content .table-status-occupied *,
+.dw-content .table-status-reserved *,
+.dw-content .table-status-disabled * {
+  color: inherit !important;
+}
+
+.dw-content .pargas-table-status-free:hover,
+.dw-content .pargas-table-status-occupied:hover,
+.dw-content .pargas-table-status-reserved:hover,
+.dw-content .pargas-table-status-disabled:hover {
+  filter: brightness(1.08) saturate(1.08) !important;
+  transform: translateY(-2px) !important;
+}
+
+/* Some table cards are rendered as buttons, and shared desktop polish styles target all buttons.
+   These selectors intentionally come later and use !important to preserve status colors. */
+.dw-content button.pargas-table-status-free,
+.dw-content button.pargas-table-status-occupied,
+.dw-content button.pargas-table-status-reserved,
+.dw-content button.pargas-table-status-disabled,
+.dw-content button[class*='table-status'],
+.dw-content button[class*='table-occupied'],
+.dw-content button[class*='table-busy'],
+.dw-content button[class*='table-reserved'],
+.dw-content button[class*='table-free'],
+.dw-content button[class*='table-available'] {
+  color: inherit !important;
+}
