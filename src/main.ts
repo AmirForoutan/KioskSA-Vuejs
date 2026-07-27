@@ -50,7 +50,6 @@ async function bootstrap() {
 
   const options: PluginOptions = {
     rtl: true,
-    position: "top-left",
     timeout: 4500,
     closeOnClick: true,
     pauseOnFocusLoss: true,
