@@ -1,26 +1,94 @@
 /* Users and permissions visibility fixes - scoped to desktop workspace */
 
-.dw-content [class*='base' i] [class*='tab' i] button.active,
-.dw-content [class*='base' i] [class*='tab' i] button.selected,
-.dw-content [class*='base' i] [class*='tab' i] button[aria-selected='true'],
-.dw-content [class*='user' i] button.active,
-.dw-content [class*='user' i] button.selected,
-.dw-content [class*='permission' i] button.active,
-.dw-content [class*='permission' i] button.selected,
-.dw-content [class*='access' i] button.active,
-.dw-content [class*='access' i] button.selected {
+.dw-content .u-perms .perm {
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 10px !important;
+  min-height: 52px !important;
+  padding: 10px 12px !important;
+  border-radius: 14px !important;
+  text-align: right !important;
+  transition: transform .15s ease, border-color .15s ease, background .15s ease, opacity .15s ease !important;
+}
+
+.dw-content .u-perms .perm::after {
+  content: 'ندارد';
+  flex: 0 0 auto;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 950;
+  color: #cbd5e1;
+  background: rgba(100, 116, 139, 0.18);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+}
+
+.dw-content .u-perms .perm.on,
+.dw-content .u-perms .perm.pargas-access-on,
+.dw-content .u-perms .perm[aria-pressed='true'] {
+  opacity: 1 !important;
+  color: #ecfeff !important;
+  background: linear-gradient(135deg, rgba(20, 184, 166, 0.34), rgba(14, 165, 233, 0.15)) !important;
+  border-color: rgba(45, 212, 191, 0.76) !important;
+  box-shadow: 0 12px 30px rgba(20, 184, 166, 0.16), inset 0 1px 0 rgba(255,255,255,0.10) !important;
+}
+
+.dw-content .u-perms .perm.on::before,
+.dw-content .u-perms .perm.pargas-access-on::before,
+.dw-content .u-perms .perm[aria-pressed='true']::before {
+  content: '✓';
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-left: 6px;
+  border-radius: 999px;
+  color: #042f2e;
+  background: #5eead4;
+  box-shadow: 0 0 18px rgba(94, 234, 212, 0.65);
+  font-weight: 1000;
+}
+
+.dw-content .u-perms .perm.on::after,
+.dw-content .u-perms .perm.pargas-access-on::after,
+.dw-content .u-perms .perm[aria-pressed='true']::after {
+  content: 'دسترسی دارد';
+  color: #ccfbf1;
+  background: rgba(20, 184, 166, 0.26);
+  border-color: rgba(45, 212, 191, 0.42);
+}
+
+.dw-content .u-perms .perm:not(.on):not(.pargas-access-on):not([aria-pressed='true']) {
+  opacity: .62 !important;
+  color: #cbd5e1 !important;
+  background: rgba(15, 23, 42, 0.48) !important;
+  border-color: rgba(148, 163, 184, 0.14) !important;
+}
+
+.dw-content .u-perms .perm:not(.on):not(.pargas-access-on):not([aria-pressed='true']):hover {
+  opacity: .92 !important;
+  border-color: rgba(148, 163, 184, 0.32) !important;
+}
+
+.dw-content .u-perms .perm:active {
+  transform: scale(.985);
+}
+
+.dw-content .bi-side > .bi-side-btn.active,
+.dw-content .bi-side > .bi-side-btn.pargas-selected-tab,
+.dw-content .bi-side > .bi-side-btn[aria-selected='true'] {
   background: linear-gradient(135deg, rgba(20, 184, 166, 0.34), rgba(14, 165, 233, 0.18)) !important;
   border-color: rgba(45, 212, 191, 0.72) !important;
   color: #ecfeff !important;
   box-shadow: 0 12px 30px rgba(20, 184, 166, 0.20), inset 0 1px 0 rgba(255,255,255,0.08) !important;
 }
 
-.dw-content [class*='base' i] [class*='tab' i] button.active::before,
-.dw-content [class*='base' i] [class*='tab' i] button.selected::before,
-.dw-content [class*='base' i] [class*='tab' i] button[aria-selected='true']::before,
-.dw-content [class*='user' i] button.active::before,
-.dw-content [class*='permission' i] button.active::before,
-.dw-content [class*='access' i] button.active::before {
+.dw-content .bi-side > .bi-side-btn.active::before,
+.dw-content .bi-side > .bi-side-btn.pargas-selected-tab::before,
+.dw-content .bi-side > .bi-side-btn[aria-selected='true']::before {
   content: '●';
   display: inline-block;
   margin-left: 6px;
@@ -28,103 +96,63 @@
   text-shadow: 0 0 12px rgba(45, 212, 191, 0.7);
 }
 
-.dw-content [class*='permission' i],
-.dw-content [class*='access' i],
-.dw-content [class*='role' i],
-.dw-content [class*='user' i] {
-  scrollbar-color: rgba(45, 212, 191, 0.35) rgba(15, 23, 42, 0.5);
+.dw-content .m-tools .tabs button.pargas-selected-tab::after,
+.dw-content .m-tools .tabs button[aria-selected='true']::after {
+  display: none !important;
+  content: none !important;
 }
 
-.dw-content [class*='permission' i] input[type='checkbox'],
-.dw-content [class*='access' i] input[type='checkbox'],
-.dw-content [class*='role' i] input[type='checkbox'],
-.dw-content [class*='user' i] input[type='checkbox'] {
-  width: 20px !important;
-  height: 20px !important;
-  min-height: 20px !important;
-  accent-color: #14b8a6 !important;
-  box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.72), 0 0 0 4px rgba(148, 163, 184, 0.18) !important;
-}
-
-.dw-content [class*='permission' i] input[type='checkbox']:checked,
-.dw-content [class*='access' i] input[type='checkbox']:checked,
-.dw-content [class*='role' i] input[type='checkbox']:checked,
-.dw-content [class*='user' i] input[type='checkbox']:checked {
-  box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.72), 0 0 0 5px rgba(45, 212, 191, 0.34) !important;
-}
-
-.dw-content tr:has(input[type='checkbox']:checked),
-.dw-content li:has(input[type='checkbox']:checked),
-.dw-content label:has(input[type='checkbox']:checked),
-.dw-content div:has(> input[type='checkbox']:checked) {
-  background: linear-gradient(135deg, rgba(20, 184, 166, 0.14), rgba(14, 165, 233, 0.06)) !important;
-  border-color: rgba(45, 212, 191, 0.26) !important;
+.dw-content .m-tools .tabs button.active {
+  position: relative !important;
+  background: linear-gradient(135deg, rgba(20, 184, 166, 0.28), rgba(14, 165, 233, 0.12)) !important;
+  border-color: rgba(45, 212, 191, 0.58) !important;
   color: #ecfeff !important;
 }
 
-.dw-content [class*='permission' i] label:has(input[type='checkbox']:checked)::after,
-.dw-content [class*='access' i] label:has(input[type='checkbox']:checked)::after,
-.dw-content [class*='role' i] label:has(input[type='checkbox']:checked)::after {
-  content: 'فعال';
-  margin-right: auto;
-  padding: 3px 9px;
-  border-radius: 999px;
-  background: rgba(20, 184, 166, 0.24);
-  border: 1px solid rgba(45, 212, 191, 0.36);
-  color: #ccfbf1;
-  font-size: 11px;
-  font-weight: 900;
+.dw-content .m-tools .tabs button.active::after {
+  content: '' !important;
+  position: absolute !important;
+  right: 10px !important;
+  left: 10px !important;
+  bottom: -5px !important;
+  height: 3px !important;
+  border-radius: 999px !important;
+  background: #5eead4 !important;
+  box-shadow: 0 0 14px rgba(94, 234, 212, .8) !important;
 }
 
-.dw-content [class*='permission' i] table,
-.dw-content [class*='access' i] table,
-.dw-content [class*='user' i] table,
-.dw-content [class*='role' i] table {
-  border-radius: 18px;
-  overflow: hidden;
-  background: rgba(2, 6, 23, 0.20);
+.dw-content .u-card,
+.dw-content .u-perms,
+.dw-content .u-table {
+  scrollbar-color: rgba(45, 212, 191, 0.35) rgba(15, 23, 42, 0.5);
 }
 
-.dw-content [class*='permission' i] th,
-.dw-content [class*='access' i] th,
-.dw-content [class*='user' i] th,
-.dw-content [class*='role' i] th {
+.dw-content .u-table {
+  border-radius: 18px !important;
+  overflow: auto !important;
+  background: rgba(2, 6, 23, 0.20) !important;
+}
+
+.dw-content .u-th {
   color: #99f6e4 !important;
 }
 
-.dw-content [class*='permission' i] .active,
-.dw-content [class*='access' i] .active,
-.dw-content [class*='role' i] .active,
-.dw-content [class*='permission' i] .selected,
-.dw-content [class*='access' i] .selected,
-.dw-content [class*='role' i] .selected {
-  outline: 1px solid rgba(45, 212, 191, 0.46) !important;
-  outline-offset: 2px !important;
-}
-
 @media (max-width: 900px) {
-  .dw-content [class*='permission' i] table,
-  .dw-content [class*='access' i] table,
-  .dw-content [class*='user' i] table,
-  .dw-content [class*='role' i] table {
-    min-width: 680px;
+  .dw-content .u-grid {
+    grid-template-columns: 1fr !important;
   }
 
-  .dw-content [class*='base' i] [class*='tab' i],
-  .dw-content [class*='user' i] [class*='tab' i],
-  .dw-content [class*='permission' i] [class*='tab' i],
-  .dw-content [class*='access' i] [class*='tab' i] {
-    display: grid !important;
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-    gap: 8px !important;
+  .dw-content .u-perms {
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)) !important;
   }
 }
 
 @media (max-width: 520px) {
-  .dw-content [class*='base' i] [class*='tab' i],
-  .dw-content [class*='user' i] [class*='tab' i],
-  .dw-content [class*='permission' i] [class*='tab' i],
-  .dw-content [class*='access' i] [class*='tab' i] {
+  .dw-content .u-perms {
     grid-template-columns: 1fr !important;
+  }
+
+  .dw-content .u-perms .perm {
+    min-height: 48px !important;
   }
 }
