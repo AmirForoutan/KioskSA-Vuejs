@@ -1,0 +1,139 @@
+/* Responsive and z-index fixes for inventory screens */
+
+.inventory-tab .stocktaking-filter {
+  overflow: visible !important;
+}
+
+.inventory-tab .stocktaking-date-label {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  align-items: start !important;
+  gap: 8px !important;
+  min-height: unset !important;
+  color: #ccfbf1 !important;
+  font-weight: 950 !important;
+}
+
+.inventory-tab .stocktaking-date-label input {
+  border-color: rgba(45, 212, 191, 0.38) !important;
+  background: rgba(2, 6, 23, 0.92) !important;
+}
+
+.inventory-tab .inventory-supplier-search-enhancer {
+  z-index: 400 !important;
+}
+
+.inventory-tab .inventory-supplier-search-enhancer:focus-within,
+.inventory-tab .inventory-supplier-search-enhancer:hover {
+  z-index: 9999 !important;
+}
+
+.inventory-tab .inventory-supplier-search-dropdown {
+  z-index: 10000 !important;
+  position: absolute !important;
+}
+
+.inventory-tab .inv-card,
+.inventory-tab .inv-form-grid,
+.inventory-tab .inv-form-row,
+.inventory-tab .inv-table-wrap {
+  overflow: visible;
+}
+
+.inventory-tab .inv-table-wrap {
+  overflow-x: auto !important;
+  overflow-y: auto !important;
+}
+
+.inventory-tab .inv-card:has(.inventory-supplier-search-dropdown[style*='block']) {
+  overflow: visible !important;
+}
+
+@media (max-width: 1280px) {
+  .inventory-tab .inventory-header {
+    align-items: flex-start !important;
+    gap: 12px !important;
+  }
+
+  .inventory-tab .inv-form-grid {
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)) !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .inventory-tab {
+    padding: 0 2px 14px !important;
+  }
+
+  .inventory-tab .inventory-header {
+    flex-direction: column !important;
+    padding: 14px !important;
+  }
+
+  .inventory-tab .inventory-header h2 {
+    font-size: 22px !important;
+  }
+
+  .inventory-tab .inv-tabs {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .inventory-tab .inv-tabs button,
+  .inventory-tab button {
+    width: 100% !important;
+    margin: 0 !important;
+  }
+
+  .inventory-tab .inv-card {
+    padding: 12px !important;
+    border-radius: 18px !important;
+  }
+
+  .inventory-tab .inv-form-grid,
+  .inventory-tab .inv-form-row,
+  .inventory-tab .stocktaking-filter {
+    grid-template-columns: 1fr !important;
+  }
+
+  .inventory-tab table {
+    min-width: 720px !important;
+    font-size: 12px !important;
+  }
+
+  .inventory-tab th,
+  .inventory-tab td {
+    padding: 8px !important;
+  }
+}
+
+@media (max-width: 520px) {
+  .inventory-tab .inv-tabs {
+    grid-template-columns: 1fr !important;
+  }
+
+  .inventory-tab .inventory-header p {
+    font-size: 12px !important;
+  }
+
+  .inventory-tab .inv-card h3 {
+    font-size: 16px !important;
+  }
+
+  .inventory-tab input,
+  .inventory-tab select {
+    min-height: 40px !important;
+  }
+
+  .inventory-tab table {
+    min-width: 640px !important;
+  }
+
+  .inventory-tab .inventory-supplier-search-dropdown {
+    position: fixed !important;
+    right: 12px !important;
+    left: 12px !important;
+    top: 30% !important;
+    max-height: 45vh !important;
+  }
+}
