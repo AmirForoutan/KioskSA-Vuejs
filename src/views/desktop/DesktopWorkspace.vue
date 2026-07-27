@@ -19,12 +19,28 @@ type Tab = { key: string; title: string; icon?: string };
 
 const hasStockLicense = ref(false);
 
+const inventoryPermissionKeys = [
+    "view.inventory",
+    "manage.inventory",
+    "view.inventory.settings",
+    "manage.inventory.settings",
+    "view.inventory.documents",
+    "manage.inventory.documents",
+    "view.inventory.reports",
+    "view.inventory.kardex",
+    "view.inventory.stocktaking",
+    "manage.inventory.stocktaking",
+    "view.inventory.suppliers",
+    "manage.inventory.suppliers",
+    "view.inventory.history",
+];
+
 function canOpenDiscounts() {
     return can("view.discounts") || can("manage.discounts") || can("manage.discountCards") || can("sales.discount.percent") || can("sales.discount.amount");
 }
 
 function canOpenInventoryByPermission() {
-    return can("view.inventory") || can("manage.inventory");
+    return inventoryPermissionKeys.some((permission) => can(permission));
 }
 
 function canOpenInventoryAnalysisByPermission() {
