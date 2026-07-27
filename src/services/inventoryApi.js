@@ -41,6 +41,37 @@ function normalizeInventoryBootstrap(data) {
         fiscalYears: (data.fiscalYears || []).map(normalizeFiscalYear),
     };
 }
+function padDatePart(value) {
+    const text = String(value || "").trim();
+    if (!text)
+        return "";
+    return text.length === 1 ? `0${text}` : text;
+}
+function normalizeDateText(value) {
+    const text = String(value || "").trim().replace(/-/g, "/");
+    const parts = text.split("/");
+    if (parts.length < 3)
+        return text;
+    return `${parts[0]}/${padDatePart(parts[1])}/${padDatePart(parts[2])}`;
+}
+function normalizeKardexRow(row) {
+    return {
+        LedgerId: Number(row.LedgerId ?? row.ledgerId ?? 0),
+        DocumentId: Number(row.DocumentId ?? row.documentId ?? 0),
+        DocumentType: Number(row.DocumentType ?? row.documentType ?? 0),
+        DocumentNumber: String(row.DocumentNumber ?? row.documentNumber ?? ""),
+        DocumentDate: normalizeDateText(row.DocumentDate ?? row.documentDate),
+        WarehouseTitle: String(row.WarehouseTitle ?? row.warehouseTitle ?? ""),
+        GoodsId: Number(row.GoodsId ?? row.goodsId ?? 0),
+        GoodsName: String(row.GoodsName ?? row.goodsName ?? ""),
+        InQuantity: Number(row.InQuantity ?? row.inQuantity ?? 0),
+        OutQuantity: Number(row.OutQuantity ?? row.outQuantity ?? 0),
+        BalanceAfter: Number(row.BalanceAfter ?? row.balanceAfter ?? 0),
+        UnitPrice: Number(row.UnitPrice ?? row.unitPrice ?? 0),
+        Amount: Number(row.Amount ?? row.amount ?? 0),
+        Description: String(row.Description ?? row.description ?? ""),
+    };
+}
 async function getInventoryApiAddress() {
     return buildServiceAddress(1, "/inventory");
 }
@@ -87,7 +118,7 @@ export function saveGoodsLimits(items) {
     return postInventory("goods/limits/save", { Items: items });
 }
 export function saveInventoryDocument(data) {
-    return postInventory("document/save", data);
+    return postInventoryAnalysis("document/save", data);
 }
 export function listInventoryDocuments(filters) {
     return postInventory("documents/list", filters);
@@ -95,8 +126,10 @@ export function listInventoryDocuments(filters) {
 export function loadStockReport(filters) {
     return postInventory("report/stock", filters);
 }
-export function loadKardexReport(filters) {
-    return postInventory("report/kardex", filters);
+export async function loadKardexReport(filters) {
+    const result = await postInventory("report/kardex", filters);
+    const rows = (result.rows || result.Rows || []).map(normalizeKardexRow);
+    return { ...result, rows };
 }
 export function loadInventoryChangeLogs() {
     return postInventory("change-logs");
