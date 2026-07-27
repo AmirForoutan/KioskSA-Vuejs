@@ -24,15 +24,111 @@
     return map[Number(type)] || type || '-';
   }
 
-  function showDetail(docNumber) {
-    var detail = getDetails().find(function (item) { return String(item.DocumentNumber) === String(docNumber); });
-    if (!detail) {
-      if (window.pargasToast) window.pargasToast.info('جزئیات این سند در حافظه مرورگر موجود نیست. اسناد جدید از این به بعد ذخیره می‌شوند.');
-      return;
+  async function getConfiguredApiBase() {
+    var response = await fetch('./config.json', { cache: 'no-store' });
+    var config = await response.json();
+    return config.ServiceAPIAddress || config.ServiceAddress || '';
+  }
+
+  function buildInventoryBase(serviceUrl) {
+    try {
+      var url = new URL(serviceUrl, window.location.href);
+      var port = Number(url.port || (url.protocol === 'https:' ? 443 : 80));
+      url.port = String(port + 1);
+      url.pathname = '/inventory';
+      url.search = '';
+      url.hash = '';
+      return url.toString().replace(/\/$/, '');
+    } catch (_) {
+      return String(serviceUrl).replace(/:(\d+)(\/?$)/, function (_match, port) {
+        return ':' + (Number(port) + 1) + '/inventory';
+      }).replace(/\/$/, '');
+    }
+  }
+
+  function normalizeKardexRow(row) {
+    return {
+      DocumentNumber: row.DocumentNumber || row.documentNumber || '',
+      DocumentType: Number(row.DocumentType || row.documentType || 0),
+      DocumentDate: row.DocumentDate || row.documentDate || '',
+      WarehouseTitle: row.WarehouseTitle || row.warehouseTitle || '',
+      GoodsId: Number(row.GoodsId || row.goodsId || 0),
+      GoodsName: row.GoodsName || row.goodsName || '',
+      InQuantity: Number(row.InQuantity || row.inQuantity || 0),
+      OutQuantity: Number(row.OutQuantity || row.outQuantity || 0),
+      BalanceAfter: Number(row.BalanceAfter || row.balanceAfter || 0),
+      UnitPrice: Number(row.UnitPrice || row.unitPrice || 0),
+      Amount: Number(row.Amount || row.amount || 0),
+      Description: row.Description || row.description || ''
+    };
+  }
+
+  function saveFetchedDetail(detail) {
+    try {
+      var key = 'pargas_inventory_document_details';
+      var list = getDetails().filter(function (item) { return String(item.DocumentNumber) !== String(detail.DocumentNumber); });
+      list.unshift(detail);
+      localStorage.setItem(key, JSON.stringify(list.slice(0, 300)));
+    } catch (_) { }
+  }
+
+  async function fetchDetailFromKardex(docNumber) {
+    var serviceUrl = await getConfiguredApiBase();
+    var base = buildInventoryBase(serviceUrl);
+    var bootstrapResponse = await fetch(base + '/bootstrap', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      body: '{}'
+    });
+    var bootstrap = await bootstrapResponse.json();
+    var fiscalYears = Array.isArray(bootstrap.fiscalYears) ? bootstrap.fiscalYears : [];
+    if (!fiscalYears.length) fiscalYears = [{ FiscalYearId: 0 }];
+
+    for (var i = 0; i < Math.min(fiscalYears.length, 4); i++) {
+      var fy = fiscalYears[i];
+      var response = await fetch(base + '/report/kardex', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+        body: JSON.stringify({ FiscalYearId: Number(fy.FiscalYearId || fy.fiscalYearId || 0), WarehouseId: 0, GoodsId: 0, FromDate: '', ToDate: '' })
+      });
+      var result = await response.json();
+      var rows = (result.rows || result.Rows || []).map(normalizeKardexRow).filter(function (row) {
+        return String(row.DocumentNumber).trim() === String(docNumber).trim();
+      });
+      if (rows.length) {
+        var first = rows[0];
+        var detail = {
+          DocumentNumber: first.DocumentNumber,
+          DocumentId: 0,
+          DocumentDate: first.DocumentDate,
+          DocumentType: first.DocumentType,
+          WarehouseTitle: first.WarehouseTitle,
+          PersonTitle: '',
+          Description: 'جزئیات از کاردکس انبار خوانده شد',
+          Items: rows.map(function (row) {
+            return {
+              GoodsId: row.GoodsId,
+              GoodsName: row.GoodsName,
+              Quantity: row.InQuantity > 0 ? row.InQuantity : row.OutQuantity,
+              Direction: row.InQuantity > 0 ? 'ورود' : 'خروج',
+              UnitPrice: row.UnitPrice,
+              Description: row.Description,
+              BalanceAfter: row.BalanceAfter
+            };
+          }),
+          SavedAt: new Date().toISOString()
+        };
+        saveFetchedDetail(detail);
+        return detail;
+      }
     }
 
+    return null;
+  }
+
+  function renderDetail(detail) {
     var rows = (detail.Items || []).map(function (item) {
-      return '<tr><td>' + escapeHtml(item.GoodsId) + '</td><td>' + escapeHtml(item.Quantity) + '</td><td>' + escapeHtml(Number(item.UnitPrice || 0).toLocaleString()) + '</td><td>' + escapeHtml(item.Description || '') + '</td></tr>';
+      return '<tr><td>' + escapeHtml(item.GoodsName || item.GoodsId) + '</td><td>' + escapeHtml(item.Direction || '-') + '</td><td>' + escapeHtml(item.Quantity) + '</td><td>' + escapeHtml(Number(item.UnitPrice || 0).toLocaleString()) + '</td><td>' + escapeHtml(item.BalanceAfter == null ? '-' : item.BalanceAfter) + '</td><td>' + escapeHtml(item.Description || '') + '</td></tr>';
     }).join('');
 
     var overlay = document.createElement('div');
@@ -43,15 +139,34 @@
       '<div class="inventory-history-detail-meta">' +
       '<span>نوع: ' + escapeHtml(typeTitle(detail.DocumentType)) + '</span>' +
       '<span>تاریخ: ' + escapeHtml(detail.DocumentDate || '-') + '</span>' +
-      '<span>شخص/تأمین‌کننده: ' + escapeHtml(detail.PersonTitle || '-') + '</span>' +
+      '<span>انبار: ' + escapeHtml(detail.WarehouseTitle || detail.WarehouseId || '-') + '</span>' +
       '</div>' +
       '<p>' + escapeHtml(detail.Description || '') + '</p>' +
-      '<table><thead><tr><th>کالا</th><th>تعداد</th><th>قیمت</th><th>شرح</th></tr></thead><tbody>' + rows + '</tbody></table>' +
+      '<table><thead><tr><th>کالا</th><th>جهت</th><th>تعداد</th><th>قیمت</th><th>مانده بعد سند</th><th>شرح</th></tr></thead><tbody>' + rows + '</tbody></table>' +
       '</div>';
 
     document.body.appendChild(overlay);
     overlay.querySelector('.inventory-history-detail-close').addEventListener('click', function () { overlay.remove(); });
     overlay.addEventListener('click', function (event) { if (event.target === overlay) overlay.remove(); });
+  }
+
+  async function showDetail(docNumber) {
+    var detail = getDetails().find(function (item) { return String(item.DocumentNumber) === String(docNumber); });
+    if (!detail) {
+      if (window.pargasToast && window.pargasToast.info) window.pargasToast.info('در حال دریافت جزئیات سند از کاردکس...');
+      try {
+        detail = await fetchDetailFromKardex(docNumber);
+      } catch (error) {
+        console.error('خطا در دریافت جزئیات سابقه انبار:', error);
+      }
+    }
+
+    if (!detail) {
+      if (window.pargasToast && window.pargasToast.error) window.pargasToast.error('جزئیات این سند از کاردکس هم پیدا نشد. یک بار بازسازی موجودی یا بروزرسانی سابقه را بزنید.');
+      return;
+    }
+
+    renderDetail(detail);
   }
 
   function enhanceHistoryRows() {
