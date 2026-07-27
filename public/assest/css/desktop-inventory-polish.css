@@ -236,6 +236,29 @@
   line-height: 1.9 !important;
 }
 
+.inventory-tab .stocktaking-filter {
+  padding: 12px !important;
+  border-radius: 18px !important;
+  background: rgba(20, 184, 166, 0.08) !important;
+  border: 1px solid rgba(45, 212, 191, 0.2) !important;
+  margin-bottom: 12px !important;
+}
+
+.inventory-tab .stocktaking-filter label {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  align-items: start !important;
+  gap: 8px !important;
+  min-height: unset !important;
+  color: #ccfbf1 !important;
+  font-weight: 950 !important;
+}
+
+.inventory-tab .stocktaking-filter select {
+  border-color: rgba(45, 212, 191, 0.38) !important;
+  background: rgba(2, 6, 23, 0.92) !important;
+}
+
 @media (max-width: 1100px) {
   .inventory-tab .inv-grid.two {
     grid-template-columns: 1fr !important;
