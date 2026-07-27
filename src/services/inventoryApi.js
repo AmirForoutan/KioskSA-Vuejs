@@ -1,4 +1,5 @@
 import { GetApiAddress } from "../utilities";
+const jsonHeaders = { "Content-Type": "application/json; charset=utf-8" };
 async function buildServiceAddress(offset, path) {
     const serviceAdd = await GetApiAddress();
     try {
@@ -24,7 +25,7 @@ async function postInventory(path, data = {}) {
     const inventoryAdd = await getInventoryApiAddress();
     const response = await fetch(`${inventoryAdd}/${path}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: jsonHeaders,
         body: JSON.stringify(data),
     });
     const result = await response.json();
@@ -37,7 +38,7 @@ async function postInventoryAnalysis(path, data = {}) {
     const inventoryAdd = await getInventoryAnalysisApiAddress();
     const response = await fetch(`${inventoryAdd}/${path}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: jsonHeaders,
         body: JSON.stringify(data),
     });
     const result = await response.json();
