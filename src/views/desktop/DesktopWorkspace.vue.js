@@ -18,7 +18,10 @@ function canOpenDiscounts() {
     return can("view.discounts") || can("manage.discounts") || can("manage.discountCards") || can("sales.discount.percent") || can("sales.discount.amount");
 }
 function canOpenInventoryByPermission() {
-    return can("view.inventory") || can("manage.inventory") || can("view.reports") || can("view.settings");
+    return can("view.inventory") || can("manage.inventory");
+}
+function canOpenInventoryAnalysisByPermission() {
+    return can("view.inventoryAnalysis") || can("manage.inventoryAnalysis") || can("manage.inventory");
 }
 async function getInventoryBootstrapAddress() {
     const serviceAdd = await GetApiAddress();
@@ -53,6 +56,9 @@ async function checkInventoryLicense() {
 function canOpenInventory() {
     return canOpenInventoryByPermission() && hasStockLicense.value;
 }
+function canOpenInventoryAnalysis() {
+    return canOpenInventoryAnalysisByPermission() && hasStockLicense.value;
+}
 const availableTabs = computed(() => {
     const t = [];
     if (can("view.sales"))
@@ -65,7 +71,7 @@ const availableTabs = computed(() => {
         t.push({ key: "discounts", title: "تخفیف‌ها" });
     if (canOpenInventory())
         t.push({ key: "inventory", title: "انبار" });
-    if (canOpenInventory())
+    if (canOpenInventoryAnalysis())
         t.push({ key: "inventoryAnalysis", title: "آنالیز کالا" });
     if (can("view.reports"))
         t.push({ key: "reports", title: "گزارشگیری" });
@@ -88,7 +94,7 @@ const activeComponent = computed(() => {
         case "inventory":
             return canOpenInventory() ? InventoryTab : SalesTab;
         case "inventoryAnalysis":
-            return canOpenInventory() ? InventoryAnalysisTab : SalesTab;
+            return canOpenInventoryAnalysis() ? InventoryAnalysisTab : SalesTab;
         case "reports":
             return ReportsTab;
         case "settings":
