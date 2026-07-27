@@ -14,6 +14,8 @@ const kardexRows = ref([]);
 const changeLogRows = ref([]);
 const stockTakingRows = ref([]);
 const goodsSearch = ref("");
+const suppliers = ref(loadSuppliersFromStorage());
+const supplierLedger = ref(loadSupplierLedgerFromStorage());
 const settings = reactive({
     IsWarehouseEnabled: true,
     AllowNegativeStockSale: false,
@@ -32,6 +34,15 @@ const warehouseForm = reactive({
     IsDefault: false,
     Description: "",
 });
+const supplierForm = reactive({
+    SupplierId: 0,
+    SupplierCode: "",
+    SupplierTitle: "",
+    Phone: "",
+    Address: "",
+    Description: "",
+    IsActive: true,
+});
 const documentForm = reactive({
     DocumentId: 0,
     DocumentType: 1,
@@ -39,7 +50,11 @@ const documentForm = reactive({
     DocumentDate: todayFa(),
     FiscalYearId: 0,
     WarehouseId: 0,
+    PersonId: 0,
     PersonTitle: "",
+    PurchaseAmount: 0,
+    PaidAmount: 0,
+    PaymentDescription: "",
     Description: "",
 });
 const documentItems = ref([
@@ -52,6 +67,10 @@ const reportFilter = reactive({
     ToDate: "",
     GoodsId: 0,
 });
+const historyFilter = reactive({
+    FromDate: "",
+    ToDate: "",
+});
 const filteredGoods = computed(() => {
     const q = goodsSearch.value.trim().toLowerCase();
     if (!q)
@@ -61,6 +80,18 @@ const filteredGoods = computed(() => {
 const selectedFiscalYear = computed(() => fiscalYears.value.find((f) => f.FiscalYearId === Number(reportFilter.FiscalYearId)) || fiscalYears.value[0]);
 const selectedWarehouseTitle = computed(() => warehouses.value.find((w) => w.WarehouseId === Number(reportFilter.WarehouseId))?.WarehouseTitle || "همه انبارها");
 const defaultWarehouseId = computed(() => warehouses.value.find((w) => w.IsDefault)?.WarehouseId || warehouses.value[0]?.WarehouseId || 0);
+const supplierBalanceRows = computed(() => suppliers.value.map((supplier) => {
+    const rows = supplierLedger.value.filter((row) => row.SupplierId === supplier.SupplierId);
+    const purchaseAmount = rows.reduce((sum, row) => sum + Number(row.PurchaseAmount || 0), 0);
+    const paidAmount = rows.reduce((sum, row) => sum + Number(row.PaidAmount || 0), 0);
+    return {
+        ...supplier,
+        PurchaseAmount: purchaseAmount,
+        PaidAmount: paidAmount,
+        BalanceAmount: purchaseAmount - paidAmount,
+    };
+}));
+const filteredChangeLogRows = computed(() => filterRowsByDate(changeLogRows.value, (row) => String(row.ChangedAt || "").split("-")[0], historyFilter.FromDate, historyFilter.ToDate));
 onMounted(loadAll);
 function todayFa() {
     return new Date().toLocaleDateString("fa-IR-u-nu-latn").replace(/-/g, "/");
@@ -71,6 +102,41 @@ function showMessage(text) {
         if (message.value === text)
             message.value = "";
     }, 3500);
+}
+function compareDateText(value, fromDate, toDate) {
+    const date = String(value || "").trim();
+    if (!date)
+        return true;
+    if (fromDate && date < fromDate)
+        return false;
+    if (toDate && date > toDate)
+        return false;
+    return true;
+}
+function filterRowsByDate(rows, dateSelector, fromDate, toDate) {
+    return rows.filter((row) => compareDateText(dateSelector(row), fromDate, toDate));
+}
+function loadSuppliersFromStorage() {
+    try {
+        return JSON.parse(localStorage.getItem("pargas_inventory_suppliers") || "[]");
+    }
+    catch {
+        return [];
+    }
+}
+function saveSuppliersToStorage() {
+    localStorage.setItem("pargas_inventory_suppliers", JSON.stringify(suppliers.value));
+}
+function loadSupplierLedgerFromStorage() {
+    try {
+        return JSON.parse(localStorage.getItem("pargas_inventory_supplier_ledger") || "[]");
+    }
+    catch {
+        return [];
+    }
+}
+function saveSupplierLedgerToStorage() {
+    localStorage.setItem("pargas_inventory_supplier_ledger", JSON.stringify(supplierLedger.value));
 }
 async function loadAll() {
     loading.value = true;
@@ -117,6 +183,70 @@ async function submitWarehouse() {
 function editWarehouse(row) {
     Object.assign(warehouseForm, row);
 }
+function submitSupplier() {
+    if (!supplierForm.SupplierTitle?.trim()) {
+        showMessage("عنوان تأمین‌کننده الزامی است");
+        return;
+    }
+    if (Number(supplierForm.SupplierId) > 0) {
+        const index = suppliers.value.findIndex((item) => item.SupplierId === Number(supplierForm.SupplierId));
+        if (index >= 0)
+            suppliers.value[index] = { ...supplierForm };
+    }
+    else {
+        const nextId = Math.max(0, ...suppliers.value.map((item) => item.SupplierId)) + 1;
+        suppliers.value.push({
+            SupplierId: nextId,
+            SupplierCode: supplierForm.SupplierCode?.trim() || `SUP-${nextId}`,
+            SupplierTitle: supplierForm.SupplierTitle.trim(),
+            Phone: supplierForm.Phone || "",
+            Address: supplierForm.Address || "",
+            Description: supplierForm.Description || "",
+            IsActive: supplierForm.IsActive !== false,
+        });
+    }
+    saveSuppliersToStorage();
+    Object.assign(supplierForm, { SupplierId: 0, SupplierCode: "", SupplierTitle: "", Phone: "", Address: "", Description: "", IsActive: true });
+    showMessage("تأمین‌کننده ذخیره شد");
+}
+function editSupplier(row) {
+    Object.assign(supplierForm, row);
+    activeTab.value = "suppliers";
+}
+function onSupplierChange() {
+    const supplier = suppliers.value.find((item) => item.SupplierId === Number(documentForm.PersonId));
+    documentForm.PersonTitle = supplier?.SupplierTitle || "";
+}
+function getPaymentStatusTitle(purchaseAmount, paidAmount) {
+    if (paidAmount === purchaseAmount)
+        return "تسویه شده";
+    if (paidAmount < purchaseAmount)
+        return "بدهکار به تأمین‌کننده";
+    return "پرداخت بیشتر / طلبکار";
+}
+function recordSupplierLedger(documentNumber) {
+    if (Number(documentForm.DocumentType) !== 3 || !Number(documentForm.PersonId))
+        return;
+    const supplier = suppliers.value.find((item) => item.SupplierId === Number(documentForm.PersonId));
+    if (!supplier)
+        return;
+    const purchaseAmount = Number(documentForm.PurchaseAmount || 0);
+    const paidAmount = Number(documentForm.PaidAmount || 0);
+    if (purchaseAmount <= 0 && paidAmount <= 0)
+        return;
+    supplierLedger.value.unshift({
+        SupplierId: supplier.SupplierId,
+        SupplierTitle: supplier.SupplierTitle,
+        DocumentNumber: documentNumber,
+        DocumentDate: documentForm.DocumentDate,
+        PurchaseAmount: purchaseAmount,
+        PaidAmount: paidAmount,
+        BalanceAmount: purchaseAmount - paidAmount,
+        StatusTitle: getPaymentStatusTitle(purchaseAmount, paidAmount),
+        Description: documentForm.PaymentDescription || documentForm.Description,
+    });
+    saveSupplierLedgerToStorage();
+}
 async function saveLimits() {
     try {
         const result = await saveGoodsLimits(goods.value);
@@ -138,9 +268,14 @@ async function submitDocument() {
     try {
         const items = documentItems.value.filter((item) => Number(item.GoodsId) > 0 && Number(item.Quantity) > 0);
         const result = await saveInventoryDocument({ ...documentForm, Items: items });
+        recordSupplierLedger(result.DocumentNumber || documentForm.DocumentNumber || "-");
         showMessage(result.message || "سند انبار ذخیره شد");
         documentForm.DocumentNumber = "";
+        documentForm.PersonId = 0;
         documentForm.PersonTitle = "";
+        documentForm.PurchaseAmount = 0;
+        documentForm.PaidAmount = 0;
+        documentForm.PaymentDescription = "";
         documentForm.Description = "";
         documentItems.value = [{ GoodsId: 0, Quantity: 1, UnitPrice: 0, Description: "" }];
         await loadStock();
@@ -162,7 +297,7 @@ async function loadStock() {
 async function loadKardex() {
     try {
         const result = await loadKardexReport(reportFilter);
-        kardexRows.value = result.rows || [];
+        kardexRows.value = filterRowsByDate(result.rows || [], (row) => row.DocumentDate, reportFilter.FromDate, reportFilter.ToDate);
         activeTab.value = "kardex";
     }
     catch (error) {
@@ -223,9 +358,16 @@ async function prepareStockTaking() {
 function updateStockTakingDiff(row) {
     row.DifferenceQuantity = Number(row.RealQuantity || 0) - Number(row.CurrentQuantity || 0);
 }
+function toInventoryUnitPrice(row) {
+    return Math.round(Number(row.LastPurchasePrice || row.AveragePrice || 0));
+}
 async function applyStockTaking() {
     if (!Number(reportFilter.WarehouseId)) {
         showMessage("برای ثبت انبارگردانی باید انبار مشخص باشد");
+        return;
+    }
+    if (!stockTakingRows.value.length) {
+        showMessage("ابتدا موجودی سیستم را بارگذاری کنید");
         return;
     }
     const increases = stockTakingRows.value
@@ -233,7 +375,7 @@ async function applyStockTaking() {
         .map((row) => ({
         GoodsId: row.GoodsId,
         Quantity: Number(row.DifferenceQuantity),
-        UnitPrice: Number(row.LastPurchasePrice || row.AveragePrice || 0),
+        UnitPrice: toInventoryUnitPrice(row),
         Description: `انبارگردانی - موجودی سیستمی ${row.CurrentQuantity} / موجودی واقعی ${row.RealQuantity}`,
     }));
     const decreases = stockTakingRows.value
@@ -241,7 +383,7 @@ async function applyStockTaking() {
         .map((row) => ({
         GoodsId: row.GoodsId,
         Quantity: Math.abs(Number(row.DifferenceQuantity)),
-        UnitPrice: Number(row.LastPurchasePrice || row.AveragePrice || 0),
+        UnitPrice: toInventoryUnitPrice(row),
         Description: `انبارگردانی - موجودی سیستمی ${row.CurrentQuantity} / موجودی واقعی ${row.RealQuantity}`,
     }));
     if (!increases.length && !decreases.length) {
@@ -272,7 +414,6 @@ async function applyStockTaking() {
             });
         }
         showMessage("انبارگردانی ثبت شد و اسناد اصلاحی ایجاد شدند");
-        await rebuildBalances();
         await prepareStockTaking();
     }
     catch (error) {
@@ -411,6 +552,12 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElement
 __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
     ...{ onClick: (__VLS_ctx.openStockTaking) },
     ...{ class: ({ active: __VLS_ctx.activeTab === 'stocktaking' }) },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+    ...{ onClick: (...[$event]) => {
+            __VLS_ctx.activeTab = 'suppliers';
+        } },
+    ...{ class: ({ active: __VLS_ctx.activeTab === 'suppliers' }) },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
     ...{ onClick: (__VLS_ctx.loadHistory) },
@@ -612,6 +759,7 @@ if (__VLS_ctx.activeTab === 'documents') {
     (__VLS_ctx.documentForm.DocumentNumber);
     __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
         placeholder: "تاریخ",
+        'data-jdp': true,
     });
     (__VLS_ctx.documentForm.DocumentDate);
     __VLS_asFunctionalElement(__VLS_intrinsicElements.select, __VLS_intrinsicElements.select)({
@@ -624,14 +772,47 @@ if (__VLS_ctx.activeTab === 'documents') {
         });
         (w.WarehouseTitle);
     }
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.select, __VLS_intrinsicElements.select)({
+        ...{ onChange: (__VLS_ctx.onSupplierChange) },
+        value: (__VLS_ctx.documentForm.PersonId),
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.option, __VLS_intrinsicElements.option)({
+        value: (0),
+    });
+    for (const [s] of __VLS_getVForSourceType((__VLS_ctx.suppliers.filter(x => x.IsActive)))) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.option, __VLS_intrinsicElements.option)({
+            key: (s.SupplierId),
+            value: (s.SupplierId),
+        });
+        (s.SupplierTitle);
+    }
     __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
-        placeholder: "تامین‌کننده/شخص",
+        placeholder: "تأمین‌کننده/شخص",
     });
     (__VLS_ctx.documentForm.PersonTitle);
     __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
         placeholder: "توضیحات",
     });
     (__VLS_ctx.documentForm.Description);
+    if (Number(__VLS_ctx.documentForm.DocumentType) === 3) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "inv-form-grid" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+            type: "number",
+            placeholder: "مبلغ خرید",
+        });
+        (__VLS_ctx.documentForm.PurchaseAmount);
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+            type: "number",
+            placeholder: "مبلغ پرداختی",
+        });
+        (__VLS_ctx.documentForm.PaidAmount);
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+            placeholder: "شرح پرداخت / حساب تامین‌کننده",
+        });
+        (__VLS_ctx.documentForm.PaymentDescription);
+    }
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "inv-table-wrap" },
     });
@@ -726,10 +907,12 @@ if (__VLS_ctx.activeTab === 'reports') {
     }
     __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
         placeholder: "از تاریخ",
+        'data-jdp': true,
     });
     (__VLS_ctx.reportFilter.FromDate);
     __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
         placeholder: "تا تاریخ",
+        'data-jdp': true,
     });
     (__VLS_ctx.reportFilter.ToDate);
     __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
@@ -852,6 +1035,16 @@ if (__VLS_ctx.activeTab === 'kardex') {
         (g.GoodsCode);
         (g.GoodsName);
     }
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+        placeholder: "از تاریخ",
+        'data-jdp': true,
+    });
+    (__VLS_ctx.reportFilter.FromDate);
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+        placeholder: "تا تاریخ",
+        'data-jdp': true,
+    });
+    (__VLS_ctx.reportFilter.ToDate);
     __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
         ...{ onClick: (__VLS_ctx.loadKardex) },
         ...{ class: "inv-primary" },
@@ -1011,11 +1204,138 @@ if (__VLS_ctx.activeTab === 'stocktaking') {
         }
     }
 }
+if (__VLS_ctx.activeTab === 'suppliers') {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "inv-card" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.h3, __VLS_intrinsicElements.h3)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "inv-form-grid" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+        placeholder: "کد تأمین‌کننده",
+    });
+    (__VLS_ctx.supplierForm.SupplierCode);
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+        placeholder: "نام تأمین‌کننده",
+    });
+    (__VLS_ctx.supplierForm.SupplierTitle);
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+        placeholder: "تلفن",
+    });
+    (__VLS_ctx.supplierForm.Phone);
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+        placeholder: "آدرس",
+    });
+    (__VLS_ctx.supplierForm.Address);
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+        placeholder: "توضیحات",
+    });
+    (__VLS_ctx.supplierForm.Description);
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+        type: "checkbox",
+    });
+    (__VLS_ctx.supplierForm.IsActive);
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (__VLS_ctx.submitSupplier) },
+        ...{ class: "inv-primary" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "inv-table-wrap" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.table, __VLS_intrinsicElements.table)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.thead, __VLS_intrinsicElements.thead)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.tr, __VLS_intrinsicElements.tr)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.tbody, __VLS_intrinsicElements.tbody)({});
+    for (const [s] of __VLS_getVForSourceType((__VLS_ctx.supplierBalanceRows))) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.tr, __VLS_intrinsicElements.tr)({
+            key: (s.SupplierId),
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
+        (s.SupplierCode);
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
+        (s.SupplierTitle);
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
+        (s.Phone);
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
+        (s.PurchaseAmount.toLocaleString());
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
+        (s.PaidAmount.toLocaleString());
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
+        (s.BalanceAmount.toLocaleString());
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+            ...{ onClick: (...[$event]) => {
+                    if (!(__VLS_ctx.activeTab === 'suppliers'))
+                        return;
+                    __VLS_ctx.editSupplier(s);
+                } },
+        });
+    }
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.h3, __VLS_intrinsicElements.h3)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "inv-table-wrap" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.table, __VLS_intrinsicElements.table)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.thead, __VLS_intrinsicElements.thead)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.tr, __VLS_intrinsicElements.tr)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.tbody, __VLS_intrinsicElements.tbody)({});
+    for (const [row] of __VLS_getVForSourceType((__VLS_ctx.supplierLedger))) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.tr, __VLS_intrinsicElements.tr)({
+            key: (`${row.SupplierId}-${row.DocumentNumber}-${row.DocumentDate}`),
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
+        (row.DocumentDate);
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
+        (row.SupplierTitle);
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
+        (row.DocumentNumber);
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
+        (row.PurchaseAmount.toLocaleString());
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
+        (row.PaidAmount.toLocaleString());
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
+        (row.BalanceAmount.toLocaleString());
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
+        (row.StatusTitle);
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
+        (row.Description);
+    }
+}
 if (__VLS_ctx.activeTab === 'history') {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "inv-card" },
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.h3, __VLS_intrinsicElements.h3)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "inv-form-grid" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+        placeholder: "از تاریخ",
+        'data-jdp': true,
+    });
+    (__VLS_ctx.historyFilter.FromDate);
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+        placeholder: "تا تاریخ",
+        'data-jdp': true,
+    });
+    (__VLS_ctx.historyFilter.ToDate);
     __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
         ...{ onClick: (__VLS_ctx.loadHistory) },
         ...{ class: "inv-primary" },
@@ -1033,7 +1353,7 @@ if (__VLS_ctx.activeTab === 'history') {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
     __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
     __VLS_asFunctionalElement(__VLS_intrinsicElements.tbody, __VLS_intrinsicElements.tbody)({});
-    for (const [r] of __VLS_getVForSourceType((__VLS_ctx.changeLogRows))) {
+    for (const [r] of __VLS_getVForSourceType((__VLS_ctx.filteredChangeLogRows))) {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.tr, __VLS_intrinsicElements.tr)({
             key: (r.ChangeLogId),
         });
@@ -1063,6 +1383,7 @@ if (__VLS_ctx.activeTab === 'history') {
 /** @type {__VLS_StyleScopedClasses['active']} */ ;
 /** @type {__VLS_StyleScopedClasses['active']} */ ;
 /** @type {__VLS_StyleScopedClasses['active']} */ ;
+/** @type {__VLS_StyleScopedClasses['active']} */ ;
 /** @type {__VLS_StyleScopedClasses['inv-grid']} */ ;
 /** @type {__VLS_StyleScopedClasses['two']} */ ;
 /** @type {__VLS_StyleScopedClasses['inv-card']} */ ;
@@ -1075,6 +1396,7 @@ if (__VLS_ctx.activeTab === 'history') {
 /** @type {__VLS_StyleScopedClasses['inv-table-wrap']} */ ;
 /** @type {__VLS_StyleScopedClasses['inv-primary']} */ ;
 /** @type {__VLS_StyleScopedClasses['inv-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['inv-form-grid']} */ ;
 /** @type {__VLS_StyleScopedClasses['inv-form-grid']} */ ;
 /** @type {__VLS_StyleScopedClasses['inv-table-wrap']} */ ;
 /** @type {__VLS_StyleScopedClasses['inv-primary']} */ ;
@@ -1098,6 +1420,12 @@ if (__VLS_ctx.activeTab === 'history') {
 /** @type {__VLS_StyleScopedClasses['inv-table-wrap']} */ ;
 /** @type {__VLS_StyleScopedClasses['diff']} */ ;
 /** @type {__VLS_StyleScopedClasses['inv-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['inv-form-grid']} */ ;
+/** @type {__VLS_StyleScopedClasses['inv-primary']} */ ;
+/** @type {__VLS_StyleScopedClasses['inv-table-wrap']} */ ;
+/** @type {__VLS_StyleScopedClasses['inv-table-wrap']} */ ;
+/** @type {__VLS_StyleScopedClasses['inv-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['inv-form-grid']} */ ;
 /** @type {__VLS_StyleScopedClasses['inv-primary']} */ ;
 /** @type {__VLS_StyleScopedClasses['inv-table-wrap']} */ ;
 var __VLS_dollars;
@@ -1115,19 +1443,27 @@ const __VLS_self = (await import('vue')).defineComponent({
             documentTypes: documentTypes,
             stockRows: stockRows,
             kardexRows: kardexRows,
-            changeLogRows: changeLogRows,
             stockTakingRows: stockTakingRows,
             goodsSearch: goodsSearch,
+            suppliers: suppliers,
+            supplierLedger: supplierLedger,
             settings: settings,
             warehouseForm: warehouseForm,
+            supplierForm: supplierForm,
             documentForm: documentForm,
             documentItems: documentItems,
             reportFilter: reportFilter,
+            historyFilter: historyFilter,
             filteredGoods: filteredGoods,
+            supplierBalanceRows: supplierBalanceRows,
+            filteredChangeLogRows: filteredChangeLogRows,
             loadAll: loadAll,
             saveSettings: saveSettings,
             submitWarehouse: submitWarehouse,
             editWarehouse: editWarehouse,
+            submitSupplier: submitSupplier,
+            editSupplier: editSupplier,
+            onSupplierChange: onSupplierChange,
             saveLimits: saveLimits,
             addDocumentItem: addDocumentItem,
             removeDocumentItem: removeDocumentItem,
