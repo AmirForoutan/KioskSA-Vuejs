@@ -91,6 +91,7 @@ const filteredGoods = computed(() => {
 
 const selectedFiscalYear = computed(() => fiscalYears.value.find((f) => f.FiscalYearId === Number(reportFilter.FiscalYearId)) || fiscalYears.value[0]);
 const selectedWarehouseTitle = computed(() => warehouses.value.find((w) => w.WarehouseId === Number(reportFilter.WarehouseId))?.WarehouseTitle || "همه انبارها");
+const defaultWarehouseId = computed(() => warehouses.value.find((w) => w.IsDefault)?.WarehouseId || warehouses.value[0]?.WarehouseId || 0);
 
 onMounted(loadAll);
 
@@ -117,7 +118,7 @@ async function loadAll() {
     valuationMethods.value = data.valuationMethods || [];
     documentTypes.value = data.documentTypes || [];
 
-    documentForm.WarehouseId = warehouses.value.find((w) => w.IsDefault)?.WarehouseId || warehouses.value[0]?.WarehouseId || 0;
+    documentForm.WarehouseId = defaultWarehouseId.value;
     documentForm.FiscalYearId = fiscalYears.value[0]?.FiscalYearId || 0;
     reportFilter.FiscalYearId = fiscalYears.value[0]?.FiscalYearId || 0;
   } catch (error) {
@@ -224,13 +225,34 @@ async function rebuildBalances() {
   }
 }
 
+async function openStockTaking() {
+  activeTab.value = "stocktaking";
+  if (!Number(reportFilter.WarehouseId)) {
+    reportFilter.WarehouseId = defaultWarehouseId.value;
+  }
+
+  if (!Number(reportFilter.WarehouseId)) {
+    showMessage("ابتدا از بخش تنظیمات و کالاها، حداقل یک انبار تعریف کنید");
+    return;
+  }
+
+  await prepareStockTaking();
+}
+
 async function prepareStockTaking() {
+  activeTab.value = "stocktaking";
+
   if (!settings.EnableStockTaking) {
     showMessage("انبارگردانی در تنظیمات غیرفعال است");
     return;
   }
+
   if (!Number(reportFilter.WarehouseId)) {
-    showMessage("برای انبارگردانی باید یک انبار مشخص انتخاب کنید");
+    reportFilter.WarehouseId = defaultWarehouseId.value;
+  }
+
+  if (!Number(reportFilter.WarehouseId)) {
+    showMessage("برای انبارگردانی باید از همین بخش، یک انبار مشخص انتخاب کنید");
     return;
   }
 
@@ -240,7 +262,6 @@ async function prepareStockTaking() {
     RealQuantity: Number(row.CurrentQuantity || 0),
     DifferenceQuantity: 0,
   }));
-  activeTab.value = "stocktaking";
 }
 
 function updateStockTakingDiff(row: StockTakingRow) {
@@ -388,7 +409,7 @@ function printKardexReport(mode: "a4" | "a5" | "receipt") {
       <button :class="{ active: activeTab === 'documents' }" @click="activeTab = 'documents'">اسناد انبار</button>
       <button :class="{ active: activeTab === 'reports' }" @click="activeTab = 'reports'">گزارش موجودی</button>
       <button :class="{ active: activeTab === 'kardex' }" @click="activeTab = 'kardex'">کاردکس کالا</button>
-      <button :class="{ active: activeTab === 'stocktaking' }" @click="prepareStockTaking">انبارگردانی</button>
+      <button :class="{ active: activeTab === 'stocktaking' }" @click="openStockTaking">انبارگردانی</button>
       <button :class="{ active: activeTab === 'history' }" @click="loadHistory">سابقه تغییرات</button>
     </nav>
 
@@ -532,16 +553,28 @@ function printKardexReport(mode: "a4" | "a5" | "receipt") {
       </div>
     </div>
 
-    <div v-if="activeTab === 'stocktaking'" class="inv-card">
+    <div v-if="activeTab === 'stocktaking'" class="inv-card stocktaking-card">
       <h3>انبارگردانی</h3>
-      <div class="inv-warning">برای انبارگردانی، یک انبار مشخص انتخاب کنید، سپس موجودی واقعی را وارد کنید. سیستم اختلاف را به سند اصلاحی ورود یا خروج تبدیل می‌کند.</div>
-      <div class="inv-form-grid">
-        <select v-model.number="reportFilter.FiscalYearId"><option v-for="f in fiscalYears" :key="f.FiscalYearId" :value="f.FiscalYearId">{{ f.Title }}</option></select>
-        <select v-model.number="reportFilter.WarehouseId"><option :value="0">انتخاب انبار</option><option v-for="w in warehouses" :key="w.WarehouseId" :value="w.WarehouseId">{{ w.WarehouseTitle }}</option></select>
+      <div class="inv-warning">اینجا اول انبار موردنظر را انتخاب کن، بعد روی «بارگذاری موجودی سیستم» بزن. اگر انبار پیش‌فرض تعریف شده باشد، برنامه خودش آن را انتخاب می‌کند.</div>
+      <div class="inv-form-grid stocktaking-filter">
+        <label>
+          دوره مالی
+          <select v-model.number="reportFilter.FiscalYearId">
+            <option v-for="f in fiscalYears" :key="f.FiscalYearId" :value="f.FiscalYearId">{{ f.Title }}</option>
+          </select>
+        </label>
+        <label>
+          انبار موردنظر برای انبارگردانی
+          <select v-model.number="reportFilter.WarehouseId" @change="prepareStockTaking">
+            <option :value="0">انتخاب انبار</option>
+            <option v-for="w in warehouses" :key="w.WarehouseId" :value="w.WarehouseId">{{ w.WarehouseTitle }}</option>
+          </select>
+        </label>
       </div>
       <button class="inv-primary" @click="prepareStockTaking">بارگذاری موجودی سیستم</button>
       <button class="inv-danger" @click="applyStockTaking">ثبت اختلاف انبارگردانی</button>
-      <div class="inv-table-wrap">
+      <div v-if="!stockTakingRows.length" class="inv-warning">بعد از انتخاب انبار، موجودی سیستم اینجا نمایش داده می‌شود.</div>
+      <div v-else class="inv-table-wrap">
         <table>
           <thead><tr><th>کد</th><th>کالا</th><th>موجودی سیستم</th><th>موجودی واقعی</th><th>اختلاف</th><th>آخرین خرید</th></tr></thead>
           <tbody>
