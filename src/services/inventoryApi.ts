@@ -1,0 +1,158 @@
+import { GetApiAddress } from "../utilities";
+
+async function postInventory<T>(path: string, data: unknown = {}): Promise<T> {
+  const serviceAdd = await GetApiAddress();
+  const response = await fetch(`${serviceAdd}/inventory/${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+
+  const result = await response.json();
+  if (!result?.status) {
+    throw new Error(result?.message || "خطا در عملیات انبار");
+  }
+  return result as T;
+}
+
+export type InventorySettings = {
+  InventorySettingsId?: number;
+  IsWarehouseEnabled: boolean;
+  AllowNegativeStockSale: boolean;
+  InventoryValuationMethod: number;
+  AutoCreateStockReceiptFromPurchaseInvoice: boolean;
+  AutoCreateStockIssueFromSaleInvoice: boolean;
+  RequireWarehouseForSale: boolean;
+  RequireWarehouseForPurchase: boolean;
+  EnableStockTaking: boolean;
+};
+
+export type Warehouse = {
+  WarehouseId: number;
+  WarehouseCode: string;
+  WarehouseTitle: string;
+  IsActive: boolean;
+  IsDefault: boolean;
+  Description?: string;
+};
+
+export type FiscalYear = {
+  FiscalYearId: number;
+  Title: string;
+  StartDate: string;
+  EndDate: string;
+  IsActive: boolean;
+  IsClosed: boolean;
+};
+
+export type InventoryGoods = {
+  GoodsId: number;
+  GoodsCode: number;
+  GoodsName: string;
+  GoodsGroupId: number;
+  StockInventory: number;
+  MinStock: number;
+  MaxStock: number;
+  ReorderPoint: number;
+  DefaultWarehouseId?: number | null;
+};
+
+export type InventoryDocumentItem = {
+  GoodsId: number;
+  Quantity: number;
+  UnitPrice: number;
+  Description?: string;
+};
+
+export type InventoryDocument = {
+  DocumentId?: number;
+  DocumentType: number;
+  DocumentNumber?: string;
+  DocumentDate: string;
+  FiscalYearId?: number;
+  WarehouseId: number;
+  PersonId?: number | null;
+  PersonTitle?: string;
+  Description?: string;
+  Username?: string;
+  Items: InventoryDocumentItem[];
+};
+
+export type InventoryBootstrap = {
+  status: boolean;
+  haveStockLicense: boolean;
+  settings: InventorySettings;
+  warehouses: Warehouse[];
+  fiscalYears: FiscalYear[];
+  goods: InventoryGoods[];
+  valuationMethods: { id: number; title: string }[];
+  documentTypes: { id: number; title: string }[];
+};
+
+export type InventoryStockReportRow = {
+  GoodsId: number;
+  GoodsCode: number;
+  GoodsName: string;
+  CurrentQuantity: number;
+  PeriodInQuantity: number;
+  PeriodOutQuantity: number;
+  InventoryValue: number;
+  LastPurchasePrice: number;
+  AveragePrice: number;
+  MinStock: number;
+  MaxStock: number;
+  ReorderPoint: number;
+};
+
+export type InventoryKardexRow = {
+  LedgerId: number;
+  DocumentId: number;
+  DocumentType: number;
+  DocumentNumber: string;
+  DocumentDate: string;
+  WarehouseTitle: string;
+  GoodsId: number;
+  GoodsName: string;
+  InQuantity: number;
+  OutQuantity: number;
+  BalanceAfter: number;
+  UnitPrice: number;
+  Amount: number;
+  Description?: string;
+};
+
+export function loadInventoryBootstrap() {
+  return postInventory<InventoryBootstrap>("bootstrap");
+}
+
+export function saveInventorySettings(data: InventorySettings) {
+  return postInventory<{ status: boolean; message: string }>("settings/save", data);
+}
+
+export function saveWarehouse(data: Partial<Warehouse>) {
+  return postInventory<{ status: boolean; message: string }>("warehouse/save", data);
+}
+
+export function saveGoodsLimits(items: Partial<InventoryGoods>[]) {
+  return postInventory<{ status: boolean; message: string }>("goods/limits/save", { Items: items });
+}
+
+export function saveInventoryDocument(data: InventoryDocument) {
+  return postInventory<{ status: boolean; message: string; DocumentId: number; DocumentNumber: string }>("document/save", data);
+}
+
+export function listInventoryDocuments(filters: Record<string, unknown>) {
+  return postInventory<{ status: boolean; documents: unknown[] }>("documents/list", filters);
+}
+
+export function loadStockReport(filters: Record<string, unknown>) {
+  return postInventory<{ status: boolean; rows: InventoryStockReportRow[] }>("report/stock", filters);
+}
+
+export function loadKardexReport(filters: Record<string, unknown>) {
+  return postInventory<{ status: boolean; rows: InventoryKardexRow[] }>("report/kardex", filters);
+}
+
+export function rebuildInventoryBalances(fiscalYearId?: number) {
+  return postInventory<{ status: boolean; message: string }>("rebuild-balances", { FiscalYearId: fiscalYearId || 0 });
+}
