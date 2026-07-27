@@ -1,0 +1,87 @@
+/* Desktop sales and tables gradient background fix.
+   Loaded after shared desktop polish so these screens keep the same visual language as Inventory. */
+
+.dw-shell {
+  background:
+    radial-gradient(circle at top right, rgba(20, 184, 166, 0.16), transparent 34%),
+    radial-gradient(circle at bottom left, rgba(14, 165, 233, 0.12), transparent 30%),
+    linear-gradient(135deg, #0f172a 0%, #10131a 48%, #111827 100%) !important;
+}
+
+.dw-content {
+  position: relative;
+  isolation: isolate;
+  background:
+    radial-gradient(circle at 12% 8%, rgba(45, 212, 191, 0.13), transparent 26%),
+    radial-gradient(circle at 90% 18%, rgba(14, 165, 233, 0.12), transparent 28%),
+    linear-gradient(135deg, rgba(15, 23, 42, 0.72), rgba(17, 24, 39, 0.58)) !important;
+  border-radius: 0;
+  overflow: auto;
+}
+
+.dw-content::before {
+  content: '';
+  position: absolute;
+  inset: 12px;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: 26px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.012)),
+    radial-gradient(circle at top right, rgba(20, 184, 166, 0.12), transparent 34%);
+  border: 1px solid rgba(148, 163, 184, 0.10);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 22px 60px rgba(2, 6, 23, 0.20);
+}
+
+.dw-content > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Sales and tables cards often have their own class names. Keep their background glassy instead of flat. */
+.dw-content .sales-tab,
+.dw-content .tables-tab,
+.dw-content .sales-panel,
+.dw-content .tables-panel,
+.dw-content .table-panel,
+.dw-content .hall-panel,
+.dw-content .order-panel,
+.dw-content .cart-panel,
+.dw-content .items-panel,
+.dw-content .products-panel,
+.dw-content .categories-panel,
+.dw-content .table-list,
+.dw-content .tables-list,
+.dw-content .hall-list,
+.dw-content .table-grid,
+.dw-content .tables-grid {
+  background:
+    linear-gradient(145deg, rgba(15, 23, 42, 0.78), rgba(30, 41, 59, 0.54)) !important;
+  border-color: rgba(148, 163, 184, 0.14) !important;
+  box-shadow: 0 18px 46px rgba(2, 6, 23, 0.22) !important;
+}
+
+/* Do not let the shared polish turn table status cards into plain dark cards. */
+.dw-content .pargas-table-status-free,
+.dw-content .pargas-table-status-occupied,
+.dw-content .pargas-table-status-reserved,
+.dw-content .pargas-table-status-disabled,
+.dw-content [data-pargas-table-status-fixed] {
+  background-clip: padding-box !important;
+}
+
+.dw-content .pargas-table-status-free {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.36), rgba(21, 128, 61, 0.24)) !important;
+}
+
+.dw-content .pargas-table-status-occupied {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.46), rgba(153, 27, 27, 0.30)) !important;
+}
+
+.dw-content .pargas-table-status-reserved {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.44), rgba(180, 83, 9, 0.28)) !important;
+}
+
+.dw-content .pargas-table-status-disabled {
+  background: linear-gradient(135deg, rgba(100, 116, 139, 0.36), rgba(51, 65, 85, 0.28)) !important;
+}
