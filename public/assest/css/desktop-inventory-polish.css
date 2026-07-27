@@ -1,0 +1,243 @@
+/* Desktop Inventory UI polish - scoped to InventoryTab only */
+
+.inventory-tab,
+.inventory-tab * {
+  font-family: Vazirmatn, Vazir, IRANSans, Tahoma, Arial, sans-serif !important;
+  font-variant-numeric: tabular-nums;
+}
+
+.inventory-tab {
+  padding: 2px 4px 18px;
+  color: #e5e7eb !important;
+}
+
+.inventory-tab .inventory-header {
+  padding: 18px 20px !important;
+  margin-bottom: 16px !important;
+  border-radius: 22px !important;
+  background:
+    radial-gradient(circle at top right, rgba(20, 184, 166, 0.24), transparent 36%),
+    linear-gradient(135deg, rgba(15, 23, 42, 0.94), rgba(17, 24, 39, 0.82)) !important;
+  border: 1px solid rgba(148, 163, 184, 0.18) !important;
+  box-shadow: 0 18px 44px rgba(2, 6, 23, 0.28) !important;
+}
+
+.inventory-tab .inventory-header h2 {
+  font-size: 28px !important;
+  font-weight: 1000 !important;
+  letter-spacing: -0.4px !important;
+}
+
+.inventory-tab .inventory-header p {
+  color: #a7b4c6 !important;
+  font-size: 14px !important;
+  line-height: 1.9 !important;
+}
+
+.inventory-tab .inv-tabs {
+  padding: 8px !important;
+  border-radius: 18px !important;
+  background: rgba(15, 23, 42, 0.58) !important;
+  border: 1px solid rgba(148, 163, 184, 0.13) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04) !important;
+}
+
+.inventory-tab .inv-tabs button,
+.inventory-tab button {
+  min-height: 38px !important;
+  padding: 9px 14px !important;
+  border-radius: 13px !important;
+  font-weight: 850 !important;
+  letter-spacing: -0.15px !important;
+  transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease, box-shadow 0.16s ease !important;
+}
+
+.inventory-tab button:hover {
+  transform: translateY(-1px) !important;
+  border-color: rgba(45, 212, 191, 0.36) !important;
+  box-shadow: 0 9px 22px rgba(2, 6, 23, 0.2) !important;
+}
+
+.inventory-tab .inv-tabs button.active,
+.inventory-tab .inv-primary {
+  background: linear-gradient(135deg, rgba(20, 184, 166, 0.32), rgba(14, 116, 144, 0.2)) !important;
+  border-color: rgba(45, 212, 191, 0.55) !important;
+  color: #ecfeff !important;
+}
+
+.inventory-tab .inv-grid.two {
+  grid-template-columns: minmax(320px, 0.9fr) minmax(420px, 1.1fr) !important;
+  align-items: start !important;
+}
+
+.inventory-tab .inv-card {
+  position: relative !important;
+  overflow: hidden !important;
+  padding: 18px !important;
+  border-radius: 22px !important;
+  background:
+    linear-gradient(145deg, rgba(15, 23, 42, 0.92), rgba(30, 41, 59, 0.66)) !important;
+  border: 1px solid rgba(148, 163, 184, 0.16) !important;
+  box-shadow: 0 18px 46px rgba(2, 6, 23, 0.24) !important;
+}
+
+.inventory-tab .inv-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(90deg, rgba(20, 184, 166, 0.14), transparent 36%);
+  opacity: 0.72;
+}
+
+.inventory-tab .inv-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.inventory-tab .inv-card h3 {
+  display: flex !important;
+  align-items: center !important;
+  gap: 9px !important;
+  margin-bottom: 14px !important;
+  color: #f8fafc !important;
+  font-size: 18px !important;
+  font-weight: 1000 !important;
+}
+
+.inventory-tab .inv-card h3::before {
+  content: '';
+  width: 10px;
+  height: 28px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #2dd4bf, #0ea5e9);
+  box-shadow: 0 0 18px rgba(45, 212, 191, 0.45);
+}
+
+.inventory-tab .inv-card label {
+  display: flex !important;
+  align-items: center !important;
+  gap: 9px !important;
+  min-height: 36px !important;
+  padding: 7px 9px !important;
+  margin: 6px 0 !important;
+  border-radius: 13px !important;
+  color: #dbeafe !important;
+  background: rgba(15, 23, 42, 0.36) !important;
+  border: 1px solid rgba(148, 163, 184, 0.08) !important;
+}
+
+.inventory-tab input,
+.inventory-tab select {
+  min-height: 42px !important;
+  border-radius: 14px !important;
+  background: rgba(15, 23, 42, 0.86) !important;
+  border: 1px solid rgba(148, 163, 184, 0.22) !important;
+  color: #f8fafc !important;
+  outline: none !important;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease !important;
+}
+
+.inventory-tab input:focus,
+.inventory-tab select:focus {
+  border-color: rgba(45, 212, 191, 0.62) !important;
+  box-shadow: 0 0 0 4px rgba(20, 184, 166, 0.13) !important;
+  background: rgba(2, 6, 23, 0.92) !important;
+}
+
+.inventory-tab input::placeholder {
+  color: #94a3b8 !important;
+}
+
+.inventory-tab input[type='checkbox'] {
+  width: 19px !important;
+  height: 19px !important;
+  min-height: 19px !important;
+  accent-color: #14b8a6 !important;
+}
+
+.inventory-tab .inv-form-row,
+.inventory-tab .inv-form-grid {
+  gap: 10px !important;
+}
+
+.inventory-tab .inv-table-wrap {
+  max-height: 440px !important;
+  border-radius: 18px !important;
+  border: 1px solid rgba(148, 163, 184, 0.14) !important;
+  background: rgba(2, 6, 23, 0.25) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04) !important;
+}
+
+.inventory-tab table {
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+}
+
+.inventory-tab th {
+  padding: 12px 12px !important;
+  background: rgba(15, 23, 42, 0.98) !important;
+  color: #bae6fd !important;
+  font-size: 13px !important;
+  font-weight: 950 !important;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.16) !important;
+}
+
+.inventory-tab td {
+  padding: 11px 12px !important;
+  color: #e2e8f0 !important;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.08) !important;
+}
+
+.inventory-tab tbody tr {
+  transition: background 0.14s ease, transform 0.14s ease !important;
+}
+
+.inventory-tab tbody tr:nth-child(even) {
+  background: rgba(15, 23, 42, 0.28) !important;
+}
+
+.inventory-tab tbody tr:hover {
+  background: rgba(20, 184, 166, 0.12) !important;
+}
+
+.inventory-tab td button {
+  min-height: 34px !important;
+  padding: 6px 12px !important;
+  border-radius: 999px !important;
+  color: #cffafe !important;
+  background: rgba(8, 145, 178, 0.16) !important;
+  border-color: rgba(34, 211, 238, 0.26) !important;
+}
+
+.inventory-tab .inv-card:nth-child(2) table td:nth-child(2) {
+  font-weight: 950 !important;
+  color: #f8fafc !important;
+}
+
+.inventory-tab .inv-card:nth-child(2) table td:nth-child(3) {
+  color: #99f6e4 !important;
+  font-weight: 900 !important;
+}
+
+.inventory-tab .inv-card:nth-child(2) table td:nth-child(3)::before {
+  content: '● ';
+  color: #14b8a6;
+}
+
+.inventory-tab .inv-card:nth-child(2) table td:nth-child(3):empty::before {
+  content: '';
+}
+
+.inventory-tab .inv-message,
+.inventory-tab .inv-warning {
+  border-radius: 16px !important;
+  font-weight: 850 !important;
+  line-height: 1.9 !important;
+}
+
+@media (max-width: 1100px) {
+  .inventory-tab .inv-grid.two {
+    grid-template-columns: 1fr !important;
+  }
+}
