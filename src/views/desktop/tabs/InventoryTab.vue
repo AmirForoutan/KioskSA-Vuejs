@@ -64,7 +64,7 @@ const documentForm = reactive({
   DocumentId: 0,
   DocumentType: 1,
   DocumentNumber: "",
-  DocumentDate: new Date().toLocaleDateString("fa-IR-u-nu-latn").replace(/-/g, "/"),
+  DocumentDate: todayFa(),
   FiscalYearId: 0,
   WarehouseId: 0,
   PersonTitle: "",
@@ -172,10 +172,7 @@ function removeDocumentItem(index: number) {
 async function submitDocument() {
   try {
     const items = documentItems.value.filter((item) => Number(item.GoodsId) > 0 && Number(item.Quantity) > 0);
-    const result = await saveInventoryDocument({
-      ...documentForm,
-      Items: items,
-    });
+    const result = await saveInventoryDocument({ ...documentForm, Items: items });
     showMessage(result.message || "سند انبار ذخیره شد");
     documentForm.DocumentNumber = "";
     documentForm.PersonTitle = "";
@@ -347,10 +344,13 @@ function printHtml(title: string, tableHtml: string, mode: "a4" | "a5" | "receip
       <h2>${title}</h2>
       <div class="meta">دوره مالی: ${selectedFiscalYear.value?.Title || "-"} | انبار: ${selectedWarehouseTitle.value} | تاریخ چاپ: ${todayFa()}</div>
       ${tableHtml}
-      <script>window.onload=function(){window.print();}</script>
     </body>
     </html>`);
   win.document.close();
+  window.setTimeout(() => {
+    win.focus();
+    win.print();
+  }, 250);
 }
 
 function printStockReport(mode: "a4" | "a5" | "receipt") {
