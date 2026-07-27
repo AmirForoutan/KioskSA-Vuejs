@@ -5,7 +5,7 @@ import { createPinia } from "pinia"
 import router from './router'
 import { initConfig } from './utilities'
 import { registerSW } from 'virtual:pwa-register'
-import Toast, { PluginOptions } from "vue-toastification";
+import Toast, { PluginOptions, useToast } from "vue-toastification";
 import "vue-toastification/dist/index.css";
 import { seedDesktopUser } from './components/stores/auth.store'
 import "@majidh1/jalalidatepicker";
@@ -16,6 +16,7 @@ declare global {
     jalaliDatepicker?: {
       startWatch: (options?: Record<string, unknown>) => void;
     };
+    pargasToast?: ReturnType<typeof useToast>;
   }
 }
 
@@ -48,13 +49,20 @@ async function bootstrap() {
   const app = createApp(App)
 
   const options: PluginOptions = {
-    // You can set your default options here
+    rtl: true,
+    position: "top-left",
+    timeout: 4500,
+    closeOnClick: true,
+    pauseOnFocusLoss: true,
+    pauseOnHover: true,
   };
 
   // 3. پلاگین‌ها را نصب می‌کنیم
   app.use(createPinia())
   app.use(router)
   app.use(Toast, options)
+  window.pargasToast = useToast()
+  window.dispatchEvent(new Event("pargas-toast-ready"))
 
   // 4. تنظیمات روتر (بعد از نصب router)
   router.afterEach((to, from) => {
