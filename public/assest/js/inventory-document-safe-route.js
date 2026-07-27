@@ -54,6 +54,29 @@
     }));
   }
 
+  function saveDocumentDetail(data, responseData) {
+    try {
+      var key = 'pargas_inventory_document_details';
+      var list = JSON.parse(localStorage.getItem(key) || '[]');
+      var docNumber = responseData && responseData.DocumentNumber ? responseData.DocumentNumber : (data.DocumentNumber || '-');
+      var row = {
+        DocumentNumber: docNumber,
+        DocumentId: responseData && responseData.DocumentId ? responseData.DocumentId : 0,
+        DocumentDate: data.DocumentDate,
+        DocumentType: data.DocumentType,
+        WarehouseId: data.WarehouseId,
+        PersonTitle: data.PersonTitle || '',
+        Description: data.Description || '',
+        Items: data.Items || [],
+        SavedAt: new Date().toISOString()
+      };
+      list = list.filter(function (item) { return item.DocumentNumber !== docNumber; });
+      list.unshift(row);
+      localStorage.setItem(key, JSON.stringify(list.slice(0, 300)));
+      window.dispatchEvent(new CustomEvent('pargas-inventory-document-detail-saved', { detail: row }));
+    } catch (_) { }
+  }
+
   var nativeFetch = window.fetch;
   window.fetch = function (input, init) {
     var url = typeof input === 'string' ? input : (input && input.url ? input.url : '');
@@ -77,7 +100,14 @@
             headers: Object.assign({ 'Content-Type': 'application/json; charset=utf-8' }, requestInit.headers || {}),
             body: JSON.stringify(data)
           });
-          return nativeFetch.call(this, makeUrl(url, '/inventory-analysis/document/save'), newInit);
+          return nativeFetch.call(this, makeUrl(url, '/inventory-analysis/document/save'), newInit).then(function (response) {
+            try {
+              response.clone().json().then(function (result) {
+                if (result && result.status) saveDocumentDetail(data, result);
+              }).catch(function () { });
+            } catch (_) { }
+            return response;
+          });
         }
       } catch (_) {
         return nativeFetch.apply(this, arguments);
