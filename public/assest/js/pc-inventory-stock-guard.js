@@ -44,9 +44,13 @@
   }
 
   function jsonResponse(payload, status) {
+    const headers = { 'Content-Type': 'application/json; charset=utf-8' };
+    if (payload && (payload.skipGlobalToast === true || payload.SkipGlobalToast === true)) {
+      headers['X-Pargas-Skip-Toast'] = '1';
+    }
     return new Response(JSON.stringify(payload), {
       status: status || 200,
-      headers: { 'Content-Type': 'application/json; charset=utf-8' }
+      headers: headers
     });
   }
 
@@ -345,12 +349,10 @@
     try {
       stockGuardResult = await checkStockBeforeInvoice(serviceUrl, bodyText);
       if (!stockGuardResult.allow) {
-        notify('error', stockGuardResult.message);
-        return jsonResponse({ status: false, message: stockGuardResult.message }, 200);
+        return jsonResponse({ status: false, message: stockGuardResult.message, skipGlobalToast: true }, 200);
       }
     } catch (error) {
-      notify('error', error && error.message ? error.message : 'خطا در کنترل موجودی انبار');
-      return jsonResponse({ status: false, message: 'خطا در کنترل موجودی انبار' }, 200);
+      return jsonResponse({ status: false, message: error && error.message ? error.message : 'خطا در کنترل موجودی انبار', skipGlobalToast: true }, 200);
     }
 
     const response = await originalFetch(input, init);
