@@ -46,6 +46,14 @@
     return '';
   }
 
+  function shouldSkipToast(data, response) {
+    try {
+      if (data && (data.skipGlobalToast === true || data.SkipGlobalToast === true)) return true;
+      if (response && response.headers && response.headers.get('X-Pargas-Skip-Toast') === '1') return true;
+    } catch (_error) { }
+    return false;
+  }
+
   var nativeFetch = window.fetch;
   window.fetch = function (input, init) {
     var url = extractUrl(input);
@@ -58,6 +66,7 @@
           var contentType = cloned.headers.get('content-type') || '';
           if (contentType.indexOf('application/json') >= 0) {
             cloned.json().then(function (data) {
+              if (shouldSkipToast(data, response)) return;
               if (!response.ok) {
                 showToast((data && data.message) || ('خطا در ارتباط با سرویس؛ کد ' + response.status));
                 return;
