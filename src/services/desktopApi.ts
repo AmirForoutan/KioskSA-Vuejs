@@ -913,3 +913,11 @@ export async function loadDesktopAccess() {
     users: [],
   };
 }
+
+export async function saveDesktopRole(role: DesktopRole) {
+  return postApi<ApiEnvelope>("/roles/save", role);
+}
+
+export async function saveDesktopUser(user: DesktopUser) {
+  return postApi<ApiEnvelope>("/users/save", user);
+}
