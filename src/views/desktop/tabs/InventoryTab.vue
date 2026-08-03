@@ -4,7 +4,6 @@ import {
   loadInventoryBootstrap,
   saveInventorySettings,
   saveWarehouse,
-  saveGoodsLimits,
   saveInventoryDocument,
   loadStockReport,
   loadKardexReport,
@@ -49,7 +48,7 @@ type SupplierLedgerRow = {
 
 const loading = ref(false);
 const message = ref("");
-const activeTab = ref<"settings" | "documents" | "reports" | "kardex" | "stocktaking" | "suppliers" | "history">("settings");
+const activeTab = ref<"settings" | "fiscalYears" | "documents" | "reports" | "kardex" | "stocktaking" | "suppliers" | "history">("settings");
 const haveStockLicense = ref(false);
 const warehouses = ref<Warehouse[]>([]);
 const fiscalYears = ref<FiscalYear[]>([]);
@@ -60,7 +59,6 @@ const stockRows = ref<InventoryStockReportRow[]>([]);
 const kardexRows = ref<InventoryKardexRow[]>([]);
 const changeLogRows = ref<InventoryChangeLogRow[]>([]);
 const stockTakingRows = ref<StockTakingRow[]>([]);
-const goodsSearch = ref("");
 const suppliers = ref<Supplier[]>(loadSuppliersFromStorage());
 const supplierLedger = ref<SupplierLedgerRow[]>(loadSupplierLedgerFromStorage());
 
@@ -121,15 +119,11 @@ const reportFilter = reactive({
   GoodsId: 0,
 });
 
+const stockTakingDate = ref(todayFa());
+
 const historyFilter = reactive({
   FromDate: "",
   ToDate: "",
-});
-
-const filteredGoods = computed(() => {
-  const q = goodsSearch.value.trim().toLowerCase();
-  if (!q) return goods.value;
-  return goods.value.filter((item) => `${item.GoodsCode} ${item.GoodsName}`.toLowerCase().includes(q));
 });
 
 const selectedFiscalYear = computed(() => fiscalYears.value.find((f) => f.FiscalYearId === Number(reportFilter.FiscalYearId)) || fiscalYears.value[0]);
@@ -152,8 +146,29 @@ const filteredChangeLogRows = computed(() => filterRowsByDate(changeLogRows.valu
 
 onMounted(loadAll);
 
+function padDatePart(value: string | number | undefined) {
+  const text = String(value || "").trim();
+  if (!text) return "00";
+  return text.length === 1 ? `0${text}` : text;
+}
+
 function todayFa() {
-  return new Date().toLocaleDateString("fa-IR-u-nu-latn").replace(/-/g, "/");
+  const parts = new Intl.DateTimeFormat("fa-IR-u-ca-persian-nu-latn", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+
+  const year = parts.find((part) => part.type === "year")?.value || "";
+  const month = parts.find((part) => part.type === "month")?.value || "";
+  const day = parts.find((part) => part.type === "day")?.value || "";
+  return `${year}/${padDatePart(month)}/${padDatePart(day)}`;
+}
+
+function fiscalYearStatus(row: FiscalYear) {
+  if (row.IsClosed) return "بسته شده";
+  if (row.IsActive) return "باز / فعال";
+  return "باز";
 }
 
 function showMessage(text: string) {
@@ -214,6 +229,7 @@ async function loadAll() {
     documentForm.WarehouseId = defaultWarehouseId.value;
     documentForm.FiscalYearId = fiscalYears.value[0]?.FiscalYearId || 0;
     reportFilter.FiscalYearId = fiscalYears.value[0]?.FiscalYearId || 0;
+    if (!stockTakingDate.value) stockTakingDate.value = todayFa();
   } catch (error) {
     showMessage(error instanceof Error ? error.message : "خطا در دریافت اطلاعات انبار");
   } finally {
@@ -311,15 +327,6 @@ function recordSupplierLedger(documentNumber: string) {
   saveSupplierLedgerToStorage();
 }
 
-async function saveLimits() {
-  try {
-    const result = await saveGoodsLimits(goods.value);
-    showMessage(result.message || "محدوده موجودی کالاها ذخیره شد");
-  } catch (error) {
-    showMessage(error instanceof Error ? error.message : "خطا در ذخیره محدوده موجودی");
-  }
-}
-
 function addDocumentItem() {
   documentItems.value.push({ GoodsId: 0, Quantity: 1, UnitPrice: 0, Description: "" });
 }
@@ -396,7 +403,7 @@ async function openStockTaking() {
   }
 
   if (!Number(reportFilter.WarehouseId)) {
-    showMessage("ابتدا از بخش تنظیمات و کالاها، حداقل یک انبار تعریف کنید");
+    showMessage("ابتدا از بخش تنظیمات انبار، حداقل یک انبار تعریف کنید");
     return;
   }
 
@@ -446,6 +453,7 @@ async function applyStockTaking() {
     return;
   }
 
+  const documentDate = stockTakingDate.value || todayFa();
   const increases = stockTakingRows.value
     .filter((row) => Number(row.DifferenceQuantity) > 0)
     .map((row) => ({
@@ -473,7 +481,7 @@ async function applyStockTaking() {
     if (increases.length) {
       await saveInventoryDocument({
         DocumentType: 6,
-        DocumentDate: todayFa(),
+        DocumentDate: documentDate,
         FiscalYearId: Number(reportFilter.FiscalYearId || selectedFiscalYear.value?.FiscalYearId || 0),
         WarehouseId: Number(reportFilter.WarehouseId),
         PersonTitle: "سیستم",
@@ -485,7 +493,7 @@ async function applyStockTaking() {
     if (decreases.length) {
       await saveInventoryDocument({
         DocumentType: 8,
-        DocumentDate: todayFa(),
+        DocumentDate: documentDate,
         FiscalYearId: Number(reportFilter.FiscalYearId || selectedFiscalYear.value?.FiscalYearId || 0),
         WarehouseId: Number(reportFilter.WarehouseId),
         PersonTitle: "سیستم",
@@ -576,7 +584,8 @@ function printKardexReport(mode: "a4" | "a5" | "receipt") {
     <div v-if="!haveStockLicense" class="inv-warning">لایسنس انبار برای این سیستم فعال نیست.</div>
 
     <nav class="inv-tabs">
-      <button :class="{ active: activeTab === 'settings' }" @click="activeTab = 'settings'">تنظیمات و کالاها</button>
+      <button :class="{ active: activeTab === 'settings' }" @click="activeTab = 'settings'">تنظیمات و انبارها</button>
+      <button :class="{ active: activeTab === 'fiscalYears' }" @click="activeTab = 'fiscalYears'">دوره مالی</button>
       <button :class="{ active: activeTab === 'documents' }" @click="activeTab = 'documents'">اسناد انبار</button>
       <button :class="{ active: activeTab === 'reports' }" @click="activeTab = 'reports'">گزارش موجودی</button>
       <button :class="{ active: activeTab === 'kardex' }" @click="activeTab = 'kardex'">کاردکس کالا</button>
@@ -601,7 +610,7 @@ function printKardexReport(mode: "a4" | "a5" | "receipt") {
       </div>
 
       <div class="inv-card">
-        <h3>انبارها</h3>
+        <h3>تعریف انبار</h3>
         <div class="inv-form-row">
           <input v-model="warehouseForm.WarehouseCode" placeholder="کد انبار" />
           <input v-model="warehouseForm.WarehouseTitle" placeholder="عنوان انبار" />
@@ -620,31 +629,25 @@ function printKardexReport(mode: "a4" | "a5" | "receipt") {
           </tbody>
         </table>
       </div>
+    </div>
 
-      <div class="inv-card wide">
-        <h3>حداقل، حداکثر و نقطه سفارش کالاها</h3>
-        <input v-model="goodsSearch" placeholder="جستجوی کالا" />
+    <div v-if="activeTab === 'fiscalYears'" class="inventory-fiscal-years-panel">
+      <div class="inv-card">
+        <h3>دوره‌های مالی</h3>
+        <div class="inv-warning">دوره مالی از کالاها و تنظیمات انبار جدا شد. بستن دوره مالی باید فقط از همین تب انجام شود.</div>
         <div class="inv-table-wrap">
           <table>
-            <thead><tr><th>کد</th><th>نام کالا</th><th>حداقل</th><th>حداکثر</th><th>نقطه سفارش</th><th>انبار پیش‌فرض</th></tr></thead>
+            <thead><tr><th>عنوان</th><th>شروع</th><th>پایان</th><th>وضعیت</th></tr></thead>
             <tbody>
-              <tr v-for="g in filteredGoods" :key="g.GoodsId">
-                <td>{{ g.GoodsCode }}</td>
-                <td>{{ g.GoodsName }}</td>
-                <td><input type="number" v-model.number="g.MinStock" /></td>
-                <td><input type="number" v-model.number="g.MaxStock" /></td>
-                <td><input type="number" v-model.number="g.ReorderPoint" /></td>
-                <td>
-                  <select v-model.number="g.DefaultWarehouseId">
-                    <option :value="null">پیش‌فرض سیستم</option>
-                    <option v-for="w in warehouses" :key="w.WarehouseId" :value="w.WarehouseId">{{ w.WarehouseTitle }}</option>
-                  </select>
-                </td>
+              <tr v-for="f in fiscalYears" :key="f.FiscalYearId">
+                <td>{{ f.Title }}</td>
+                <td>{{ f.StartDate }}</td>
+                <td>{{ f.EndDate }}</td>
+                <td>{{ fiscalYearStatus(f) }}</td>
               </tr>
             </tbody>
           </table>
         </div>
-        <button class="inv-primary" @click="saveLimits">ذخیره محدوده موجودی کالاها</button>
       </div>
     </div>
 
@@ -738,8 +741,12 @@ function printKardexReport(mode: "a4" | "a5" | "receipt") {
 
     <div v-if="activeTab === 'stocktaking'" class="inv-card stocktaking-card">
       <h3>انبارگردانی</h3>
-      <div class="inv-warning">اینجا اول انبار موردنظر را انتخاب کن، بعد روی «بارگذاری موجودی سیستم» بزن. اگر انبار پیش‌فرض تعریف شده باشد، برنامه خودش آن را انتخاب می‌کند.</div>
+      <div class="inv-warning">اینجا اول تاریخ، دوره مالی و انبار موردنظر را انتخاب کن، بعد روی «بارگذاری موجودی سیستم» بزن.</div>
       <div class="inv-form-grid stocktaking-filter">
+        <label>
+          تاریخ انبارگردانی
+          <input v-model="stockTakingDate" placeholder="مثلاً 1405/05/05" data-jdp />
+        </label>
         <label>
           دوره مالی
           <select v-model.number="reportFilter.FiscalYearId">
