@@ -5,10 +5,11 @@ import CategoryModal from "../../../components/CategoryModal.vue";
 import { can } from "../../../components/acl/can";
 import { useDesktopToastMessage } from "../useDesktopToastMessage";
 import {
-  loadDesktopCatalog,
   saveDesktopCategory,
+  unwrapArray,
   type DesktopCategory,
 } from "../../../services/desktopApi";
+import { GetApiAddress } from "../../../utilities";
 
 const q = ref("");
 const rows = ref<DesktopCategory[]>([]);
@@ -33,12 +34,35 @@ const filtered = computed(() => {
 
 onMounted(loadRows);
 
+function buildBaseInfoUrl(baseUrl: string, endpoint: string) {
+  const base = baseUrl.replace(/\/$/, "");
+  const path = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
+  return `${base}${path}?catalogContext=baseinfo`;
+}
+
+async function postBaseInfoCategory(endpoint: string) {
+  const serviceAdd = await GetApiAddress();
+  const response = await fetch(buildBaseInfoUrl(serviceAdd, endpoint), {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: JSON.stringify({ ConnectionsId: 0, IncludeInactive: true, IncludeAll: true }),
+  });
+
+  if (!response.ok) throw new Error(`HTTP ${response.status} for ${endpoint}`);
+  return response.json();
+}
+
 async function loadRows() {
   loading.value = true;
   message.value = "";
   try {
-    const result = await loadDesktopCatalog(0);
-    rows.value = result.categories;
+    const response = await postBaseInfoCategory("/getgoodsgroup");
+    rows.value = unwrapArray<DesktopCategory>(response, [
+      "GoodsGroup",
+      "Groups",
+      "Categories",
+      "categories",
+    ]);
     if (!rows.value.length) message.value = "دسته‌بندی‌ای از سرویس دریافت نشد";
   } catch (error) {
     rows.value = [];
@@ -49,7 +73,7 @@ async function loadRows() {
 }
 
 function add() {
-  editor.value = { GroupId: 0, GroupCode: "", GroupName: "", IsActive: true };
+  editor.value = { GroupId: 0, GroupCode: "", GroupName: "", IsActive: true, IsKioskVisible: true };
 }
 
 function edit(id: number | string) {
@@ -122,6 +146,7 @@ function refreshImage(payload?: { removed?: boolean }) {
         <div>کد</div>
         <div>نام</div>
         <div>وضعیت</div>
+        <div>کیوسک</div>
         <div>عکس</div>
         <div>عملیات</div>
       </div>
@@ -134,6 +159,9 @@ function refreshImage(payload?: { removed?: boolean }) {
         <div class="bold">{{ r.GroupName }}</div>
         <div>
           <span class="status" :class="{ off: r.IsActive === false }">{{ r.IsActive === false ? "غیرفعال" : "فعال" }}</span>
+        </div>
+        <div>
+          <span class="status kiosk" :class="{ off: r.IsKioskVisible === false }">{{ r.IsKioskVisible === false ? "عدم نمایش" : "نمایش" }}</span>
         </div>
         <div><button class="m-btn small" @click="setImage(r.GroupId)">آپلود</button></div>
         <div><button v-if="can('manage.categories')" class="m-btn small" @click="edit(r.GroupId)">ویرایش</button></div>
@@ -229,7 +257,7 @@ function refreshImage(payload?: { removed?: boolean }) {
 
 .m-tr {
   display: grid;
-  grid-template-columns: 70px 110px 1fr 120px 100px 100px;
+  grid-template-columns: 70px 110px 1fr 120px 120px 100px 100px;
   gap: 10px;
   align-items: center;
   padding: 11px 12px;
@@ -265,6 +293,12 @@ function refreshImage(payload?: { removed?: boolean }) {
   color: #bbf7d0;
   background: rgba(34, 197, 94, 0.1);
   border: 1px solid rgba(34, 197, 94, 0.22);
+}
+
+.status.kiosk {
+  color: #bae6fd;
+  background: rgba(14, 165, 233, 0.1);
+  border-color: rgba(14, 165, 233, 0.22);
 }
 
 .status.off {
