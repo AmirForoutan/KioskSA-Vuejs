@@ -5,11 +5,12 @@ import ProductModal from "../../../components/ProductModal.vue";
 import { can } from "../../../components/acl/can";
 import { useDesktopToastMessage } from "../useDesktopToastMessage";
 import {
-  loadDesktopCatalog,
   saveDesktopProduct,
+  unwrapArray,
   type DesktopCategory,
   type DesktopProduct,
 } from "../../../services/desktopApi";
+import { GetApiAddress } from "../../../utilities";
 
 const fallbackCategories: DesktopCategory[] = [
   { GroupId: 1, GroupName: "عمومی" },
@@ -28,6 +29,9 @@ const fallbackRows: DesktopProduct[] = [
     DutyPercent: 0,
     PackingPrice: 0,
     StockInventory: 10,
+    IsPurchasable: true,
+    IsSellable: true,
+    IsKioskVisible: true,
     IsActive: true,
   },
 ];
@@ -60,11 +64,46 @@ const filtered = computed(() => {
 
 onMounted(loadProducts);
 
+function buildBaseInfoUrl(baseUrl: string, endpoint: string) {
+  const base = baseUrl.replace(/\/$/, "");
+  const path = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
+  return `${base}${path}?catalogContext=baseinfo`;
+}
+
+async function postBaseInfoCatalog(endpoint: string) {
+  const serviceAdd = await GetApiAddress();
+  const response = await fetch(buildBaseInfoUrl(serviceAdd, endpoint), {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: JSON.stringify({ ConnectionsId: 0, IncludeInactive: true, IncludeAll: true }),
+  });
+
+  if (!response.ok) throw new Error(`HTTP ${response.status} for ${endpoint}`);
+  return response.json();
+}
+
+async function loadBaseInfoCatalog() {
+  const [categoriesResponse, goodsResponse] = await Promise.all([
+    postBaseInfoCatalog("/getgoodsgroup"),
+    postBaseInfoCatalog("/getgoods"),
+  ]);
+
+  return {
+    categories: unwrapArray<DesktopCategory>(categoriesResponse, [
+      "GoodsGroup",
+      "Groups",
+      "Categories",
+      "categories",
+    ]),
+    goods: unwrapArray<DesktopProduct>(goodsResponse, ["Goods", "Products", "goods", "products"]),
+  };
+}
+
 async function loadProducts() {
   loading.value = true;
   message.value = "";
   try {
-    const result = await loadDesktopCatalog(0);
+    const result = await loadBaseInfoCatalog();
     rows.value = result.goods.length ? result.goods : fallbackRows;
     categories.value = result.categories.length ? result.categories : fallbackCategories;
     if (!result.goods.length) message.value = "داده کالا از سرویس دریافت نشد؛ نمونه نمایش داده شد";
@@ -93,6 +132,9 @@ function newProduct(): DesktopProduct {
     DutyPercent: 0,
     PackingPrice: 0,
     StockInventory: 0,
+    IsPurchasable: true,
+    IsSellable: true,
+    IsKioskVisible: true,
     IsActive: true,
     Saturday: true,
     FromTimeSaturday: "00:00",
@@ -141,6 +183,7 @@ async function save(product: DesktopProduct) {
     else rows.value.unshift({ ...product, GoodsId: product.GoodsId || Date.now() });
     message.value = result.message || "کالا ذخیره شد";
     closeEditor();
+    await loadProducts();
   } catch (error) {
     message.value = error instanceof Error ? error.message : "خطا در ذخیره کالا";
   } finally {
