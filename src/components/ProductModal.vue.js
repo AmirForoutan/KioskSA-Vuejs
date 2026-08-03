@@ -54,6 +54,7 @@ function defaultProduct() {
         DefaultWarehouseId: null,
         IsPurchasable: true,
         IsSellable: true,
+        IsKioskVisible: true,
         IsActive: true,
         Saturday: true,
         FromTimeSaturday: '00:00',
@@ -86,6 +87,7 @@ function normalizeProduct(value) {
     merged.ReorderPoint = Number(merged.ReorderPoint || 0);
     merged.IsPurchasable = merged.IsPurchasable !== false;
     merged.IsSellable = merged.IsSellable !== false;
+    merged.IsKioskVisible = merged.IsKioskVisible !== false;
     merged.IsActive = merged.IsActive !== false;
     return merged;
 }
@@ -479,6 +481,14 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
 });
 (__VLS_ctx.localProduct.IsSellable);
 __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({
+    ...{ class: "usage-toggle" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+    type: "checkbox",
+});
+(__VLS_ctx.localProduct.IsKioskVisible);
+__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "form-group" },
 });
@@ -633,6 +643,7 @@ if (__VLS_ctx.showKeyboard && __VLS_ctx.activeInputRef) {
 /** @type {__VLS_StyleScopedClasses['settings-box']} */ ;
 /** @type {__VLS_StyleScopedClasses['hint']} */ ;
 /** @type {__VLS_StyleScopedClasses['usage-grid']} */ ;
+/** @type {__VLS_StyleScopedClasses['usage-toggle']} */ ;
 /** @type {__VLS_StyleScopedClasses['usage-toggle']} */ ;
 /** @type {__VLS_StyleScopedClasses['usage-toggle']} */ ;
 /** @type {__VLS_StyleScopedClasses['form-group']} */ ;
