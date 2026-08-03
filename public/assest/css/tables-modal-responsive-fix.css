@@ -1,0 +1,130 @@
+/* Tables management modal responsive/scroll fixes */
+
+.tables-shell .modal-overlay {
+  overflow: auto !important;
+  align-items: start !important;
+  padding: 18px !important;
+}
+
+.tables-shell .setup-modal {
+  width: min(980px, calc(100vw - 28px)) !important;
+  max-height: none !important;
+  height: auto !important;
+  min-height: 0 !important;
+  margin: auto 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+
+.tables-shell .setup-modal .modal-head {
+  flex: 0 0 auto !important;
+}
+
+.tables-shell .setup-modal-body {
+  flex: 0 1 auto !important;
+  min-height: 0 !important;
+  max-height: calc(100vh - 138px) !important;
+  overflow: auto !important;
+  display: grid !important;
+  grid-template-columns: minmax(280px, 0.82fr) minmax(340px, 1.18fr) !important;
+  align-items: start !important;
+  gap: 14px !important;
+  padding: 14px !important;
+}
+
+.tables-shell .setup-form-card,
+.tables-shell .setup-list-card {
+  align-self: start !important;
+  height: auto !important;
+  min-height: 0 !important;
+}
+
+.tables-shell .setup-form-card {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 2 !important;
+}
+
+.tables-shell .setup-list-card {
+  display: flex !important;
+  flex-direction: column !important;
+  max-height: min(560px, calc(100vh - 170px)) !important;
+  overflow: hidden !important;
+}
+
+.tables-shell .setup-list-card > .admin-title {
+  flex: 0 0 auto !important;
+}
+
+.tables-shell .modal-list {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  align-content: start !important;
+  grid-auto-rows: minmax(58px, max-content) !important;
+  padding-inline-end: 4px !important;
+}
+
+.tables-shell .modal-list:empty {
+  display: block !important;
+  min-height: 0 !important;
+  max-height: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
+.tables-shell .modal-list button {
+  min-width: 0 !important;
+  overflow: hidden !important;
+}
+
+.tables-shell .modal-list button span,
+.tables-shell .modal-list button small {
+  min-width: 0 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.tables-shell .table-empty {
+  align-self: start !important;
+  min-height: 0 !important;
+  padding: 12px 14px !important;
+}
+
+@media (max-width: 900px) {
+  .tables-shell .modal-overlay {
+    padding: 12px !important;
+  }
+
+  .tables-shell .setup-modal {
+    width: calc(100vw - 24px) !important;
+  }
+
+  .tables-shell .setup-modal-body {
+    max-height: calc(100vh - 122px) !important;
+    grid-template-columns: 1fr !important;
+  }
+
+  .tables-shell .setup-form-card {
+    position: static !important;
+  }
+
+  .tables-shell .setup-list-card {
+    max-height: 46vh !important;
+  }
+}
+
+@media (max-width: 560px) {
+  .tables-shell .setup-modal-body {
+    padding: 10px !important;
+    gap: 10px !important;
+  }
+
+  .tables-shell .modal-list {
+    grid-template-columns: 1fr !important;
+  }
+}
