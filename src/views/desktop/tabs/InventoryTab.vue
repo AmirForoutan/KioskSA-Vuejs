@@ -575,7 +575,6 @@ function printKardexReport(mode: "a4" | "a5" | "receipt") {
     <header class="inventory-header">
       <div>
         <h2>انبار</h2>
-        <p>فاکتور خرید، رسید ورود و خروج، اصلاح موجودی، انبارگردانی، گزارش موجودی و کاردکس کالا</p>
       </div>
       <button class="inv-primary" @click="loadAll" :disabled="loading">بروزرسانی</button>
     </header>
@@ -598,9 +597,12 @@ function printKardexReport(mode: "a4" | "a5" | "receipt") {
       <div class="inv-card">
         <h3>تنظیمات انبار</h3>
         <label><input type="checkbox" v-model="settings.IsWarehouseEnabled" /> انبار فعال باشد</label>
-        <label><input type="checkbox" v-model="settings.AllowNegativeStockSale" /> اجازه ثبت فاکتور با موجودی منفی</label>
-        <label><input type="checkbox" v-model="settings.AutoCreateStockReceiptFromPurchaseInvoice" /> ایجاد رسید ورود از فاکتور خرید</label>
-        <label><input type="checkbox" v-model="settings.AutoCreateStockIssueFromSaleInvoice" /> ایجاد خروج انبار از فروش</label>
+        <label><input type="checkbox" v-model="settings.AllowNegativeStockSale" /> اجازه ثبت فاکتور با موجودی
+          منفی</label>
+        <label><input type="checkbox" v-model="settings.AutoCreateStockReceiptFromPurchaseInvoice" /> ایجاد رسید ورود از
+          فاکتور خرید</label>
+        <label><input type="checkbox" v-model="settings.AutoCreateStockIssueFromSaleInvoice" /> ایجاد خروج انبار از
+          فروش</label>
         <label><input type="checkbox" v-model="settings.EnableStockTaking" /> انبارگردانی فعال باشد</label>
         <label>روش ارزش‌گذاری موجودی</label>
         <select v-model.number="settings.InventoryValuationMethod">
@@ -620,10 +622,19 @@ function printKardexReport(mode: "a4" | "a5" | "receipt") {
         <label><input type="checkbox" v-model="warehouseForm.IsDefault" /> انبار پیش‌فرض</label>
         <button class="inv-primary" @click="submitWarehouse">ذخیره انبار</button>
         <table>
-          <thead><tr><th>کد</th><th>عنوان</th><th>پیش‌فرض</th><th></th></tr></thead>
+          <thead>
+            <tr>
+              <th>کد</th>
+              <th>عنوان</th>
+              <th>پیش‌فرض</th>
+              <th></th>
+            </tr>
+          </thead>
           <tbody>
             <tr v-for="w in warehouses" :key="w.WarehouseId">
-              <td>{{ w.WarehouseCode }}</td><td>{{ w.WarehouseTitle }}</td><td>{{ w.IsDefault ? 'بله' : '-' }}</td>
+              <td>{{ w.WarehouseCode }}</td>
+              <td>{{ w.WarehouseTitle }}</td>
+              <td>{{ w.IsDefault ? 'بله' : '-' }}</td>
               <td><button @click="editWarehouse(w)">ویرایش</button></td>
             </tr>
           </tbody>
@@ -634,10 +645,16 @@ function printKardexReport(mode: "a4" | "a5" | "receipt") {
     <div v-if="activeTab === 'fiscalYears'" class="inventory-fiscal-years-panel">
       <div class="inv-card">
         <h3>دوره‌های مالی</h3>
-        <div class="inv-warning">دوره مالی از کالاها و تنظیمات انبار جدا شد. بستن دوره مالی باید فقط از همین تب انجام شود.</div>
         <div class="inv-table-wrap">
           <table>
-            <thead><tr><th>عنوان</th><th>شروع</th><th>پایان</th><th>وضعیت</th></tr></thead>
+            <thead>
+              <tr>
+                <th>عنوان</th>
+                <th>شروع</th>
+                <th>پایان</th>
+                <th>وضعیت</th>
+              </tr>
+            </thead>
             <tbody>
               <tr v-for="f in fiscalYears" :key="f.FiscalYearId">
                 <td>{{ f.Title }}</td>
@@ -654,13 +671,18 @@ function printKardexReport(mode: "a4" | "a5" | "receipt") {
     <div v-if="activeTab === 'documents'" class="inv-card">
       <h3>ثبت سند انبار</h3>
       <div class="inv-form-grid">
-        <select v-model.number="documentForm.DocumentType"><option v-for="t in documentTypes" :key="t.id" :value="t.id">{{ t.title }}</option></select>
+        <select v-model.number="documentForm.DocumentType">
+          <option v-for="t in documentTypes" :key="t.id" :value="t.id">{{ t.title }}</option>
+        </select>
         <input v-model="documentForm.DocumentNumber" placeholder="شماره سند؛ خالی یعنی خودکار" />
         <input v-model="documentForm.DocumentDate" placeholder="تاریخ" data-jdp />
-        <select v-model.number="documentForm.WarehouseId"><option v-for="w in warehouses" :key="w.WarehouseId" :value="w.WarehouseId">{{ w.WarehouseTitle }}</option></select>
+        <select v-model.number="documentForm.WarehouseId">
+          <option v-for="w in warehouses" :key="w.WarehouseId" :value="w.WarehouseId">{{ w.WarehouseTitle }}</option>
+        </select>
         <select v-model.number="documentForm.PersonId" @change="onSupplierChange">
           <option :value="0">انتخاب تأمین‌کننده/شخص</option>
-          <option v-for="s in suppliers.filter(x => x.IsActive)" :key="s.SupplierId" :value="s.SupplierId">{{ s.SupplierTitle }}</option>
+          <option v-for="s in suppliers.filter(x => x.IsActive)" :key="s.SupplierId" :value="s.SupplierId">{{
+            s.SupplierTitle }}</option>
         </select>
         <input v-model="documentForm.PersonTitle" placeholder="تأمین‌کننده/شخص" />
         <input v-model="documentForm.Description" placeholder="توضیحات" />
@@ -672,10 +694,22 @@ function printKardexReport(mode: "a4" | "a5" | "receipt") {
       </div>
       <div class="inv-table-wrap">
         <table>
-          <thead><tr><th>کالا</th><th>تعداد</th><th>قیمت واحد</th><th>توضیح</th><th></th></tr></thead>
+          <thead>
+            <tr>
+              <th>کالا</th>
+              <th>تعداد</th>
+              <th>قیمت واحد</th>
+              <th>توضیح</th>
+              <th></th>
+            </tr>
+          </thead>
           <tbody>
             <tr v-for="(item, index) in documentItems" :key="index">
-              <td><select v-model.number="item.GoodsId"><option :value="0">انتخاب کالا</option><option v-for="g in goods" :key="g.GoodsId" :value="g.GoodsId">{{ g.GoodsCode }} - {{ g.GoodsName }}</option></select></td>
+              <td><select v-model.number="item.GoodsId">
+                  <option :value="0">انتخاب کالا</option>
+                  <option v-for="g in goods" :key="g.GoodsId" :value="g.GoodsId">{{ g.GoodsCode }} - {{ g.GoodsName }}
+                  </option>
+                </select></td>
               <td><input type="number" v-model.number="item.Quantity" /></td>
               <td><input type="number" v-model.number="item.UnitPrice" /></td>
               <td><input v-model="item.Description" /></td>
@@ -691,8 +725,13 @@ function printKardexReport(mode: "a4" | "a5" | "receipt") {
     <div v-if="activeTab === 'reports'" class="inv-card">
       <h3>گزارش موجودی</h3>
       <div class="inv-form-grid">
-        <select v-model.number="reportFilter.FiscalYearId"><option v-for="f in fiscalYears" :key="f.FiscalYearId" :value="f.FiscalYearId">{{ f.Title }}</option></select>
-        <select v-model.number="reportFilter.WarehouseId"><option :value="0">همه انبارها</option><option v-for="w in warehouses" :key="w.WarehouseId" :value="w.WarehouseId">{{ w.WarehouseTitle }}</option></select>
+        <select v-model.number="reportFilter.FiscalYearId">
+          <option v-for="f in fiscalYears" :key="f.FiscalYearId" :value="f.FiscalYearId">{{ f.Title }}</option>
+        </select>
+        <select v-model.number="reportFilter.WarehouseId">
+          <option :value="0">همه انبارها</option>
+          <option v-for="w in warehouses" :key="w.WarehouseId" :value="w.WarehouseId">{{ w.WarehouseTitle }}</option>
+        </select>
         <input v-model="reportFilter.FromDate" placeholder="از تاریخ" data-jdp />
         <input v-model="reportFilter.ToDate" placeholder="تا تاریخ" data-jdp />
       </div>
@@ -704,10 +743,32 @@ function printKardexReport(mode: "a4" | "a5" | "receipt") {
       <button class="inv-danger" @click="rebuildBalances">بازسازی موجودی از کاردکس</button>
       <div class="inv-table-wrap">
         <table>
-          <thead><tr><th>کد</th><th>کالا</th><th>موجودی حال حاضر</th><th>ورود بازه</th><th>خروج بازه</th><th>ارزش</th><th>آخرین خرید</th><th>میانگین</th><th>حداقل</th><th>حداکثر</th></tr></thead>
+          <thead>
+            <tr>
+              <th>کد</th>
+              <th>کالا</th>
+              <th>موجودی حال حاضر</th>
+              <th>ورود بازه</th>
+              <th>خروج بازه</th>
+              <th>ارزش</th>
+              <th>آخرین خرید</th>
+              <th>میانگین</th>
+              <th>حداقل</th>
+              <th>حداکثر</th>
+            </tr>
+          </thead>
           <tbody>
             <tr v-for="r in stockRows" :key="r.GoodsId">
-              <td>{{ r.GoodsCode }}</td><td>{{ r.GoodsName }}</td><td>{{ r.CurrentQuantity }}</td><td>{{ r.PeriodInQuantity }}</td><td>{{ r.PeriodOutQuantity }}</td><td>{{ Number(r.InventoryValue).toLocaleString() }}</td><td>{{ Number(r.LastPurchasePrice).toLocaleString() }}</td><td>{{ Number(r.AveragePrice).toLocaleString() }}</td><td>{{ r.MinStock }}</td><td>{{ r.MaxStock }}</td>
+              <td>{{ r.GoodsCode }}</td>
+              <td>{{ r.GoodsName }}</td>
+              <td>{{ r.CurrentQuantity }}</td>
+              <td>{{ r.PeriodInQuantity }}</td>
+              <td>{{ r.PeriodOutQuantity }}</td>
+              <td>{{ Number(r.InventoryValue).toLocaleString() }}</td>
+              <td>{{ Number(r.LastPurchasePrice).toLocaleString() }}</td>
+              <td>{{ Number(r.AveragePrice).toLocaleString() }}</td>
+              <td>{{ r.MinStock }}</td>
+              <td>{{ r.MaxStock }}</td>
             </tr>
           </tbody>
         </table>
@@ -717,9 +778,17 @@ function printKardexReport(mode: "a4" | "a5" | "receipt") {
     <div v-if="activeTab === 'kardex'" class="inv-card">
       <h3>کاردکس کالا</h3>
       <div class="inv-form-grid">
-        <select v-model.number="reportFilter.FiscalYearId"><option v-for="f in fiscalYears" :key="f.FiscalYearId" :value="f.FiscalYearId">{{ f.Title }}</option></select>
-        <select v-model.number="reportFilter.WarehouseId"><option :value="0">همه انبارها</option><option v-for="w in warehouses" :key="w.WarehouseId" :value="w.WarehouseId">{{ w.WarehouseTitle }}</option></select>
-        <select v-model.number="reportFilter.GoodsId"><option :value="0">همه کالاها</option><option v-for="g in goods" :key="g.GoodsId" :value="g.GoodsId">{{ g.GoodsCode }} - {{ g.GoodsName }}</option></select>
+        <select v-model.number="reportFilter.FiscalYearId">
+          <option v-for="f in fiscalYears" :key="f.FiscalYearId" :value="f.FiscalYearId">{{ f.Title }}</option>
+        </select>
+        <select v-model.number="reportFilter.WarehouseId">
+          <option :value="0">همه انبارها</option>
+          <option v-for="w in warehouses" :key="w.WarehouseId" :value="w.WarehouseId">{{ w.WarehouseTitle }}</option>
+        </select>
+        <select v-model.number="reportFilter.GoodsId">
+          <option :value="0">همه کالاها</option>
+          <option v-for="g in goods" :key="g.GoodsId" :value="g.GoodsId">{{ g.GoodsCode }} - {{ g.GoodsName }}</option>
+        </select>
         <input v-model="reportFilter.FromDate" placeholder="از تاریخ" data-jdp />
         <input v-model="reportFilter.ToDate" placeholder="تا تاریخ" data-jdp />
       </div>
@@ -729,10 +798,30 @@ function printKardexReport(mode: "a4" | "a5" | "receipt") {
       <button @click="printKardexReport('receipt')">چاپ فیش ۷ سانت</button>
       <div class="inv-table-wrap">
         <table>
-          <thead><tr><th>تاریخ</th><th>سند</th><th>انبار</th><th>کالا</th><th>ورود</th><th>خروج</th><th>مانده</th><th>قیمت</th><th>مبلغ</th></tr></thead>
+          <thead>
+            <tr>
+              <th>تاریخ</th>
+              <th>سند</th>
+              <th>انبار</th>
+              <th>کالا</th>
+              <th>ورود</th>
+              <th>خروج</th>
+              <th>مانده</th>
+              <th>قیمت</th>
+              <th>مبلغ</th>
+            </tr>
+          </thead>
           <tbody>
             <tr v-for="r in kardexRows" :key="r.LedgerId">
-              <td>{{ r.DocumentDate }}</td><td>{{ r.DocumentNumber }}</td><td>{{ r.WarehouseTitle }}</td><td>{{ r.GoodsName }}</td><td>{{ r.InQuantity }}</td><td>{{ r.OutQuantity }}</td><td>{{ r.BalanceAfter }}</td><td>{{ Number(r.UnitPrice).toLocaleString() }}</td><td>{{ Number(r.Amount).toLocaleString() }}</td>
+              <td>{{ r.DocumentDate }}</td>
+              <td>{{ r.DocumentNumber }}</td>
+              <td>{{ r.WarehouseTitle }}</td>
+              <td>{{ r.GoodsName }}</td>
+              <td>{{ r.InQuantity }}</td>
+              <td>{{ r.OutQuantity }}</td>
+              <td>{{ r.BalanceAfter }}</td>
+              <td>{{ Number(r.UnitPrice).toLocaleString() }}</td>
+              <td>{{ Number(r.Amount).toLocaleString() }}</td>
             </tr>
           </tbody>
         </table>
@@ -741,7 +830,8 @@ function printKardexReport(mode: "a4" | "a5" | "receipt") {
 
     <div v-if="activeTab === 'stocktaking'" class="inv-card stocktaking-card">
       <h3>انبارگردانی</h3>
-      <div class="inv-warning">اینجا اول تاریخ، دوره مالی و انبار موردنظر را انتخاب کن، بعد روی «بارگذاری موجودی سیستم» بزن.</div>
+      <div class="inv-warning">اینجا اول تاریخ، دوره مالی و انبار موردنظر را انتخاب کن، بعد روی «بارگذاری موجودی سیستم»
+        بزن.</div>
       <div class="inv-form-grid stocktaking-filter">
         <label>
           تاریخ انبارگردانی
@@ -763,10 +853,20 @@ function printKardexReport(mode: "a4" | "a5" | "receipt") {
       </div>
       <button class="inv-primary" @click="prepareStockTaking">بارگذاری موجودی سیستم</button>
       <button class="inv-danger" @click="applyStockTaking">ثبت اختلاف انبارگردانی</button>
-      <div v-if="!stockTakingRows.length" class="inv-warning">بعد از انتخاب انبار، موجودی سیستم اینجا نمایش داده می‌شود.</div>
+      <div v-if="!stockTakingRows.length" class="inv-warning">بعد از انتخاب انبار، موجودی سیستم اینجا نمایش داده می‌شود.
+      </div>
       <div v-else class="inv-table-wrap">
         <table>
-          <thead><tr><th>کد</th><th>کالا</th><th>موجودی سیستم</th><th>موجودی واقعی</th><th>اختلاف</th><th>آخرین خرید</th></tr></thead>
+          <thead>
+            <tr>
+              <th>کد</th>
+              <th>کالا</th>
+              <th>موجودی سیستم</th>
+              <th>موجودی واقعی</th>
+              <th>اختلاف</th>
+              <th>آخرین خرید</th>
+            </tr>
+          </thead>
           <tbody>
             <tr v-for="r in stockTakingRows" :key="r.GoodsId" :class="{ diff: Number(r.DifferenceQuantity) !== 0 }">
               <td>{{ r.GoodsCode }}</td>
@@ -794,10 +894,26 @@ function printKardexReport(mode: "a4" | "a5" | "receipt") {
       <button class="inv-primary" @click="submitSupplier">ذخیره تأمین‌کننده</button>
       <div class="inv-table-wrap">
         <table>
-          <thead><tr><th>کد</th><th>نام</th><th>تلفن</th><th>جمع خرید</th><th>جمع پرداخت</th><th>مانده</th><th></th></tr></thead>
+          <thead>
+            <tr>
+              <th>کد</th>
+              <th>نام</th>
+              <th>تلفن</th>
+              <th>جمع خرید</th>
+              <th>جمع پرداخت</th>
+              <th>مانده</th>
+              <th></th>
+            </tr>
+          </thead>
           <tbody>
             <tr v-for="s in supplierBalanceRows" :key="s.SupplierId">
-              <td>{{ s.SupplierCode }}</td><td>{{ s.SupplierTitle }}</td><td>{{ s.Phone }}</td><td>{{ s.PurchaseAmount.toLocaleString() }}</td><td>{{ s.PaidAmount.toLocaleString() }}</td><td>{{ s.BalanceAmount.toLocaleString() }}</td><td><button @click="editSupplier(s)">ویرایش</button></td>
+              <td>{{ s.SupplierCode }}</td>
+              <td>{{ s.SupplierTitle }}</td>
+              <td>{{ s.Phone }}</td>
+              <td>{{ s.PurchaseAmount.toLocaleString() }}</td>
+              <td>{{ s.PaidAmount.toLocaleString() }}</td>
+              <td>{{ s.BalanceAmount.toLocaleString() }}</td>
+              <td><button @click="editSupplier(s)">ویرایش</button></td>
             </tr>
           </tbody>
         </table>
@@ -805,10 +921,28 @@ function printKardexReport(mode: "a4" | "a5" | "receipt") {
       <h3>سابقه حساب تأمین‌کننده‌ها</h3>
       <div class="inv-table-wrap">
         <table>
-          <thead><tr><th>تاریخ</th><th>تأمین‌کننده</th><th>سند</th><th>خرید</th><th>پرداخت</th><th>مانده</th><th>وضعیت</th><th>شرح</th></tr></thead>
+          <thead>
+            <tr>
+              <th>تاریخ</th>
+              <th>تأمین‌کننده</th>
+              <th>سند</th>
+              <th>خرید</th>
+              <th>پرداخت</th>
+              <th>مانده</th>
+              <th>وضعیت</th>
+              <th>شرح</th>
+            </tr>
+          </thead>
           <tbody>
             <tr v-for="row in supplierLedger" :key="`${row.SupplierId}-${row.DocumentNumber}-${row.DocumentDate}`">
-              <td>{{ row.DocumentDate }}</td><td>{{ row.SupplierTitle }}</td><td>{{ row.DocumentNumber }}</td><td>{{ row.PurchaseAmount.toLocaleString() }}</td><td>{{ row.PaidAmount.toLocaleString() }}</td><td>{{ row.BalanceAmount.toLocaleString() }}</td><td>{{ row.StatusTitle }}</td><td>{{ row.Description }}</td>
+              <td>{{ row.DocumentDate }}</td>
+              <td>{{ row.SupplierTitle }}</td>
+              <td>{{ row.DocumentNumber }}</td>
+              <td>{{ row.PurchaseAmount.toLocaleString() }}</td>
+              <td>{{ row.PaidAmount.toLocaleString() }}</td>
+              <td>{{ row.BalanceAmount.toLocaleString() }}</td>
+              <td>{{ row.StatusTitle }}</td>
+              <td>{{ row.Description }}</td>
             </tr>
           </tbody>
         </table>
@@ -824,10 +958,24 @@ function printKardexReport(mode: "a4" | "a5" | "receipt") {
       <button class="inv-primary" @click="loadHistory">بروزرسانی سابقه</button>
       <div class="inv-table-wrap">
         <table>
-          <thead><tr><th>زمان</th><th>کاربر</th><th>نوع سند</th><th>شماره سند</th><th>عملیات</th><th>شرح</th></tr></thead>
+          <thead>
+            <tr>
+              <th>زمان</th>
+              <th>کاربر</th>
+              <th>نوع سند</th>
+              <th>شماره سند</th>
+              <th>عملیات</th>
+              <th>شرح</th>
+            </tr>
+          </thead>
           <tbody>
             <tr v-for="r in filteredChangeLogRows" :key="r.ChangeLogId">
-              <td>{{ r.ChangedAt }}</td><td>{{ r.ChangedBy }}</td><td>{{ r.DocumentType }}</td><td>{{ r.DocumentNumber }}</td><td>{{ r.ActionType }}</td><td>{{ r.Description }}</td>
+              <td>{{ r.ChangedAt }}</td>
+              <td>{{ r.ChangedBy }}</td>
+              <td>{{ r.DocumentType }}</td>
+              <td>{{ r.DocumentNumber }}</td>
+              <td>{{ r.ActionType }}</td>
+              <td>{{ r.Description }}</td>
             </tr>
           </tbody>
         </table>
@@ -837,28 +985,163 @@ function printKardexReport(mode: "a4" | "a5" | "receipt") {
 </template>
 
 <style scoped>
-.inventory-tab { direction: rtl; color: #e5e7eb; height: 100%; overflow: auto; }
-.inventory-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-.inventory-header h2 { margin: 0; font-size: 24px; }
-.inventory-header p { margin: 4px 0 0; color: #94a3b8; }
-.inv-tabs { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
-.inv-tabs button, .inventory-tab button { border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.05); color: #e5e7eb; border-radius: 10px; padding: 9px 12px; cursor: pointer; margin: 3px; }
-.inv-tabs button.active, .inv-primary { background: rgba(20,184,166,.18) !important; border-color: rgba(20,184,166,.45) !important; color: #ccfbf1 !important; }
-.inv-danger { background: rgba(239,68,68,.16) !important; border-color: rgba(239,68,68,.35) !important; color: #fecaca !important; }
-.inv-message, .inv-warning { padding: 10px 12px; border-radius: 12px; margin-bottom: 10px; }
-.inv-message { background: rgba(59,130,246,.14); border: 1px solid rgba(59,130,246,.28); }
-.inv-warning { background: rgba(245,158,11,.14); border: 1px solid rgba(245,158,11,.3); color: #fde68a; }
-.inv-grid.two { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; }
-.inv-card { background: rgba(255,255,255,.045); border: 1px solid rgba(255,255,255,.08); border-radius: 16px; padding: 14px; margin-bottom: 12px; }
-.inv-card.wide { grid-column: 1 / -1; }
-.inv-card h3 { margin: 0 0 12px; }
-.inv-form-row, .inv-form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px; margin-bottom: 10px; }
-.inventory-tab input, .inventory-tab select { width: 100%; min-height: 38px; border-radius: 10px; border: 1px solid rgba(255,255,255,.1); background: #111827; color: #e5e7eb; padding: 7px 9px; box-sizing: border-box; }
-.inventory-tab label { display: block; margin: 8px 0; color: #d1d5db; }
-.inv-table-wrap { max-height: 420px; overflow: auto; border-radius: 12px; border: 1px solid rgba(255,255,255,.08); margin-top: 10px; }
-table { width: 100%; border-collapse: collapse; min-width: 820px; }
-th, td { padding: 9px 10px; border-bottom: 1px solid rgba(255,255,255,.07); text-align: right; }
-th { position: sticky; top: 0; background: #151b27; z-index: 1; color: #cbd5e1; }
-tr.diff { background: rgba(245,158,11,.1); }
-@media (max-width: 900px) { .inv-grid.two { grid-template-columns: 1fr; } }
+.inventory-tab {
+  direction: rtl;
+  color: #e5e7eb;
+  height: 100%;
+  overflow: auto;
+}
+
+.inventory-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.inventory-header h2 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.inventory-header p {
+  margin: 4px 0 0;
+  color: #94a3b8;
+}
+
+.inv-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.inv-tabs button,
+.inventory-tab button {
+  border: 1px solid rgba(255, 255, 255, .1);
+  background: rgba(255, 255, 255, .05);
+  color: #e5e7eb;
+  border-radius: 10px;
+  padding: 9px 12px;
+  cursor: pointer;
+  margin: 3px;
+}
+
+.inv-tabs button.active,
+.inv-primary {
+  background: rgba(20, 184, 166, .18) !important;
+  border-color: rgba(20, 184, 166, .45) !important;
+  color: #ccfbf1 !important;
+}
+
+.inv-danger {
+  background: rgba(239, 68, 68, .16) !important;
+  border-color: rgba(239, 68, 68, .35) !important;
+  color: #fecaca !important;
+}
+
+.inv-message,
+.inv-warning {
+  padding: 10px 12px;
+  border-radius: 12px;
+  margin-bottom: 10px;
+}
+
+.inv-message {
+  background: rgba(59, 130, 246, .14);
+  border: 1px solid rgba(59, 130, 246, .28);
+}
+
+.inv-warning {
+  background: rgba(245, 158, 11, .14);
+  border: 1px solid rgba(245, 158, 11, .3);
+  color: #fde68a;
+}
+
+.inv-grid.two {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.inv-card {
+  background: rgba(255, 255, 255, .045);
+  border: 1px solid rgba(255, 255, 255, .08);
+  border-radius: 16px;
+  padding: 14px;
+  margin-bottom: 12px;
+}
+
+.inv-card.wide {
+  grid-column: 1 / -1;
+}
+
+.inv-card h3 {
+  margin: 0 0 12px;
+}
+
+.inv-form-row,
+.inv-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.inventory-tab input,
+.inventory-tab select {
+  width: 100%;
+  min-height: 38px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, .1);
+  background: #111827;
+  color: #e5e7eb;
+  padding: 7px 9px;
+  box-sizing: border-box;
+}
+
+.inventory-tab label {
+  display: block;
+  margin: 8px 0;
+  color: #d1d5db;
+}
+
+.inv-table-wrap {
+  max-height: 420px;
+  overflow: auto;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, .08);
+  margin-top: 10px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 820px;
+}
+
+th,
+td {
+  padding: 9px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, .07);
+  text-align: right;
+}
+
+th {
+  position: sticky;
+  top: 0;
+  background: #151b27;
+  z-index: 1;
+  color: #cbd5e1;
+}
+
+tr.diff {
+  background: rgba(245, 158, 11, .1);
+}
+
+@media (max-width: 900px) {
+  .inv-grid.two {
+    grid-template-columns: 1fr;
+  }
+}
 </style>
