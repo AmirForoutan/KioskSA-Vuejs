@@ -31,7 +31,7 @@
                 </div>
 
                 <div class="form-group">
-                    <label>قیمت (تومان):</label>
+                    <label>قیمت فروش (تومان):</label>
                     <input v-model.number="localProduct.GoodsPrice" value="0" type="text" ref="goodsprice"
                         @click="handleInputClick($event, 'price')" @focus="handleInputFocus('price')" />
                 </div>
@@ -55,9 +55,49 @@
                 </div>
 
                 <div class="form-group">
-                    <label>موجودی کالا:</label>
+                    <label>موجودی اولیه/نمایشی:</label>
                     <input v-model.number="localProduct.StockInventory" value="0" type="text" ref="stockInventory"
                         @click="handleInputClick($event, 'inventory')" @focus="handleInputFocus('inventory')" />
+                </div>
+
+                <div class="settings-box">
+                    <h4>تنظیمات انبار و هشدار موجودی</h4>
+                    <div class="settings-grid">
+                        <div class="form-group">
+                            <label>حداقل موجودی:</label>
+                            <input v-model.number="localProduct.MinStock" value="0" type="text" ref="minStock"
+                                @click="handleInputClick($event, 'minstock')" @focus="handleInputFocus('minstock')" />
+                        </div>
+                        <div class="form-group">
+                            <label>حداکثر موجودی:</label>
+                            <input v-model.number="localProduct.MaxStock" value="0" type="text" ref="maxStock"
+                                @click="handleInputClick($event, 'maxstock')" @focus="handleInputFocus('maxstock')" />
+                        </div>
+                        <div class="form-group">
+                            <label>نقطه سفارش مجدد:</label>
+                            <input v-model.number="localProduct.ReorderPoint" value="0" type="text" ref="reorderPoint"
+                                @click="handleInputClick($event, 'reorderpoint')" @focus="handleInputFocus('reorderpoint')" />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="settings-box">
+                    <h4>کاربرد کالا</h4>
+                    <p class="hint">این تنظیمات مشخص می‌کند کالا در کدام بخش‌ها قابل استفاده یا نمایش باشد.</p>
+                    <div class="usage-grid">
+                        <label class="usage-toggle">
+                            <input v-model="localProduct.IsPurchasable" type="checkbox" />
+                            <span>قابل استفاده در فاکتور خرید</span>
+                        </label>
+                        <label class="usage-toggle">
+                            <input v-model="localProduct.IsSellable" type="checkbox" />
+                            <span>نمایش در صفحه فروش PC</span>
+                        </label>
+                        <label class="usage-toggle">
+                            <input v-model="localProduct.IsKioskVisible" type="checkbox" />
+                            <span>نمایش در کیوسک</span>
+                        </label>
+                    </div>
                 </div>
 
                 <div class="form-group">
@@ -77,7 +117,6 @@
                     </div>
                 </div>
 
-                <!-- روزهای هفته و ساعات کاری -->
                 <div class="time-settings">
                     <h4>تنظیمات زمانی:</h4>
                     <div v-for="day in daysOfWeek" :key="day.key" class="day-setting">
@@ -124,14 +163,11 @@ import VirtualKeyboard from './VirtualKeyboard.vue';
 import { ShwoKeyboardStatus } from '../utilities'
 
 const IsShowKeyboard = ref(false)
-
-// مدیریت کیبورد مجازی
 const showKeyboard = ref(false)
 const activeInputType = ref('')
 const activeInputRef = ref(null)
 const isNumberMode = ref(false)
 
-// refs برای فیلدهای ورودی
 const goodscode = ref(null)
 const goodsname = ref(null)
 const goodsprice = ref(null)
@@ -140,7 +176,9 @@ const goodsduty = ref(null)
 const packingprice = ref(null)
 const goodsdescription = ref(null)
 const stockInventory = ref(null)
-
+const minStock = ref(null)
+const maxStock = ref(null)
+const reorderPoint = ref(null)
 
 const toast = useToast({
     position: 'top-right',
@@ -148,7 +186,6 @@ const toast = useToast({
         fontFamily: 'Vazirmatn-FD-Black'
     }
 })
-
 
 const props = defineProps({
     product: {
@@ -167,7 +204,6 @@ const props = defineProps({
 
 const emit = defineEmits(['save', 'close'])
 
-
 const daysOfWeek = [
     { key: 'Saturday', name: 'Saturday', label: 'شنبه' },
     { key: 'Sunday', name: 'Sunday', label: 'یکشنبه' },
@@ -178,48 +214,70 @@ const daysOfWeek = [
     { key: 'Friday', name: 'Friday', label: 'جمعه' }
 ]
 
-const localProduct = ref({
-    GoodsId: 0,
-    GoodsCode: '',
-    GoodsName: '',
-    GoodsDescription: '',
-    GoodsPrice: 0,
-    TaxPercent: 0,
-    DutyPercent: 0,
-    PackingPrice: 0,
-    GoodsGroupId: 0,
-    StockInventory: 0,
-    IsActive: true,
-    Saturday: true,
-    FromTimeSaturday: '00:00',
-    ToTimeSaturday: '23:59',
-    Sunday: true,
-    FromTimeSunday: '00:00',
-    ToTimeSunday: '23:59',
-    Monday: true,
-    FromTimeMonday: '00:00',
-    ToTimeMonday: '23:59',
-    Tuesday: true,
-    FromTimeTuesday: '00:00',
-    ToTimeTuesday: '23:59',
-    Wednesday: true,
-    FromTimeWednesday: '00:00',
-    ToTimeWednesday: '23:59',
-    Thursday: true,
-    FromTimeThursday: '00:00',
-    ToTimeThursday: '23:59',
-    Friday: true,
-    FromTimeFriday: '00:00',
-    ToTimeFriday: '23:59'
-})
+function defaultProduct() {
+    return {
+        GoodsId: 0,
+        GoodsCode: '',
+        GoodsName: '',
+        GoodsDescription: '',
+        GoodsPrice: 0,
+        TaxPercent: 0,
+        DutyPercent: 0,
+        PackingPrice: 0,
+        GoodsGroupId: 0,
+        StockInventory: 0,
+        MinStock: 0,
+        MaxStock: 0,
+        ReorderPoint: 0,
+        DefaultWarehouseId: null,
+        IsPurchasable: true,
+        IsSellable: true,
+        IsKioskVisible: true,
+        IsActive: true,
+        Saturday: true,
+        FromTimeSaturday: '00:00',
+        ToTimeSaturday: '23:59',
+        Sunday: true,
+        FromTimeSunday: '00:00',
+        ToTimeSunday: '23:59',
+        Monday: true,
+        FromTimeMonday: '00:00',
+        ToTimeMonday: '23:59',
+        Tuesday: true,
+        FromTimeTuesday: '00:00',
+        ToTimeTuesday: '23:59',
+        Wednesday: true,
+        FromTimeWednesday: '00:00',
+        ToTimeWednesday: '23:59',
+        Thursday: true,
+        FromTimeThursday: '00:00',
+        ToTimeThursday: '23:59',
+        Friday: true,
+        FromTimeFriday: '00:00',
+        ToTimeFriday: '23:59'
+    }
+}
 
-// مقداردهی اولیه با داده‌های دریافتی
+function normalizeProduct(value) {
+    const base = defaultProduct()
+    const merged = { ...base, ...(value || {}) }
+    merged.MinStock = Number(merged.MinStock || 0)
+    merged.MaxStock = Number(merged.MaxStock || 0)
+    merged.ReorderPoint = Number(merged.ReorderPoint || 0)
+    merged.IsPurchasable = merged.IsPurchasable !== false
+    merged.IsSellable = merged.IsSellable !== false
+    merged.IsKioskVisible = merged.IsKioskVisible !== false
+    merged.IsActive = merged.IsActive !== false
+    return merged
+}
+
+const localProduct = ref(defaultProduct())
+
 watch(() => props.product, (newVal) => {
-    localProduct.value = { ...newVal }
+    localProduct.value = normalizeProduct(newVal)
 }, { immediate: true })
 
 function save() {
-    // اعتبارسنجی داده‌ها
     if (!localProduct.value.GoodsCode || !localProduct.value.GoodsName) {
         toast.error('کد و نام کالا الزامی است')
         return
@@ -233,8 +291,7 @@ function save() {
     emit('save', localProduct.value)
 }
 
-watch(() => localProduct.value, (newVal) => {
-    // با تاخیر 100 میلی‌ثانیه صبر می‌کنیم تا DOM به روز رسانی شود
+watch(() => localProduct.value, () => {
     setTimeout(loadDatePicker, 100);
 }, { deep: true });
 
@@ -248,7 +305,6 @@ function loadDatePicker() {
         autoShow: false
     });
 
-    // فقط inputهایی که هنوز رویداد focus برایشان تنظیم نشده را انتخاب کنید
     const inputList = document.querySelectorAll("input[data-jdp]:not([data-jdp-initialized])");
 
     for (let i = 0; i < inputList.length; i++) {
@@ -256,42 +312,21 @@ function loadDatePicker() {
 
         inputList[i].addEventListener('focus', function () {
             if (this.hasAttribute("data-jdp-option-1")) {
-                jalaliDatepicker.updateOptions({
-                    date: false,
-                    time: true,
-                    hasSecond: false,
-                    showEmptyBtn: false,
-                    initTime: '00:00',
-                    zIndex: 2502
-                });
+                jalaliDatepicker.updateOptions({ date: false, time: true, hasSecond: false, showEmptyBtn: false, initTime: '00:00', zIndex: 2502 });
             }
             else if (this.hasAttribute("data-jdp-option-2")) {
-                jalaliDatepicker.updateOptions({
-                    date: false,
-                    time: true,
-                    hasSecond: false,
-                    showEmptyBtn: false,
-                    initTime: '23:59',
-                    zIndex: 2502
-                });
+                jalaliDatepicker.updateOptions({ date: false, time: true, hasSecond: false, showEmptyBtn: false, initTime: '23:59', zIndex: 2502 });
             }
             jalaliDatepicker.show(this);
         });
     }
 }
 
-
 function generateNewProductCode() {
     const selectedCategory = localProduct.value.GoodsGroupId
-
-    // اگر دسته‌بندی انتخاب نشده، کد اولیه
     if (!selectedCategory) return '1000'
-
-    // فیلتر کردن محصولات این دسته‌بندی
     const categoryProducts = props.products.filter(p => p.GoodsGroupId == selectedCategory)
-
     if (categoryProducts.length === 0) {
-        // اگر محصولی در این دسته‌بندی نیست، کد دسته‌بندی * 100
         const category = props.categories.find(c => c.GroupId == selectedCategory)
         if (category) {
             const categoryCode = parseInt(category.GroupCode)
@@ -299,25 +334,20 @@ function generateNewProductCode() {
         }
         return '1000'
     }
-
-    // پیدا کردن بالاترین کد عددی در این دسته‌بندی
     const maxCode = Math.max(...categoryProducts.map(prod => {
         const codeNum = parseInt(prod.GoodsCode)
         return isNaN(codeNum) ? 0 : codeNum
     }))
-
     return (maxCode + 1).toString()
 }
 
 watch(() => props.product, (newVal) => {
-    localProduct.value = { ...newVal }
-    // اگر در حال افزودن محصول جدید هستیم، کد را تولید کنیم
+    localProduct.value = normalizeProduct(newVal)
     if (!newVal.GoodsId && props.products.length > 0) {
         localProduct.value.GoodsCode = generateNewProductCode()
     }
 }, { immediate: true })
 
-// همچنین یک واچر برای تغییرات دسته‌بندی اضافه کنید
 watch(() => localProduct.value.GoodsGroupId, (newVal) => {
     if (!props.product.GoodsId && newVal) {
         localProduct.value.GoodsCode = generateNewProductCode()
@@ -335,40 +365,20 @@ watch(() => [
 ], (newValues, oldValues) => {
     daysOfWeek.forEach((day, index) => {
         if (newValues[index] && !oldValues[index]) {
-            // اگر روز فعال شده و قبلا غیرفعال بوده
             localProduct.value[`FromTime${day.name}`] = '00:00'
             localProduct.value[`ToTime${day.name}`] = '23:59'
         }
     })
 }, { deep: true })
 
-
-
-////////////////////////
-///// Virtual Keyboard ///////
-
-const numberModeInputs = ['code', 'price', 'tax', 'duty', 'packprice']
-
+const numberModeInputs = ['code', 'price', 'tax', 'duty', 'packprice', 'inventory', 'minstock', 'maxstock', 'reorderpoint']
 
 function handleInputClick(event, inputType) {
     if (IsShowKeyboard.value == true) {
         activeInputType.value = inputType
         showKeyboard.value = true
-
         isNumberMode.value = numberModeInputs.includes(inputType)
-
-        // تنظیم ref مربوطه
-        switch (inputType) {
-            case 'code': activeInputRef.value = goodscode.value; break
-            case 'name': activeInputRef.value = goodsname.value; break
-            case 'price': activeInputRef.value = goodsprice.value; break
-            case 'tax': activeInputRef.value = goodstax.value; break
-            case 'duty': activeInputRef.value = goodsduty.value; break
-            case 'packprice': activeInputRef.value = packingprice.value; break
-            case 'desc': activeInputRef.value = goodsdescription.value; break
-            case 'inventory': activeInputRef.value = stockInventory.value; break
-        }
-
+        activeInputRef.value = getInputRef(inputType)
         event.preventDefault()
     }
 }
@@ -377,20 +387,25 @@ function handleInputFocus(inputType) {
     if (IsShowKeyboard.value == true) {
         activeInputType.value = inputType
         showKeyboard.value = true
-
         isNumberMode.value = numberModeInputs.includes(inputType)
+        activeInputRef.value = getInputRef(inputType)
+    }
+}
 
-        // تنظیم ref مربوطه
-        switch (inputType) {
-            case 'code': activeInputRef.value = goodscode.value; break
-            case 'name': activeInputRef.value = goodsname.value; break
-            case 'price': activeInputRef.value = goodsprice.value; break
-            case 'tax': activeInputRef.value = goodstax.value; break
-            case 'duty': activeInputRef.value = goodsduty.value; break
-            case 'packprice': activeInputRef.value = packingprice.value; break
-            case 'desc': activeInputRef.value = goodsdescription.value; break
-            case 'inventory': activeInputRef.value = stockInventory.value; break
-        }
+function getInputRef(inputType) {
+    switch (inputType) {
+        case 'code': return goodscode.value
+        case 'name': return goodsname.value
+        case 'price': return goodsprice.value
+        case 'tax': return goodstax.value
+        case 'duty': return goodsduty.value
+        case 'packprice': return packingprice.value
+        case 'desc': return goodsdescription.value
+        case 'inventory': return stockInventory.value
+        case 'minstock': return minStock.value
+        case 'maxstock': return maxStock.value
+        case 'reorderpoint': return reorderPoint.value
+        default: return null
     }
 }
 
@@ -403,14 +418,11 @@ function hideKeyboard() {
 
 function handleKeyPress(key) {
     if (!activeInputRef.value) return
-
     const input = activeInputRef.value
     const currentValue = input.value
     const selectionStart = input.selectionStart
     const selectionEnd = input.selectionEnd
-
     if (key === '{bksp}') {
-        // حذف کاراکتر
         if (selectionStart === selectionEnd && selectionStart > 0) {
             input.value = currentValue.substring(0, selectionStart - 1) + currentValue.substring(selectionStart)
             input.selectionStart = input.selectionEnd = selectionStart - 1
@@ -419,17 +431,24 @@ function handleKeyPress(key) {
             input.selectionStart = input.selectionEnd = selectionStart
         }
     } else if (key === '{enter}') {
-        // ثبت و مخفی کردن کیبورد
         hideKeyboard()
     } else {
-        // درج کاراکتر جدید
         const newValue = currentValue.substring(0, selectionStart) + key + currentValue.substring(selectionEnd)
         input.value = newValue
         const newPosition = selectionStart + key.length
         input.selectionStart = input.selectionEnd = newPosition
     }
-
-    // انتشار رویداد input برای به روزرسانی واکنشی
     input.dispatchEvent(new Event('input'))
 }
 </script>
+
+<style scoped>
+.settings-box { margin: 12px 0; padding: 12px; border-radius: 14px; background: rgba(15,23,42,.55); border: 1px solid rgba(255,255,255,.08); }
+.settings-box h4 { margin: 0 0 10px; }
+.settings-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.usage-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.usage-toggle { min-height: 44px; display: flex; align-items: center; gap: 8px; padding: 9px 10px; border-radius: 12px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); }
+.usage-toggle input { width: 20px; height: 20px; }
+.hint { margin: -4px 0 10px; color: #94a3b8; font-size: 12px; }
+@media (max-width: 900px) { .settings-grid, .usage-grid { grid-template-columns: 1fr; } }
+</style>
