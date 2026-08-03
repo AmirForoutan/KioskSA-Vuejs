@@ -3,7 +3,8 @@ import CatalogImageModal from "../../../components/CatalogImageModal.vue";
 import ProductModal from "../../../components/ProductModal.vue";
 import { can } from "../../../components/acl/can";
 import { useDesktopToastMessage } from "../useDesktopToastMessage";
-import { loadDesktopCatalog, saveDesktopProduct, } from "../../../services/desktopApi";
+import { saveDesktopProduct, unwrapArray, } from "../../../services/desktopApi";
+import { GetApiAddress } from "../../../utilities";
 const fallbackCategories = [
     { GroupId: 1, GroupName: "عمومی" },
     { GroupId: 2, GroupName: "نوشیدنی" },
@@ -20,6 +21,9 @@ const fallbackRows = [
         DutyPercent: 0,
         PackingPrice: 0,
         StockInventory: 10,
+        IsPurchasable: true,
+        IsSellable: true,
+        IsKioskVisible: true,
         IsActive: true,
     },
 ];
@@ -43,11 +47,42 @@ const filtered = computed(() => {
     });
 });
 onMounted(loadProducts);
+function buildBaseInfoUrl(baseUrl, endpoint) {
+    const base = baseUrl.replace(/\/$/, "");
+    const path = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
+    return `${base}${path}?catalogContext=baseinfo`;
+}
+async function postBaseInfoCatalog(endpoint) {
+    const serviceAdd = await GetApiAddress();
+    const response = await fetch(buildBaseInfoUrl(serviceAdd, endpoint), {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: JSON.stringify({ ConnectionsId: 0, IncludeInactive: true, IncludeAll: true }),
+    });
+    if (!response.ok)
+        throw new Error(`HTTP ${response.status} for ${endpoint}`);
+    return response.json();
+}
+async function loadBaseInfoCatalog() {
+    const [categoriesResponse, goodsResponse] = await Promise.all([
+        postBaseInfoCatalog("/getgoodsgroup"),
+        postBaseInfoCatalog("/getgoods"),
+    ]);
+    return {
+        categories: unwrapArray(categoriesResponse, [
+            "GoodsGroup",
+            "Groups",
+            "Categories",
+            "categories",
+        ]),
+        goods: unwrapArray(goodsResponse, ["Goods", "Products", "goods", "products"]),
+    };
+}
 async function loadProducts() {
     loading.value = true;
     message.value = "";
     try {
-        const result = await loadDesktopCatalog(0);
+        const result = await loadBaseInfoCatalog();
         rows.value = result.goods.length ? result.goods : fallbackRows;
         categories.value = result.categories.length ? result.categories : fallbackCategories;
         if (!result.goods.length)
@@ -77,6 +112,9 @@ function newProduct() {
         DutyPercent: 0,
         PackingPrice: 0,
         StockInventory: 0,
+        IsPurchasable: true,
+        IsSellable: true,
+        IsKioskVisible: true,
         IsActive: true,
         Saturday: true,
         FromTimeSaturday: "00:00",
@@ -124,6 +162,7 @@ async function save(product) {
             rows.value.unshift({ ...product, GoodsId: product.GoodsId || Date.now() });
         message.value = result.message || "کالا ذخیره شد";
         closeEditor();
+        await loadProducts();
     }
     catch (error) {
         message.value = error instanceof Error ? error.message : "خطا در ذخیره کالا";
