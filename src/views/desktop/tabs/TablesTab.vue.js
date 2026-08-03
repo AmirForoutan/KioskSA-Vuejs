@@ -10,6 +10,8 @@ const loading = ref(false);
 const saving = ref(false);
 const message = ref("");
 const currencyIsRial = ref(false);
+const groupModalOpen = ref(false);
+const tableModalOpen = ref(false);
 useDesktopToastMessage(message);
 const groupForm = ref({
     TableGroupId: 0,
@@ -126,6 +128,32 @@ function resetTableForm() {
         IsOccupied: false,
     };
 }
+function openGroupManager() {
+    if (groupForm.value.TableGroupId === 0 && !groupForm.value.GroupCode)
+        resetGroupForm();
+    groupModalOpen.value = true;
+}
+function openTableManager(groupId) {
+    const desiredGroupId = groupId || selectedGroupId.value || groups.value[0]?.TableGroupId || 0;
+    if (tableForm.value.TableId === 0) {
+        tableForm.value.TableGroupId = desiredGroupId;
+        tableForm.value.TableCode = desiredGroupId ? nextTableCode(desiredGroupId) : "";
+    }
+    tableModalOpen.value = true;
+}
+function openNewTable() {
+    resetTableForm();
+    tableModalOpen.value = true;
+}
+function openEditTable(table) {
+    closeContextMenu();
+    editTable(table);
+    tableModalOpen.value = true;
+}
+function openEditGroup(group) {
+    editGroup(group);
+    groupModalOpen.value = true;
+}
 function useNextGroupCode() {
     groupForm.value.GroupCode = nextGroupCode();
 }
@@ -188,7 +216,7 @@ async function saveTable() {
 function openContext(event, table) {
     event.preventDefault();
     const menuWidth = 220;
-    const menuHeight = table.IsOccupied ? 270 : 60;
+    const menuHeight = table.IsOccupied ? 310 : 100;
     const padding = 8;
     let x = event.clientX;
     let y = event.clientY;
@@ -379,6 +407,7 @@ debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
 let __VLS_components;
 let __VLS_directives;
+/** @type {__VLS_StyleScopedClasses['head-actions']} */ ;
 /** @type {__VLS_StyleScopedClasses['tables-head']} */ ;
 /** @type {__VLS_StyleScopedClasses['admin-title']} */ ;
 /** @type {__VLS_StyleScopedClasses['admin-box']} */ ;
@@ -416,23 +445,27 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['field']} */ ;
 /** @type {__VLS_StyleScopedClasses['field']} */ ;
 /** @type {__VLS_StyleScopedClasses['status-toggle']} */ ;
-/** @type {__VLS_StyleScopedClasses['quick-list']} */ ;
-/** @type {__VLS_StyleScopedClasses['quick-list']} */ ;
-/** @type {__VLS_StyleScopedClasses['quick-list']} */ ;
-/** @type {__VLS_StyleScopedClasses['quick-list']} */ ;
+/** @type {__VLS_StyleScopedClasses['context-menu']} */ ;
+/** @type {__VLS_StyleScopedClasses['context-menu']} */ ;
+/** @type {__VLS_StyleScopedClasses['context-menu']} */ ;
+/** @type {__VLS_StyleScopedClasses['context-menu']} */ ;
+/** @type {__VLS_StyleScopedClasses['modal-list']} */ ;
+/** @type {__VLS_StyleScopedClasses['modal-list']} */ ;
+/** @type {__VLS_StyleScopedClasses['modal-list']} */ ;
+/** @type {__VLS_StyleScopedClasses['modal-list']} */ ;
+/** @type {__VLS_StyleScopedClasses['occupied']} */ ;
+/** @type {__VLS_StyleScopedClasses['modal-list']} */ ;
 /** @type {__VLS_StyleScopedClasses['inactive']} */ ;
-/** @type {__VLS_StyleScopedClasses['context-menu']} */ ;
-/** @type {__VLS_StyleScopedClasses['context-menu']} */ ;
-/** @type {__VLS_StyleScopedClasses['context-menu']} */ ;
-/** @type {__VLS_StyleScopedClasses['context-menu']} */ ;
 /** @type {__VLS_StyleScopedClasses['modal-head']} */ ;
 /** @type {__VLS_StyleScopedClasses['modal-actions']} */ ;
 /** @type {__VLS_StyleScopedClasses['modal-actions']} */ ;
 /** @type {__VLS_StyleScopedClasses['field']} */ ;
 /** @type {__VLS_StyleScopedClasses['icon']} */ ;
-/** @type {__VLS_StyleScopedClasses['tables-layout']} */ ;
-/** @type {__VLS_StyleScopedClasses['table-admin']} */ ;
-/** @type {__VLS_StyleScopedClasses['table-admin']} */ ;
+/** @type {__VLS_StyleScopedClasses['tables-head']} */ ;
+/** @type {__VLS_StyleScopedClasses['head-actions']} */ ;
+/** @type {__VLS_StyleScopedClasses['head-actions']} */ ;
+/** @type {__VLS_StyleScopedClasses['t-btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['setup-modal-body']} */ ;
 /** @type {__VLS_StyleScopedClasses['code-preview']} */ ;
 /** @type {__VLS_StyleScopedClasses['code-preview']} */ ;
 // CSS variable injection 
@@ -452,6 +485,22 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.d
 });
 (__VLS_ctx.tables.length.toLocaleString());
 (__VLS_ctx.activeGroups.length.toLocaleString());
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "head-actions" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+    ...{ onClick: (__VLS_ctx.openGroupManager) },
+    ...{ class: "t-btn" },
+    type: "button",
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+    ...{ onClick: (...[$event]) => {
+            __VLS_ctx.openTableManager(__VLS_ctx.selectedGroupId);
+        } },
+    ...{ class: "t-btn primary" },
+    type: "button",
+    disabled: (!__VLS_ctx.groups.length),
+});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
     ...{ onClick: (__VLS_ctx.loadTables) },
     ...{ class: "t-btn" },
@@ -540,184 +589,294 @@ else {
         (table.GroupTitle);
     }
 }
-__VLS_asFunctionalElement(__VLS_intrinsicElements.aside, __VLS_intrinsicElements.aside)({
-    ...{ class: "table-admin" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.section, __VLS_intrinsicElements.section)({
-    ...{ class: "admin-box setup-card group-setup-card" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "admin-title" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.small, __VLS_intrinsicElements.small)({});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-    ...{ onClick: (__VLS_ctx.resetGroupForm) },
-    ...{ class: "mini" },
-    type: "button",
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "code-preview" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.b, __VLS_intrinsicElements.b)({});
-(__VLS_ctx.nextGroupCodePreview);
-__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-    ...{ onClick: (__VLS_ctx.useNextGroupCode) },
-    type: "button",
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({
-    ...{ class: "admin-field" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
-    placeholder: "مثلاً سالن اصلی",
-});
-(__VLS_ctx.groupForm.GroupTitle);
-__VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({
-    ...{ class: "admin-field code-field" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
-    placeholder: "مثلاً 1",
-});
-(__VLS_ctx.groupForm.GroupCode);
-__VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({
-    ...{ class: "status-toggle" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
-    type: "checkbox",
-});
-(__VLS_ctx.groupForm.IsActive);
-__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-    ...{ onClick: (__VLS_ctx.saveGroup) },
-    ...{ class: "t-btn primary" },
-    disabled: (__VLS_ctx.saving),
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "quick-title" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "quick-list group-list" },
-});
-for (const [group] of __VLS_getVForSourceType((__VLS_ctx.groups))) {
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-        ...{ onClick: (...[$event]) => {
-                __VLS_ctx.editGroup(group);
-            } },
-        key: (group.TableGroupId),
-        type: "button",
-        ...{ class: ({ inactive: group.IsActive === false }) },
-    });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
-    (group.GroupTitle);
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.small, __VLS_intrinsicElements.small)({});
-    (group.GroupCode || '-');
-}
-__VLS_asFunctionalElement(__VLS_intrinsicElements.section, __VLS_intrinsicElements.section)({
-    ...{ class: "admin-box setup-card table-setup-card" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "admin-title" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.small, __VLS_intrinsicElements.small)({});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-    ...{ onClick: (__VLS_ctx.resetTableForm) },
-    ...{ class: "mini" },
-    type: "button",
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "code-preview table-code-preview" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
-(__VLS_ctx.selectedGroupTitle);
-__VLS_asFunctionalElement(__VLS_intrinsicElements.b, __VLS_intrinsicElements.b)({});
-(__VLS_ctx.nextTableCodePreview || '-');
-__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-    ...{ onClick: (__VLS_ctx.useNextTableCode) },
-    type: "button",
-    disabled: (!__VLS_ctx.tableForm.TableGroupId),
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({
-    ...{ class: "admin-field" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.select, __VLS_intrinsicElements.select)({
-    value: (__VLS_ctx.tableForm.TableGroupId),
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.option, __VLS_intrinsicElements.option)({
-    value: (0),
-});
-for (const [group] of __VLS_getVForSourceType((__VLS_ctx.groups))) {
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.option, __VLS_intrinsicElements.option)({
-        key: (group.TableGroupId),
-        value: (group.TableGroupId),
-    });
-    (group.GroupTitle);
-}
-__VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({
-    ...{ class: "admin-field" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
-    placeholder: "مثلاً میز 1",
-});
-(__VLS_ctx.tableForm.TableTitle);
-__VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({
-    ...{ class: "admin-field code-field" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
-    placeholder: "کد خودکار",
-});
-(__VLS_ctx.tableForm.TableCode);
-__VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({
-    ...{ class: "status-toggle" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
-    type: "checkbox",
-});
-(__VLS_ctx.tableForm.IsActive);
-__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-    ...{ onClick: (__VLS_ctx.saveTable) },
-    ...{ class: "t-btn primary" },
-    disabled: (__VLS_ctx.saving || !__VLS_ctx.groups.length),
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "quick-title" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "quick-list table-list" },
-});
-for (const [table] of __VLS_getVForSourceType((__VLS_ctx.selectedGroupTables))) {
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-        ...{ onClick: (...[$event]) => {
-                __VLS_ctx.editTable(table);
-            } },
-        key: (`edit-${table.TableId}`),
-        type: "button",
-        ...{ class: ({ inactive: table.IsActive === false }) },
-    });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
-    (table.TableTitle);
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.small, __VLS_intrinsicElements.small)({});
-    (table.TableCode || '-');
-}
 if (__VLS_ctx.message) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "table-message" },
     });
     (__VLS_ctx.message);
 }
+if (__VLS_ctx.groupModalOpen) {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ onClick: (...[$event]) => {
+                if (!(__VLS_ctx.groupModalOpen))
+                    return;
+                __VLS_ctx.groupModalOpen = false;
+            } },
+        ...{ class: "modal-overlay" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "table-modal setup-modal" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "modal-head" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "modal-title" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "modal-sub" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (...[$event]) => {
+                if (!(__VLS_ctx.groupModalOpen))
+                    return;
+                __VLS_ctx.groupModalOpen = false;
+            } },
+        ...{ class: "icon" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "setup-modal-body" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.section, __VLS_intrinsicElements.section)({
+        ...{ class: "admin-box setup-form-card" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "admin-title" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+    (__VLS_ctx.groupForm.TableGroupId ? 'ویرایش گروه میز' : 'تعریف گروه میز');
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.small, __VLS_intrinsicElements.small)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (__VLS_ctx.resetGroupForm) },
+        ...{ class: "mini" },
+        type: "button",
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "code-preview" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.b, __VLS_intrinsicElements.b)({});
+    (__VLS_ctx.nextGroupCodePreview);
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (__VLS_ctx.useNextGroupCode) },
+        type: "button",
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({
+        ...{ class: "admin-field" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+        placeholder: "مثلاً سالن اصلی",
+    });
+    (__VLS_ctx.groupForm.GroupTitle);
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({
+        ...{ class: "admin-field code-field" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+        placeholder: "مثلاً 1",
+    });
+    (__VLS_ctx.groupForm.GroupCode);
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({
+        ...{ class: "status-toggle" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+        type: "checkbox",
+    });
+    (__VLS_ctx.groupForm.IsActive);
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (__VLS_ctx.saveGroup) },
+        ...{ class: "t-btn primary" },
+        disabled: (__VLS_ctx.saving),
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.section, __VLS_intrinsicElements.section)({
+        ...{ class: "admin-box setup-list-card" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "admin-title" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.small, __VLS_intrinsicElements.small)({});
+    (__VLS_ctx.groups.length.toLocaleString());
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "modal-list group-modal-list" },
+    });
+    for (const [group] of __VLS_getVForSourceType((__VLS_ctx.groups))) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+            ...{ onClick: (...[$event]) => {
+                    if (!(__VLS_ctx.groupModalOpen))
+                        return;
+                    __VLS_ctx.openEditGroup(group);
+                } },
+            key: (group.TableGroupId),
+            type: "button",
+            ...{ class: ({ inactive: group.IsActive === false }) },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+        (group.GroupTitle);
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.small, __VLS_intrinsicElements.small)({});
+        (group.GroupCode || '-');
+    }
+}
+if (__VLS_ctx.tableModalOpen) {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ onClick: (...[$event]) => {
+                if (!(__VLS_ctx.tableModalOpen))
+                    return;
+                __VLS_ctx.tableModalOpen = false;
+            } },
+        ...{ class: "modal-overlay" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "table-modal setup-modal" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "modal-head" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "modal-title" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "modal-sub" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (...[$event]) => {
+                if (!(__VLS_ctx.tableModalOpen))
+                    return;
+                __VLS_ctx.tableModalOpen = false;
+            } },
+        ...{ class: "icon" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "setup-modal-body" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.section, __VLS_intrinsicElements.section)({
+        ...{ class: "admin-box setup-form-card" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "admin-title" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+    (__VLS_ctx.tableForm.TableId ? 'ویرایش میز' : 'تعریف میز');
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.small, __VLS_intrinsicElements.small)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (__VLS_ctx.openNewTable) },
+        ...{ class: "mini" },
+        type: "button",
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "code-preview table-code-preview" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+    (__VLS_ctx.selectedGroupTitle);
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.b, __VLS_intrinsicElements.b)({});
+    (__VLS_ctx.nextTableCodePreview || '-');
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (__VLS_ctx.useNextTableCode) },
+        type: "button",
+        disabled: (!__VLS_ctx.tableForm.TableGroupId),
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({
+        ...{ class: "admin-field" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.select, __VLS_intrinsicElements.select)({
+        value: (__VLS_ctx.tableForm.TableGroupId),
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.option, __VLS_intrinsicElements.option)({
+        value: (0),
+    });
+    for (const [group] of __VLS_getVForSourceType((__VLS_ctx.groups))) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.option, __VLS_intrinsicElements.option)({
+            key: (group.TableGroupId),
+            value: (group.TableGroupId),
+        });
+        (group.GroupTitle);
+    }
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({
+        ...{ class: "admin-field" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+        placeholder: "مثلاً میز 1",
+    });
+    (__VLS_ctx.tableForm.TableTitle);
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({
+        ...{ class: "admin-field code-field" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+        placeholder: "کد خودکار",
+    });
+    (__VLS_ctx.tableForm.TableCode);
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({
+        ...{ class: "status-toggle" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+        type: "checkbox",
+    });
+    (__VLS_ctx.tableForm.IsActive);
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (__VLS_ctx.saveTable) },
+        ...{ class: "t-btn primary" },
+        disabled: (__VLS_ctx.saving || !__VLS_ctx.groups.length),
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.section, __VLS_intrinsicElements.section)({
+        ...{ class: "admin-box setup-list-card" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "admin-title" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+    (__VLS_ctx.selectedGroupTitle);
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.small, __VLS_intrinsicElements.small)({});
+    (__VLS_ctx.selectedGroupTables.length.toLocaleString());
+    if (!__VLS_ctx.tableForm.TableGroupId) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "table-empty" },
+        });
+    }
+    else if (!__VLS_ctx.selectedGroupTables.length) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "table-empty" },
+        });
+    }
+    else {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "modal-list table-modal-list" },
+        });
+        for (const [table] of __VLS_getVForSourceType((__VLS_ctx.selectedGroupTables))) {
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+                ...{ onClick: (...[$event]) => {
+                        if (!(__VLS_ctx.tableModalOpen))
+                            return;
+                        if (!!(!__VLS_ctx.tableForm.TableGroupId))
+                            return;
+                        if (!!(!__VLS_ctx.selectedGroupTables.length))
+                            return;
+                        __VLS_ctx.editTable(table);
+                    } },
+                key: (`modal-edit-${table.TableId}`),
+                type: "button",
+                ...{ class: ({ inactive: table.IsActive === false, occupied: table.IsOccupied }) },
+            });
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+            (table.TableTitle);
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.small, __VLS_intrinsicElements.small)({});
+            (table.TableCode || '-');
+            (table.IsOccupied ? 'اشغال' : 'آزاد');
+        }
+    }
+}
 if (__VLS_ctx.contextMenu) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "context-menu" },
         ...{ style: ({ top: `${__VLS_ctx.contextMenu.y}px`, left: `${__VLS_ctx.contextMenu.x}px` }) },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (...[$event]) => {
+                if (!(__VLS_ctx.contextMenu))
+                    return;
+                __VLS_ctx.openEditTable(__VLS_ctx.contextMenu.table);
+            } },
     });
     if (__VLS_ctx.contextMenu.table.IsOccupied) {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
@@ -774,18 +933,6 @@ if (__VLS_ctx.contextMenu) {
                     __VLS_ctx.cancelInvoice(__VLS_ctx.contextMenu.table);
                 } },
             ...{ class: "danger" },
-        });
-    }
-    else {
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-            ...{ onClick: (...[$event]) => {
-                    if (!(__VLS_ctx.contextMenu))
-                        return;
-                    if (!!(__VLS_ctx.contextMenu.table.IsOccupied))
-                        return;
-                    __VLS_ctx.editTable(__VLS_ctx.contextMenu.table);
-                    __VLS_ctx.closeContextMenu();
-                } },
         });
     }
 }
@@ -917,6 +1064,10 @@ if (__VLS_ctx.moveTable) {
 /** @type {__VLS_StyleScopedClasses['tables-head']} */ ;
 /** @type {__VLS_StyleScopedClasses['tables-title']} */ ;
 /** @type {__VLS_StyleScopedClasses['tables-sub']} */ ;
+/** @type {__VLS_StyleScopedClasses['head-actions']} */ ;
+/** @type {__VLS_StyleScopedClasses['t-btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['t-btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['primary']} */ ;
 /** @type {__VLS_StyleScopedClasses['t-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['group-strip']} */ ;
 /** @type {__VLS_StyleScopedClasses['active']} */ ;
@@ -931,10 +1082,17 @@ if (__VLS_ctx.moveTable) {
 /** @type {__VLS_StyleScopedClasses['inactive-badge']} */ ;
 /** @type {__VLS_StyleScopedClasses['table-amount']} */ ;
 /** @type {__VLS_StyleScopedClasses['table-time']} */ ;
-/** @type {__VLS_StyleScopedClasses['table-admin']} */ ;
+/** @type {__VLS_StyleScopedClasses['table-message']} */ ;
+/** @type {__VLS_StyleScopedClasses['modal-overlay']} */ ;
+/** @type {__VLS_StyleScopedClasses['table-modal']} */ ;
+/** @type {__VLS_StyleScopedClasses['setup-modal']} */ ;
+/** @type {__VLS_StyleScopedClasses['modal-head']} */ ;
+/** @type {__VLS_StyleScopedClasses['modal-title']} */ ;
+/** @type {__VLS_StyleScopedClasses['modal-sub']} */ ;
+/** @type {__VLS_StyleScopedClasses['icon']} */ ;
+/** @type {__VLS_StyleScopedClasses['setup-modal-body']} */ ;
 /** @type {__VLS_StyleScopedClasses['admin-box']} */ ;
-/** @type {__VLS_StyleScopedClasses['setup-card']} */ ;
-/** @type {__VLS_StyleScopedClasses['group-setup-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['setup-form-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['admin-title']} */ ;
 /** @type {__VLS_StyleScopedClasses['mini']} */ ;
 /** @type {__VLS_StyleScopedClasses['code-preview']} */ ;
@@ -944,13 +1102,22 @@ if (__VLS_ctx.moveTable) {
 /** @type {__VLS_StyleScopedClasses['status-toggle']} */ ;
 /** @type {__VLS_StyleScopedClasses['t-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['primary']} */ ;
-/** @type {__VLS_StyleScopedClasses['quick-title']} */ ;
-/** @type {__VLS_StyleScopedClasses['quick-list']} */ ;
-/** @type {__VLS_StyleScopedClasses['group-list']} */ ;
-/** @type {__VLS_StyleScopedClasses['inactive']} */ ;
 /** @type {__VLS_StyleScopedClasses['admin-box']} */ ;
-/** @type {__VLS_StyleScopedClasses['setup-card']} */ ;
-/** @type {__VLS_StyleScopedClasses['table-setup-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['setup-list-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['admin-title']} */ ;
+/** @type {__VLS_StyleScopedClasses['modal-list']} */ ;
+/** @type {__VLS_StyleScopedClasses['group-modal-list']} */ ;
+/** @type {__VLS_StyleScopedClasses['inactive']} */ ;
+/** @type {__VLS_StyleScopedClasses['modal-overlay']} */ ;
+/** @type {__VLS_StyleScopedClasses['table-modal']} */ ;
+/** @type {__VLS_StyleScopedClasses['setup-modal']} */ ;
+/** @type {__VLS_StyleScopedClasses['modal-head']} */ ;
+/** @type {__VLS_StyleScopedClasses['modal-title']} */ ;
+/** @type {__VLS_StyleScopedClasses['modal-sub']} */ ;
+/** @type {__VLS_StyleScopedClasses['icon']} */ ;
+/** @type {__VLS_StyleScopedClasses['setup-modal-body']} */ ;
+/** @type {__VLS_StyleScopedClasses['admin-box']} */ ;
+/** @type {__VLS_StyleScopedClasses['setup-form-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['admin-title']} */ ;
 /** @type {__VLS_StyleScopedClasses['mini']} */ ;
 /** @type {__VLS_StyleScopedClasses['code-preview']} */ ;
@@ -962,11 +1129,15 @@ if (__VLS_ctx.moveTable) {
 /** @type {__VLS_StyleScopedClasses['status-toggle']} */ ;
 /** @type {__VLS_StyleScopedClasses['t-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['primary']} */ ;
-/** @type {__VLS_StyleScopedClasses['quick-title']} */ ;
-/** @type {__VLS_StyleScopedClasses['quick-list']} */ ;
-/** @type {__VLS_StyleScopedClasses['table-list']} */ ;
+/** @type {__VLS_StyleScopedClasses['admin-box']} */ ;
+/** @type {__VLS_StyleScopedClasses['setup-list-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['admin-title']} */ ;
+/** @type {__VLS_StyleScopedClasses['table-empty']} */ ;
+/** @type {__VLS_StyleScopedClasses['table-empty']} */ ;
+/** @type {__VLS_StyleScopedClasses['modal-list']} */ ;
+/** @type {__VLS_StyleScopedClasses['table-modal-list']} */ ;
 /** @type {__VLS_StyleScopedClasses['inactive']} */ ;
-/** @type {__VLS_StyleScopedClasses['table-message']} */ ;
+/** @type {__VLS_StyleScopedClasses['occupied']} */ ;
 /** @type {__VLS_StyleScopedClasses['context-menu']} */ ;
 /** @type {__VLS_StyleScopedClasses['danger']} */ ;
 /** @type {__VLS_StyleScopedClasses['modal-overlay']} */ ;
@@ -1004,6 +1175,8 @@ const __VLS_self = (await import('vue')).defineComponent({
             loading: loading,
             saving: saving,
             message: message,
+            groupModalOpen: groupModalOpen,
+            tableModalOpen: tableModalOpen,
             groupForm: groupForm,
             tableForm: tableForm,
             contextMenu: contextMenu,
@@ -1024,15 +1197,17 @@ const __VLS_self = (await import('vue')).defineComponent({
             formatMoney: formatMoney,
             formatDuration: formatDuration,
             resetGroupForm: resetGroupForm,
-            resetTableForm: resetTableForm,
+            openGroupManager: openGroupManager,
+            openTableManager: openTableManager,
+            openNewTable: openNewTable,
+            openEditTable: openEditTable,
+            openEditGroup: openEditGroup,
             useNextGroupCode: useNextGroupCode,
             useNextTableCode: useNextTableCode,
-            editGroup: editGroup,
             editTable: editTable,
             saveGroup: saveGroup,
             saveTable: saveTable,
             openContext: openContext,
-            closeContextMenu: closeContextMenu,
             startOrderForTable: startOrderForTable,
             editInvoice: editInvoice,
             openSettle: openSettle,
