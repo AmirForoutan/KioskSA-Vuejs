@@ -106,19 +106,19 @@
     return result;
   }
 
-  function findSettingsCard() {
+  function findFiscalYearsCard() {
     var inventory = document.querySelector('.inventory-tab');
     if (!inventory) return null;
-    var settingsTitle = Array.prototype.slice.call(inventory.querySelectorAll('h3')).find(function (h) {
-      return (h.textContent || '').indexOf('تنظیمات انبار') >= 0;
+    var fiscalTitle = Array.prototype.slice.call(inventory.querySelectorAll('h3')).find(function (h) {
+      return (h.textContent || '').indexOf('دوره‌های مالی') >= 0 || (h.textContent || '').indexOf('دوره مالی') >= 0;
     });
-    return settingsTitle ? settingsTitle.closest('.inv-card') : null;
+    return fiscalTitle ? fiscalTitle.closest('.inv-card') : null;
   }
 
   async function renderFiscalCloseCard() {
     if (!canManageFiscalYears()) return;
-    var settingsCard = findSettingsCard();
-    if (!settingsCard) return;
+    var fiscalCard = findFiscalYearsCard();
+    if (!fiscalCard) return;
 
     var existing = document.querySelector('.inventory-fiscal-close-card');
     if (existing) return;
@@ -129,7 +129,7 @@
       '<p class="inventory-fiscal-note">دوره مالی سال جاری قابل بستن نیست. دوره بعدی را دستی نسازید؛ هنگام بستن دوره قبلی، نرم‌افزار خودش دوره بعد و سند افتتاحیه را ایجاد می‌کند.</p>' +
       '<div class="inventory-fiscal-close-body">در حال دریافت دوره‌ها...</div>';
 
-    settingsCard.insertAdjacentElement('afterend', card);
+    fiscalCard.insertAdjacentElement('afterend', card);
     await refreshCard(card);
   }
 
