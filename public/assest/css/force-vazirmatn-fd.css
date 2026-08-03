@@ -1,0 +1,41 @@
+/* Force the whole app to use only Vazirmatn FD. No fallback font is allowed. */
+
+html,
+body,
+#app,
+html body #app,
+html body #app *,
+html body input,
+html body textarea,
+html body select,
+html body button,
+html body option,
+html body table,
+html body th,
+html body td,
+html body label,
+html body span,
+html body div,
+html body p,
+html body small,
+html body strong,
+html body b,
+html body h1,
+html body h2,
+html body h3,
+html body h4,
+html body h5,
+html body h6,
+html body a,
+html body li,
+html body svg,
+html body svg * {
+  font-family: Vazirmatn FD !important;
+  font-variant-numeric: normal !important;
+}
+
+html body input::placeholder,
+html body textarea::placeholder {
+  font-family: Vazirmatn FD !important;
+  font-variant-numeric: normal !important;
+}
