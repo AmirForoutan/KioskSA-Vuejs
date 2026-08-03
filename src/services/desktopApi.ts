@@ -13,6 +13,7 @@ export type DesktopCategory = {
   GroupCode?: number | string;
   GroupTitle?: string;
   IsActive?: boolean;
+  IsKioskVisible?: boolean;
   [key: string]: unknown;
 };
 
@@ -27,6 +28,13 @@ export type DesktopProduct = {
   DutyPercent?: number;
   PackingPrice?: number;
   StockInventory?: number;
+  MinStock?: number;
+  MaxStock?: number;
+  ReorderPoint?: number;
+  DefaultWarehouseId?: number | string | null;
+  IsPurchasable?: boolean;
+  IsSellable?: boolean;
+  IsKioskVisible?: boolean;
   IsActive?: boolean;
   [key: string]: unknown;
 };
@@ -374,7 +382,6 @@ export type DesktopCustomerCreditResult = ApiEnvelope & {
   credit?: number;
   CreditBalance?: number;
   UID?: number | string;
-  UserName?: string;
 };
 
 export type DesktopCustomerDebtPayment = {
@@ -898,21 +905,11 @@ export async function loadDesktopAccess() {
 
   if (roles.length || users.length) return { roles, users };
 
-  if (response && typeof response === "object") {
-    const record = response as Record<string, unknown>;
-    return {
-      roles: Array.isArray(record.roles) ? (record.roles as DesktopRole[]) : [],
-      users: Array.isArray(record.users) ? (record.users as DesktopUser[]) : [],
-    };
-  }
-
-  return { roles: [], users: [] };
-}
-
-export async function saveDesktopRole(role: DesktopRole) {
-  return postApi<ApiEnvelope>("/roles/save", role);
-}
-
-export async function saveDesktopUser(user: DesktopUser) {
-  return postApi<ApiEnvelope>("/users/save", user);
+  return {
+    roles: [
+      { id: 1, title: "مدیر", perms: ["*"] },
+      { id: 2, title: "صندوقدار", perms: ["view.sales", "view.baseInfo", "view.reports"] },
+    ],
+    users: [],
+  };
 }
