@@ -3,7 +3,8 @@ import CatalogImageModal from "../../../components/CatalogImageModal.vue";
 import CategoryModal from "../../../components/CategoryModal.vue";
 import { can } from "../../../components/acl/can";
 import { useDesktopToastMessage } from "../useDesktopToastMessage";
-import { loadDesktopCatalog, saveDesktopCategory, } from "../../../services/desktopApi";
+import { saveDesktopCategory, unwrapArray, } from "../../../services/desktopApi";
+import { GetApiAddress } from "../../../utilities";
 const q = ref("");
 const rows = ref([]);
 const loading = ref(false);
@@ -19,12 +20,33 @@ const filtered = computed(() => {
     return rows.value.filter((row) => `${row.GroupCode ?? ""} ${row.GroupName ?? ""}`.includes(s));
 });
 onMounted(loadRows);
+function buildBaseInfoUrl(baseUrl, endpoint) {
+    const base = baseUrl.replace(/\/$/, "");
+    const path = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
+    return `${base}${path}?catalogContext=baseinfo`;
+}
+async function postBaseInfoCategory(endpoint) {
+    const serviceAdd = await GetApiAddress();
+    const response = await fetch(buildBaseInfoUrl(serviceAdd, endpoint), {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: JSON.stringify({ ConnectionsId: 0, IncludeInactive: true, IncludeAll: true }),
+    });
+    if (!response.ok)
+        throw new Error(`HTTP ${response.status} for ${endpoint}`);
+    return response.json();
+}
 async function loadRows() {
     loading.value = true;
     message.value = "";
     try {
-        const result = await loadDesktopCatalog(0);
-        rows.value = result.categories;
+        const response = await postBaseInfoCategory("/getgoodsgroup");
+        rows.value = unwrapArray(response, [
+            "GoodsGroup",
+            "Groups",
+            "Categories",
+            "categories",
+        ]);
         if (!rows.value.length)
             message.value = "دسته‌بندی‌ای از سرویس دریافت نشد";
     }
@@ -37,7 +59,7 @@ async function loadRows() {
     }
 }
 function add() {
-    editor.value = { GroupId: 0, GroupCode: "", GroupName: "", IsActive: true };
+    editor.value = { GroupId: 0, GroupCode: "", GroupName: "", IsActive: true, IsKioskVisible: true };
 }
 function edit(id) {
     const row = rows.value.find((item) => String(item.GroupId) === String(id));
@@ -90,6 +112,7 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['m-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['m-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['m-btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['status']} */ ;
 /** @type {__VLS_StyleScopedClasses['status']} */ ;
 // CSS variable injection 
 // CSS variable injection end 
@@ -144,6 +167,7 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.d
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
 if (__VLS_ctx.loading) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "m-empty" },
@@ -168,6 +192,12 @@ for (const [r] of __VLS_getVForSourceType((__VLS_ctx.filtered))) {
         ...{ class: ({ off: r.IsActive === false }) },
     });
     (r.IsActive === false ? "غیرفعال" : "فعال");
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+        ...{ class: "status kiosk" },
+        ...{ class: ({ off: r.IsKioskVisible === false }) },
+    });
+    (r.IsKioskVisible === false ? "عدم نمایش" : "نمایش");
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
     __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
         ...{ onClick: (...[$event]) => {
@@ -268,6 +298,9 @@ if (__VLS_ctx.imageEditor) {
 /** @type {__VLS_StyleScopedClasses['m-tr']} */ ;
 /** @type {__VLS_StyleScopedClasses['bold']} */ ;
 /** @type {__VLS_StyleScopedClasses['status']} */ ;
+/** @type {__VLS_StyleScopedClasses['off']} */ ;
+/** @type {__VLS_StyleScopedClasses['status']} */ ;
+/** @type {__VLS_StyleScopedClasses['kiosk']} */ ;
 /** @type {__VLS_StyleScopedClasses['off']} */ ;
 /** @type {__VLS_StyleScopedClasses['m-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['small']} */ ;
