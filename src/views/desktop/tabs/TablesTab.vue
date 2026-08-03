@@ -54,6 +54,10 @@ const activeGroups = computed(() => groups.value.filter((group) => group.IsActiv
 const visibleTables = computed(() =>
   tables.value.filter((table) => selectedGroupId.value === null || table.TableGroupId === selectedGroupId.value)
 );
+const selectedGroupTables = computed(() => tables.value.filter((table) => table.TableGroupId === tableForm.value.TableGroupId));
+const selectedGroupTitle = computed(() => groups.value.find((group) => group.TableGroupId === tableForm.value.TableGroupId)?.GroupTitle || "گروه انتخاب نشده");
+const nextGroupCodePreview = computed(() => nextGroupCode());
+const nextTableCodePreview = computed(() => tableForm.value.TableGroupId ? nextTableCode(tableForm.value.TableGroupId) : "");
 const freeTargetTables = computed(() =>
   tables.value.filter((table) => table.IsActive !== false && !table.IsOccupied && table.TableId !== moveTable.value?.TableId)
 );
@@ -83,6 +87,7 @@ async function loadTables() {
     if (!tableForm.value.TableGroupId) {
       tableForm.value.TableGroupId = result.groups[0]?.TableGroupId || 0;
     }
+    refreshNewFormCodes();
   } catch (error) {
     message.value = error instanceof Error ? error.message : "خطا در دریافت میزها";
     groups.value = [];
@@ -125,11 +130,21 @@ function responseIsOk(response: ApiEnvelope) {
   return response.status === true || response.status === "ok" || response.status === undefined;
 }
 
+function refreshNewFormCodes() {
+  if (groupForm.value.TableGroupId === 0 && !groupForm.value.GroupCode) {
+    groupForm.value.GroupCode = nextGroupCode();
+  }
+
+  if (tableForm.value.TableId === 0 && tableForm.value.TableGroupId) {
+    tableForm.value.TableCode = nextTableCode(tableForm.value.TableGroupId);
+  }
+}
+
 function resetGroupForm() {
   groupForm.value = {
     TableGroupId: 0,
     GroupTitle: "",
-    GroupCode: "",
+    GroupCode: nextGroupCode(),
     IsActive: true,
   };
 }
@@ -145,6 +160,15 @@ function resetTableForm() {
     IsActive: true,
     IsOccupied: false,
   };
+}
+
+function useNextGroupCode() {
+  groupForm.value.GroupCode = nextGroupCode();
+}
+
+function useNextTableCode() {
+  if (!tableForm.value.TableGroupId) return;
+  tableForm.value.TableCode = nextTableCode(tableForm.value.TableGroupId);
 }
 
 function editGroup(group: DesktopTableGroup) {
@@ -171,6 +195,7 @@ async function saveGroup() {
     if (responseIsOk(result)) {
       await loadTables();
       resetGroupForm();
+      if (!selectedGroupId.value && groups.value.length) selectedGroupId.value = groups.value[0].TableGroupId;
     }
   } catch (error) {
     message.value = error instanceof Error ? error.message : "خطا در ذخیره گروه میز";
@@ -190,8 +215,8 @@ async function saveTable() {
     const result = await saveDesktopTable(tableForm.value);
     message.value = result.message || "میز ذخیره شد";
     if (responseIsOk(result)) {
-      resetTableForm();
       await loadTables();
+      resetTableForm();
     }
   } catch (error) {
     message.value = error instanceof Error ? error.message : "خطا در ذخیره میز";
@@ -379,8 +404,7 @@ function nextGroupCode() {
 function nextTableCode(groupId: number) {
   const group = groups.value.find(g => g.TableGroupId === groupId);
   const groupCode = Number(group?.GroupCode || 0);
-
-  const start = groupCode * 100;
+  const start = groupCode > 0 ? groupCode * 100 : 100;
 
   const maxCode = Math.max(
     start - 1,
@@ -401,6 +425,17 @@ watch(
     }
   }
 );
+
+watch(selectedGroupId, (groupId) => {
+  if (tableForm.value.TableId === 0 && groupId) {
+    tableForm.value.TableGroupId = groupId;
+    tableForm.value.TableCode = nextTableCode(groupId);
+  }
+});
+
+watch([groups, tables], () => {
+  refreshNewFormCodes();
+}, { deep: true });
 </script>
 
 <template>
@@ -408,8 +443,7 @@ watch(
     <header class="tables-head">
       <div>
         <div class="tables-title">میزها</div>
-        <div class="tables-sub">{{ tables.length.toLocaleString() }} میز، {{ activeGroups.length.toLocaleString() }}
-          گروه فعال</div>
+        <div class="tables-sub">{{ tables.length.toLocaleString() }} میز، {{ activeGroups.length.toLocaleString() }} گروه فعال</div>
       </div>
       <button class="t-btn" :disabled="loading" @click="loadTables">
         {{ loading ? "در حال دریافت" : "بازخوانی" }}
@@ -432,12 +466,8 @@ watch(
           <button v-for="table in visibleTables" :key="table.TableId" class="table-card" :class="{
             occupied: table.IsOccupied,
             inactive: table.IsActive === false
-          }" @click="table.IsActive !== false && startOrderForTable(table)" @contextmenu=" openContext($event,
-            table)">
-            <span v-if="table.IsActive === false" class="inactive-badge">
-              غیرفعال
-            </span>
-
+          }" @click="table.IsActive !== false && startOrderForTable(table)" @contextmenu="openContext($event, table)">
+            <span v-if="table.IsActive === false" class="inactive-badge">غیرفعال</span>
             <span class="table-amount">
               {{
                 table.IsActive === false
@@ -447,15 +477,7 @@ watch(
                     : "آزاد"
               }}
             </span>
-
-            <span class="table-time">
-              {{
-                table.IsOccupied
-                  ? formatDuration(table.OccupiedMinutes)
-                  : table.TableCode
-              }}
-            </span>
-
+            <span class="table-time">{{ table.IsOccupied ? formatDuration(table.OccupiedMinutes) : table.TableCode }}</span>
             <strong>{{ table.TableTitle }}</strong>
             <small>{{ table.GroupTitle }}</small>
           </button>
@@ -463,37 +485,86 @@ watch(
       </section>
 
       <aside class="table-admin">
-        <section class="admin-box">
+        <section class="admin-box setup-card group-setup-card">
           <div class="admin-title">
-            <span>گروه میز</span>
-            <button class="mini" @click="resetGroupForm">جدید</button>
+            <div>
+              <span>تعریف گروه میز</span>
+              <small>مثل سالن اصلی، VIP، تراس</small>
+            </div>
+            <button class="mini" type="button" @click="resetGroupForm">گروه جدید</button>
           </div>
-          <input v-model="groupForm.GroupTitle" placeholder="عنوان گروه" />
-          <input v-model="groupForm.GroupCode" placeholder="کد گروه" />
-          <label><span>فعال</span><input v-model="groupForm.IsActive" type="checkbox" /></label>
-          <button class="t-btn primary" :disabled="saving" @click="saveGroup">ذخیره گروه</button>
-          <div class="quick-list">
-            <button v-for="group in groups" :key="group.TableGroupId" @click="editGroup(group)">{{ group.GroupTitle
-            }}</button>
+
+          <div class="code-preview">
+            <span>کد پیشنهادی گروه بعدی</span>
+            <b>{{ nextGroupCodePreview }}</b>
+            <button type="button" @click="useNextGroupCode">استفاده</button>
+          </div>
+
+          <label class="admin-field">
+            <span>عنوان گروه</span>
+            <input v-model="groupForm.GroupTitle" placeholder="مثلاً سالن اصلی" />
+          </label>
+          <label class="admin-field code-field">
+            <span>کد گروه</span>
+            <input v-model="groupForm.GroupCode" placeholder="مثلاً 1" />
+          </label>
+          <label class="status-toggle">
+            <span>گروه فعال باشد</span>
+            <input v-model="groupForm.IsActive" type="checkbox" />
+          </label>
+          <button class="t-btn primary" :disabled="saving" @click="saveGroup">ذخیره گروه میز</button>
+
+          <div class="quick-title">گروه‌های تعریف‌شده</div>
+          <div class="quick-list group-list">
+            <button v-for="group in groups" :key="group.TableGroupId" type="button" :class="{ inactive: group.IsActive === false }" @click="editGroup(group)">
+              <span>{{ group.GroupTitle }}</span>
+              <small>کد {{ group.GroupCode || '-' }}</small>
+            </button>
           </div>
         </section>
 
-        <section class="admin-box">
+        <section class="admin-box setup-card table-setup-card">
           <div class="admin-title">
-            <span>میز</span>
-            <button class="mini" @click="resetTableForm">جدید</button>
+            <div>
+              <span>تعریف میز</span>
+              <small>میز را داخل گروه انتخاب‌شده بساز</small>
+            </div>
+            <button class="mini" type="button" @click="resetTableForm">میز جدید</button>
           </div>
-          <select v-model.number="tableForm.TableGroupId">
-            <option v-for="group in groups" :key="group.TableGroupId" :value="group.TableGroupId">{{ group.GroupTitle }}
-            </option>
-          </select>
-          <input v-model="tableForm.TableTitle" placeholder="عنوان میز" />
-          <input v-model="tableForm.TableCode" placeholder="کد میز" />
-          <label><span>فعال</span><input v-model="tableForm.IsActive" type="checkbox" /></label>
+
+          <div class="code-preview table-code-preview">
+            <span>کد پیشنهادی میز بعدی در {{ selectedGroupTitle }}</span>
+            <b>{{ nextTableCodePreview || '-' }}</b>
+            <button type="button" :disabled="!tableForm.TableGroupId" @click="useNextTableCode">استفاده</button>
+          </div>
+
+          <label class="admin-field">
+            <span>گروه میز</span>
+            <select v-model.number="tableForm.TableGroupId">
+              <option :value="0">انتخاب گروه</option>
+              <option v-for="group in groups" :key="group.TableGroupId" :value="group.TableGroupId">{{ group.GroupTitle }}</option>
+            </select>
+          </label>
+          <label class="admin-field">
+            <span>عنوان میز</span>
+            <input v-model="tableForm.TableTitle" placeholder="مثلاً میز 1" />
+          </label>
+          <label class="admin-field code-field">
+            <span>کد میز</span>
+            <input v-model="tableForm.TableCode" placeholder="کد خودکار" />
+          </label>
+          <label class="status-toggle">
+            <span>میز فعال باشد</span>
+            <input v-model="tableForm.IsActive" type="checkbox" />
+          </label>
           <button class="t-btn primary" :disabled="saving || !groups.length" @click="saveTable">ذخیره میز</button>
-          <div class="quick-list">
-            <button v-for="table in visibleTables" :key="`edit-${table.TableId}`" @click="editTable(table)">{{
-              table.TableTitle }}</button>
+
+          <div class="quick-title">میزهای همین گروه</div>
+          <div class="quick-list table-list">
+            <button v-for="table in selectedGroupTables" :key="`edit-${table.TableId}`" type="button" :class="{ inactive: table.IsActive === false }" @click="editTable(table)">
+              <span>{{ table.TableTitle }}</span>
+              <small>کد {{ table.TableCode || '-' }}</small>
+            </button>
           </div>
         </section>
       </aside>
@@ -587,16 +658,27 @@ watch(
   gap: 12px;
 }
 
+.tables-head {
+  padding: 14px 16px;
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at top right, rgba(20, 184, 166, 0.22), transparent 36%),
+    linear-gradient(135deg, rgba(15, 23, 42, 0.96), rgba(17, 24, 39, 0.78));
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  box-shadow: 0 14px 34px rgba(2, 6, 23, 0.24);
+}
+
 .tables-title {
-  font-size: 20px;
-  font-weight: 900;
+  font-size: 22px;
+  font-weight: 1000;
 }
 
 .tables-sub,
-.modal-sub {
+.modal-sub,
+.admin-title small {
   margin-top: 4px;
   color: #a7b0c3;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .t-btn,
@@ -609,8 +691,10 @@ watch(
 .context-menu button,
 .field input,
 .field select,
-.icon {
-  border-radius: 8px;
+.icon,
+.code-preview,
+.code-preview button {
+  border-radius: 12px;
   font-family: inherit;
 }
 
@@ -625,11 +709,12 @@ watch(
 
 .t-btn.primary {
   font-weight: 900;
-  background: rgba(20, 184, 166, 0.18);
-  border-color: rgba(20, 184, 166, 0.34);
+  background: linear-gradient(135deg, rgba(20, 184, 166, 0.25), rgba(14, 165, 233, 0.14));
+  border-color: rgba(20, 184, 166, 0.38);
 }
 
-.t-btn:disabled {
+.t-btn:disabled,
+.code-preview button:disabled {
   cursor: not-allowed;
   opacity: 0.55;
 }
@@ -638,6 +723,7 @@ watch(
   display: flex;
   gap: 8px;
   overflow-x: auto;
+  padding-bottom: 2px;
 }
 
 .group-strip button {
@@ -661,8 +747,8 @@ watch(
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
-  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: 14px;
 }
 
 .tables-board {
@@ -672,6 +758,7 @@ watch(
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   align-content: start;
   gap: 12px;
+  padding-left: 2px;
 }
 
 .table-card {
@@ -687,6 +774,12 @@ watch(
   background: rgba(34, 197, 94, 0.12);
   border: 1px solid rgba(34, 197, 94, 0.26);
   cursor: pointer;
+  transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.table-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(2, 6, 23, 0.22);
 }
 
 .table-card.occupied {
@@ -707,20 +800,14 @@ watch(
   position: absolute;
   top: 12px;
   left: -32px;
-
   width: 120px;
   text-align: center;
-
   transform: rotate(-45deg);
-
   background: rgba(107, 114, 128, 0.9);
   color: white;
-
   font-size: 11px;
   font-weight: 900;
-
   padding: 4px 0;
-
   pointer-events: none;
   z-index: 5;
 }
@@ -743,72 +830,169 @@ watch(
   min-height: 0;
   overflow: auto;
   display: grid;
-  gap: 12px;
+  gap: 14px;
+  align-content: start;
 }
 
 .admin-box {
   display: grid;
-  gap: 9px;
-  padding: 12px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.035);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  gap: 10px;
+  padding: 14px;
+  border-radius: 22px;
+  background:
+    linear-gradient(145deg, rgba(15, 23, 42, 0.92), rgba(30, 41, 59, 0.58));
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  box-shadow: 0 16px 34px rgba(2, 6, 23, 0.18);
 }
 
 .admin-title {
   font-weight: 900;
 }
 
+.admin-title > div {
+  display: grid;
+  gap: 2px;
+}
+
 .mini {
-  min-height: 30px;
-  border-radius: 8px;
+  min-height: 32px;
+  border-radius: 999px;
+  padding: 6px 11px;
   color: #ccfbf1;
   background: rgba(20, 184, 166, 0.12);
   border: 1px solid rgba(20, 184, 166, 0.22);
   cursor: pointer;
+  font-weight: 900;
+}
+
+.code-preview {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  color: #bae6fd;
+  background: rgba(14, 165, 233, 0.1);
+  border: 1px solid rgba(14, 165, 233, 0.2);
+}
+
+.code-preview span {
+  font-size: 12px;
+  color: #a7b0c3;
+}
+
+.code-preview b {
+  min-width: 54px;
+  text-align: center;
+  color: #ecfeff;
+  font-size: 18px;
+  font-weight: 1000;
+}
+
+.code-preview button {
+  min-height: 32px;
+  padding: 6px 10px;
+  color: #ccfbf1;
+  background: rgba(20, 184, 166, 0.12);
+  border: 1px solid rgba(20, 184, 166, 0.25);
+  cursor: pointer;
+  font-weight: 900;
+}
+
+.admin-field {
+  display: grid !important;
+  gap: 7px !important;
+  padding: 0 !important;
+  color: #cbd5e1 !important;
+  background: transparent !important;
+  border: 0 !important;
+}
+
+.admin-field span,
+.field span {
+  font-size: 12px;
+  color: #a7b0c3;
 }
 
 .admin-box input,
 .admin-box select,
 .field input,
 .field select {
-  min-height: 42px;
-  padding: 8px 10px;
+  min-height: 44px;
+  padding: 9px 11px;
   color: #eef2ff;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(15, 23, 42, 0.76);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  outline: none;
 }
 
-.admin-box label {
-  min-height: 42px;
-  display: flex;
+.admin-box input:focus,
+.admin-box select:focus,
+.field input:focus,
+.field select:focus {
+  border-color: rgba(45, 212, 191, 0.55);
+  box-shadow: 0 0 0 4px rgba(20, 184, 166, 0.12);
+}
+
+.status-toggle {
+  min-height: 44px;
+  display: flex !important;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 10px;
+  padding: 8px 10px !important;
+  color: #cbd5e1 !important;
+  background: rgba(255, 255, 255, 0.025) !important;
+  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+}
+
+.status-toggle input {
+  width: 22px;
+  height: 22px;
+  min-height: 22px;
+  accent-color: #14b8a6;
+}
+
+.quick-title {
+  margin-top: 4px;
   color: #a7b0c3;
-  background: rgba(255, 255, 255, 0.025);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 12px;
+  font-weight: 900;
 }
 
 .quick-list {
-  max-height: 92px;
+  max-height: 138px;
   overflow: auto;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  gap: 7px;
 }
 
 .quick-list button {
-  min-height: 30px;
+  min-height: 42px;
+  display: grid;
+  gap: 2px;
+  text-align: right;
+  padding: 7px 9px;
   color: #dbeafe;
   background: rgba(59, 130, 246, 0.12);
   border: 1px solid rgba(59, 130, 246, 0.22);
   cursor: pointer;
 }
 
+.quick-list button small {
+  color: #93c5fd;
+  font-size: 11px;
+}
+
+.quick-list button.inactive {
+  color: #d1d5db;
+  background: rgba(107, 114, 128, 0.12);
+  border-color: rgba(107, 114, 128, 0.22);
+}
+
 .table-empty,
 .table-message {
-  border-radius: 8px;
+  border-radius: 12px;
   padding: 12px;
   color: #fde68a;
   background: rgba(245, 158, 11, 0.12);
@@ -821,7 +1005,7 @@ watch(
   width: 220px;
   display: grid;
   padding: 6px;
-  border-radius: 8px;
+  border-radius: 12px;
   background: #171b24;
   border: 1px solid rgba(255, 255, 255, 0.12);
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.4);
@@ -857,7 +1041,7 @@ watch(
 
 .table-modal {
   width: min(460px, calc(100vw - 48px));
-  border-radius: 8px;
+  border-radius: 12px;
   background: #171b24;
   border: 1px solid rgba(255, 255, 255, 0.1);
   overflow: hidden;
@@ -895,7 +1079,7 @@ watch(
   display: flex;
   justify-content: space-between;
   gap: 10px;
-  border-radius: 8px;
+  border-radius: 12px;
   padding: 12px;
   color: #bfdbfe;
   background: rgba(59, 130, 246, 0.1);
@@ -911,7 +1095,7 @@ watch(
   cursor: pointer;
 }
 
-@media (max-width: 1100px) {
+@media (max-width: 1180px) {
   .tables-layout {
     grid-template-columns: 1fr;
   }
@@ -924,6 +1108,14 @@ watch(
 @media (max-width: 720px) {
   .table-admin {
     grid-template-columns: 1fr;
+  }
+
+  .code-preview {
+    grid-template-columns: 1fr auto;
+  }
+
+  .code-preview button {
+    grid-column: 1 / -1;
   }
 }
 </style>
