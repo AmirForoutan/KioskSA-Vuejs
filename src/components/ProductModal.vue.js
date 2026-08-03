@@ -5,12 +5,10 @@ import { useToast } from 'vue-toastification';
 import VirtualKeyboard from './VirtualKeyboard.vue';
 import { ShwoKeyboardStatus } from '../utilities';
 const IsShowKeyboard = ref(false);
-// مدیریت کیبورد مجازی
 const showKeyboard = ref(false);
 const activeInputType = ref('');
 const activeInputRef = ref(null);
 const isNumberMode = ref(false);
-// refs برای فیلدهای ورودی
 const goodscode = ref(null);
 const goodsname = ref(null);
 const goodsprice = ref(null);
@@ -19,6 +17,9 @@ const goodsduty = ref(null);
 const packingprice = ref(null);
 const goodsdescription = ref(null);
 const stockInventory = ref(null);
+const minStock = ref(null);
+const maxStock = ref(null);
+const reorderPoint = ref(null);
 const toast = useToast({
     position: 'top-right',
     style: {
@@ -49,46 +50,66 @@ const daysOfWeek = [
     { key: 'Thursday', name: 'Thursday', label: 'پنجشنبه' },
     { key: 'Friday', name: 'Friday', label: 'جمعه' }
 ];
-const localProduct = ref({
-    GoodsId: 0,
-    GoodsCode: '',
-    GoodsName: '',
-    GoodsDescription: '',
-    GoodsPrice: 0,
-    TaxPercent: 0,
-    DutyPercent: 0,
-    PackingPrice: 0,
-    GoodsGroupId: 0,
-    StockInventory: 0,
-    IsActive: true,
-    Saturday: true,
-    FromTimeSaturday: '00:00',
-    ToTimeSaturday: '23:59',
-    Sunday: true,
-    FromTimeSunday: '00:00',
-    ToTimeSunday: '23:59',
-    Monday: true,
-    FromTimeMonday: '00:00',
-    ToTimeMonday: '23:59',
-    Tuesday: true,
-    FromTimeTuesday: '00:00',
-    ToTimeTuesday: '23:59',
-    Wednesday: true,
-    FromTimeWednesday: '00:00',
-    ToTimeWednesday: '23:59',
-    Thursday: true,
-    FromTimeThursday: '00:00',
-    ToTimeThursday: '23:59',
-    Friday: true,
-    FromTimeFriday: '00:00',
-    ToTimeFriday: '23:59'
-});
-// مقداردهی اولیه با داده‌های دریافتی
+function defaultProduct() {
+    return {
+        GoodsId: 0,
+        GoodsCode: '',
+        GoodsName: '',
+        GoodsDescription: '',
+        GoodsPrice: 0,
+        TaxPercent: 0,
+        DutyPercent: 0,
+        PackingPrice: 0,
+        GoodsGroupId: 0,
+        StockInventory: 0,
+        MinStock: 0,
+        MaxStock: 0,
+        ReorderPoint: 0,
+        DefaultWarehouseId: null,
+        IsPurchasable: true,
+        IsSellable: true,
+        IsKioskVisible: true,
+        IsActive: true,
+        Saturday: true,
+        FromTimeSaturday: '00:00',
+        ToTimeSaturday: '23:59',
+        Sunday: true,
+        FromTimeSunday: '00:00',
+        ToTimeSunday: '23:59',
+        Monday: true,
+        FromTimeMonday: '00:00',
+        ToTimeMonday: '23:59',
+        Tuesday: true,
+        FromTimeTuesday: '00:00',
+        ToTimeTuesday: '23:59',
+        Wednesday: true,
+        FromTimeWednesday: '00:00',
+        ToTimeWednesday: '23:59',
+        Thursday: true,
+        FromTimeThursday: '00:00',
+        ToTimeThursday: '23:59',
+        Friday: true,
+        FromTimeFriday: '00:00',
+        ToTimeFriday: '23:59'
+    };
+}
+function normalizeProduct(value) {
+    const base = defaultProduct();
+    const merged = { ...base, ...(value || {}) };
+    merged.MinStock = Number(merged.MinStock || 0);
+    merged.MaxStock = Number(merged.MaxStock || 0);
+    merged.ReorderPoint = Number(merged.ReorderPoint || 0);
+    merged.IsPurchasable = merged.IsPurchasable !== false;
+    merged.IsSellable = merged.IsSellable !== false;
+    merged.IsKioskVisible = merged.IsKioskVisible !== false;
+    merged.IsActive = merged.IsActive !== false;
+    return merged;
+}
+const localProduct = ref(defaultProduct());
 watch(() => props.product, (newVal) => {
-    localProduct.value = { ...newVal };
+    localProduct.value = normalizeProduct(newVal);
 }, { immediate: true });
 function save() {
-    // اعتبارسنجی داده‌ها
     if (!localProduct.value.GoodsCode || !localProduct.value.GoodsName) {
         toast.error('کد و نام کالا الزامی است');
         return;
@@ -99,8 +120,7 @@ function save() {
     }
     emit('save', localProduct.value);
 }
-watch(() => localProduct.value, (newVal) => {
-    // با تاخیر 100 میلی‌ثانیه صبر می‌کنیم تا DOM به روز رسانی شود
+watch(() => localProduct.value, () => {
     setTimeout(loadDatePicker, 100);
 }, { deep: true });
 onMounted(() => {
@@ -111,30 +131,15 @@ function loadDatePicker() {
     jalaliDatepicker.startWatch({
         autoShow: false
     });
-    // فقط inputهایی که هنوز رویداد focus برایشان تنظیم نشده را انتخاب کنید
     const inputList = document.querySelectorAll("input[data-jdp]:not([data-jdp-initialized])");
     for (let i = 0; i < inputList.length; i++) {
         inputList[i].setAttribute('data-jdp-initialized', 'true');
         inputList[i].addEventListener('focus', function () {
             if (this.hasAttribute("data-jdp-option-1")) {
-                jalaliDatepicker.updateOptions({
-                    date: false,
-                    time: true,
-                    hasSecond: false,
-                    showEmptyBtn: false,
-                    initTime: '00:00',
-                    zIndex: 2502
-                });
+                jalaliDatepicker.updateOptions({ date: false, time: true, hasSecond: false, showEmptyBtn: false, initTime: '00:00', zIndex: 2502 });
             }
             else if (this.hasAttribute("data-jdp-option-2")) {
-                jalaliDatepicker.updateOptions({
-                    date: false,
-                    time: true,
-                    hasSecond: false,
-                    showEmptyBtn: false,
-                    initTime: '23:59',
-                    zIndex: 2502
-                });
+                jalaliDatepicker.updateOptions({ date: false, time: true, hasSecond: false, showEmptyBtn: false, initTime: '23:59', zIndex: 2502 });
             }
             jalaliDatepicker.show(this);
         });
@@ -142,13 +147,10 @@ function loadDatePicker() {
 }
 function generateNewProductCode() {
     const selectedCategory = localProduct.value.GoodsGroupId;
-    // اگر دسته‌بندی انتخاب نشده، کد اولیه
     if (!selectedCategory)
         return '1000';
-    // فیلتر کردن محصولات این دسته‌بندی
     const categoryProducts = props.products.filter(p => p.GoodsGroupId == selectedCategory);
     if (categoryProducts.length === 0) {
-        // اگر محصولی در این دسته‌بندی نیست، کد دسته‌بندی * 100
         const category = props.categories.find(c => c.GroupId == selectedCategory);
         if (category) {
             const categoryCode = parseInt(category.GroupCode);
@@ -156,7 +158,6 @@ function generateNewProductCode() {
         }
         return '1000';
     }
-    // پیدا کردن بالاترین کد عددی در این دسته‌بندی
     const maxCode = Math.max(...categoryProducts.map(prod => {
         const codeNum = parseInt(prod.GoodsCode);
         return isNaN(codeNum) ? 0 : codeNum;
@@ -164,13 +165,11 @@ function generateNewProductCode() {
     return (maxCode + 1).toString();
 }
 watch(() => props.product, (newVal) => {
-    localProduct.value = { ...newVal };
-    // اگر در حال افزودن محصول جدید هستیم، کد را تولید کنیم
+    localProduct.value = normalizeProduct(newVal);
     if (!newVal.GoodsId && props.products.length > 0) {
         localProduct.value.GoodsCode = generateNewProductCode();
     }
 }, { immediate: true });
-// همچنین یک واچر برای تغییرات دسته‌بندی اضافه کنید
 watch(() => localProduct.value.GoodsGroupId, (newVal) => {
     if (!props.product.GoodsId && newVal) {
         localProduct.value.GoodsCode = generateNewProductCode();
@@ -187,47 +186,18 @@ watch(() => [
 ], (newValues, oldValues) => {
     daysOfWeek.forEach((day, index) => {
         if (newValues[index] && !oldValues[index]) {
-            // اگر روز فعال شده و قبلا غیرفعال بوده
             localProduct.value[`FromTime${day.name}`] = '00:00';
             localProduct.value[`ToTime${day.name}`] = '23:59';
         }
     });
 }, { deep: true });
-////////////////////////
-///// Virtual Keyboard ///////
-const numberModeInputs = ['code', 'price', 'tax', 'duty', 'packprice'];
+const numberModeInputs = ['code', 'price', 'tax', 'duty', 'packprice', 'inventory', 'minstock', 'maxstock', 'reorderpoint'];
 function handleInputClick(event, inputType) {
     if (IsShowKeyboard.value == true) {
         activeInputType.value = inputType;
         showKeyboard.value = true;
         isNumberMode.value = numberModeInputs.includes(inputType);
-        // تنظیم ref مربوطه
-        switch (inputType) {
-            case 'code':
-                activeInputRef.value = goodscode.value;
-                break;
-            case 'name':
-                activeInputRef.value = goodsname.value;
-                break;
-            case 'price':
-                activeInputRef.value = goodsprice.value;
-                break;
-            case 'tax':
-                activeInputRef.value = goodstax.value;
-                break;
-            case 'duty':
-                activeInputRef.value = goodsduty.value;
-                break;
-            case 'packprice':
-                activeInputRef.value = packingprice.value;
-                break;
-            case 'desc':
-                activeInputRef.value = goodsdescription.value;
-                break;
-            case 'inventory':
-                activeInputRef.value = stockInventory.value;
-                break;
-        }
+        activeInputRef.value = getInputRef(inputType);
         event.preventDefault();
     }
 }
@@ -236,33 +206,23 @@ function handleInputFocus(inputType) {
         activeInputType.value = inputType;
         showKeyboard.value = true;
         isNumberMode.value = numberModeInputs.includes(inputType);
-        // تنظیم ref مربوطه
-        switch (inputType) {
-            case 'code':
-                activeInputRef.value = goodscode.value;
-                break;
-            case 'name':
-                activeInputRef.value = goodsname.value;
-                break;
-            case 'price':
-                activeInputRef.value = goodsprice.value;
-                break;
-            case 'tax':
-                activeInputRef.value = goodstax.value;
-                break;
-            case 'duty':
-                activeInputRef.value = goodsduty.value;
-                break;
-            case 'packprice':
-                activeInputRef.value = packingprice.value;
-                break;
-            case 'desc':
-                activeInputRef.value = goodsdescription.value;
-                break;
-            case 'inventory':
-                activeInputRef.value = stockInventory.value;
-                break;
-        }
+        activeInputRef.value = getInputRef(inputType);
+    }
+}
+function getInputRef(inputType) {
+    switch (inputType) {
+        case 'code': return goodscode.value;
+        case 'name': return goodsname.value;
+        case 'price': return goodsprice.value;
+        case 'tax': return goodstax.value;
+        case 'duty': return goodsduty.value;
+        case 'packprice': return packingprice.value;
+        case 'desc': return goodsdescription.value;
+        case 'inventory': return stockInventory.value;
+        case 'minstock': return minStock.value;
+        case 'maxstock': return maxStock.value;
+        case 'reorderpoint': return reorderPoint.value;
+        default: return null;
     }
 }
 function hideKeyboard() {
@@ -279,7 +239,6 @@ function handleKeyPress(key) {
     const selectionStart = input.selectionStart;
     const selectionEnd = input.selectionEnd;
     if (key === '{bksp}') {
-        // حذف کاراکتر
         if (selectionStart === selectionEnd && selectionStart > 0) {
             input.value = currentValue.substring(0, selectionStart - 1) + currentValue.substring(selectionStart);
             input.selectionStart = input.selectionEnd = selectionStart - 1;
@@ -290,23 +249,26 @@ function handleKeyPress(key) {
         }
     }
     else if (key === '{enter}') {
-        // ثبت و مخفی کردن کیبورد
         hideKeyboard();
     }
     else {
-        // درج کاراکتر جدید
         const newValue = currentValue.substring(0, selectionStart) + key + currentValue.substring(selectionEnd);
         input.value = newValue;
         const newPosition = selectionStart + key.length;
         input.selectionStart = input.selectionEnd = newPosition;
     }
-    // انتشار رویداد input برای به روزرسانی واکنشی
     input.dispatchEvent(new Event('input'));
 }
 debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
 let __VLS_components;
 let __VLS_directives;
+/** @type {__VLS_StyleScopedClasses['settings-box']} */ ;
+/** @type {__VLS_StyleScopedClasses['usage-toggle']} */ ;
+/** @type {__VLS_StyleScopedClasses['settings-grid']} */ ;
+/** @type {__VLS_StyleScopedClasses['usage-grid']} */ ;
+// CSS variable injection 
+// CSS variable injection end 
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "modal-overlay" },
 });
@@ -464,6 +426,98 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
 });
 /** @type {typeof __VLS_ctx.stockInventory} */ ;
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "settings-box" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.h4, __VLS_intrinsicElements.h4)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "settings-grid" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "form-group" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+    ...{ onClick: (...[$event]) => {
+            __VLS_ctx.handleInputClick($event, 'minstock');
+        } },
+    ...{ onFocus: (...[$event]) => {
+            __VLS_ctx.handleInputFocus('minstock');
+        } },
+    value: (__VLS_ctx.localProduct.MinStock),
+    value: "0",
+    type: "text",
+    ref: "minStock",
+});
+/** @type {typeof __VLS_ctx.minStock} */ ;
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "form-group" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+    ...{ onClick: (...[$event]) => {
+            __VLS_ctx.handleInputClick($event, 'maxstock');
+        } },
+    ...{ onFocus: (...[$event]) => {
+            __VLS_ctx.handleInputFocus('maxstock');
+        } },
+    value: (__VLS_ctx.localProduct.MaxStock),
+    value: "0",
+    type: "text",
+    ref: "maxStock",
+});
+/** @type {typeof __VLS_ctx.maxStock} */ ;
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "form-group" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+    ...{ onClick: (...[$event]) => {
+            __VLS_ctx.handleInputClick($event, 'reorderpoint');
+        } },
+    ...{ onFocus: (...[$event]) => {
+            __VLS_ctx.handleInputFocus('reorderpoint');
+        } },
+    value: (__VLS_ctx.localProduct.ReorderPoint),
+    value: "0",
+    type: "text",
+    ref: "reorderPoint",
+});
+/** @type {typeof __VLS_ctx.reorderPoint} */ ;
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "settings-box" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.h4, __VLS_intrinsicElements.h4)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
+    ...{ class: "hint" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "usage-grid" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({
+    ...{ class: "usage-toggle" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+    type: "checkbox",
+});
+(__VLS_ctx.localProduct.IsPurchasable);
+__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({
+    ...{ class: "usage-toggle" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+    type: "checkbox",
+});
+(__VLS_ctx.localProduct.IsSellable);
+__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({
+    ...{ class: "usage-toggle" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+    type: "checkbox",
+});
+(__VLS_ctx.localProduct.IsKioskVisible);
+__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "form-group" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({});
@@ -609,6 +663,17 @@ if (__VLS_ctx.showKeyboard && __VLS_ctx.activeInputRef) {
 /** @type {__VLS_StyleScopedClasses['form-group']} */ ;
 /** @type {__VLS_StyleScopedClasses['form-group']} */ ;
 /** @type {__VLS_StyleScopedClasses['form-group']} */ ;
+/** @type {__VLS_StyleScopedClasses['settings-box']} */ ;
+/** @type {__VLS_StyleScopedClasses['settings-grid']} */ ;
+/** @type {__VLS_StyleScopedClasses['form-group']} */ ;
+/** @type {__VLS_StyleScopedClasses['form-group']} */ ;
+/** @type {__VLS_StyleScopedClasses['form-group']} */ ;
+/** @type {__VLS_StyleScopedClasses['settings-box']} */ ;
+/** @type {__VLS_StyleScopedClasses['hint']} */ ;
+/** @type {__VLS_StyleScopedClasses['usage-grid']} */ ;
+/** @type {__VLS_StyleScopedClasses['usage-toggle']} */ ;
+/** @type {__VLS_StyleScopedClasses['usage-toggle']} */ ;
+/** @type {__VLS_StyleScopedClasses['usage-toggle']} */ ;
 /** @type {__VLS_StyleScopedClasses['form-group']} */ ;
 /** @type {__VLS_StyleScopedClasses['form-row']} */ ;
 /** @type {__VLS_StyleScopedClasses['form-group']} */ ;
@@ -646,6 +711,9 @@ const __VLS_self = (await import('vue')).defineComponent({
             packingprice: packingprice,
             goodsdescription: goodsdescription,
             stockInventory: stockInventory,
+            minStock: minStock,
+            maxStock: maxStock,
+            reorderPoint: reorderPoint,
             daysOfWeek: daysOfWeek,
             localProduct: localProduct,
             save: save,

@@ -440,14 +440,13 @@ export async function loadDesktopAccess() {
     const users = unwrapArray(response, ["users", "Users"]);
     if (roles.length || users.length)
         return { roles, users };
-    if (response && typeof response === "object") {
-        const record = response;
-        return {
-            roles: Array.isArray(record.roles) ? record.roles : [],
-            users: Array.isArray(record.users) ? record.users : [],
-        };
-    }
-    return { roles: [], users: [] };
+    return {
+        roles: [
+            { id: 1, title: "مدیر", perms: ["*"] },
+            { id: 2, title: "صندوقدار", perms: ["view.sales", "view.baseInfo", "view.reports"] },
+        ],
+        users: [],
+    };
 }
 export async function saveDesktopRole(role) {
     return postApi("/roles/save", role);

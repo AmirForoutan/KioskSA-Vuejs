@@ -2,12 +2,10 @@ import { ref, watch, onMounted } from 'vue';
 import { useToast } from 'vue-toastification';
 import VirtualKeyboard from './VirtualKeyboard.vue';
 import { ShwoKeyboardStatus } from '../utilities';
-// مدیریت کیبورد مجازی
 const showKeyboard = ref(false);
 const activeInputType = ref('');
 const activeInputRef = ref(null);
 const isNumberMode = ref(false);
-// refs برای فیلدهای ورودی
 const groupcode = ref(null);
 const groupname = ref(null);
 const IsShowKeyboard = ref(false);
@@ -31,13 +29,11 @@ onMounted(() => {
     IsShowKeyboard.value = ShwoKeyboardStatus();
 });
 const emit = defineEmits(['save', 'close']);
-const localCategory = ref({ ...props.category });
-// تابع برای تولید کد جدید دسته‌بندی
+const localCategory = ref({ ...props.category, IsKioskVisible: props.category.IsKioskVisible !== false });
 function generateNewCategoryCode() {
     if (props.categories.length === 0) {
-        return '100'; // کد اولیه اگر دسته‌بندی وجود ندارد
+        return '100';
     }
-    // پیدا کردن بالاترین کد عددی
     const maxCode = Math.max(...props.categories.map(cat => {
         const codeNum = parseInt(cat.GroupCode);
         return isNaN(codeNum) ? 0 : codeNum;
@@ -45,8 +41,7 @@ function generateNewCategoryCode() {
     return (maxCode + 1).toString();
 }
 watch(() => props.category, (newVal) => {
-    localCategory.value = { ...newVal };
-    // اگر در حال افزودن دسته‌بندی جدید هستیم، کد را تولید کنیم
+    localCategory.value = { ...newVal, IsKioskVisible: newVal.IsKioskVisible !== false };
     if (!newVal.GroupId && props.categories.length > 0) {
         localCategory.value.GroupCode = generateNewCategoryCode();
     }
@@ -58,23 +53,13 @@ function save() {
     }
     emit('save', localCategory.value);
 }
-////////////////////////
-///// Virtual Keyboard ///////
 const numberModeInputs = ['code'];
 function handleInputClick(event, inputType) {
     if (IsShowKeyboard.value == true) {
         activeInputType.value = inputType;
         showKeyboard.value = true;
         isNumberMode.value = numberModeInputs.includes(inputType);
-        // تنظیم ref مربوطه
-        switch (inputType) {
-            case 'code':
-                activeInputRef.value = groupcode.value;
-                break;
-            case 'name':
-                activeInputRef.value = groupname.value;
-                break;
-        }
+        activeInputRef.value = inputType === 'code' ? groupcode.value : groupname.value;
         event.preventDefault();
     }
 }
@@ -83,15 +68,7 @@ function handleInputFocus(inputType) {
         activeInputType.value = inputType;
         showKeyboard.value = true;
         isNumberMode.value = numberModeInputs.includes(inputType);
-        // تنظیم ref مربوطه
-        switch (inputType) {
-            case 'code':
-                activeInputRef.value = groupcode.value;
-                break;
-            case 'name':
-                activeInputRef.value = groupname.value;
-                break;
-        }
+        activeInputRef.value = inputType === 'code' ? groupcode.value : groupname.value;
     }
 }
 function hideKeyboard() {
@@ -107,7 +84,6 @@ function handleKeyPress(key) {
     const selectionStart = input.selectionStart;
     const selectionEnd = input.selectionEnd;
     if (key === '{bksp}') {
-        // حذف کاراکتر
         if (selectionStart === selectionEnd && selectionStart > 0) {
             input.value = currentValue.substring(0, selectionStart - 1) + currentValue.substring(selectionStart);
             input.selectionStart = input.selectionEnd = selectionStart - 1;
@@ -118,23 +94,22 @@ function handleKeyPress(key) {
         }
     }
     else if (key === '{enter}') {
-        // ثبت و مخفی کردن کیبورد
         hideKeyboard();
     }
     else {
-        // درج کاراکتر جدید
         const newValue = currentValue.substring(0, selectionStart) + key + currentValue.substring(selectionEnd);
         input.value = newValue;
         const newPosition = selectionStart + key.length;
         input.selectionStart = input.selectionEnd = newPosition;
     }
-    // انتشار رویداد input برای به روزرسانی واکنشی
     input.dispatchEvent(new Event('input'));
 }
 debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
 let __VLS_components;
 let __VLS_directives;
+// CSS variable injection 
+// CSS variable injection end 
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "modal-overlay" },
 });
@@ -207,6 +182,23 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.
 __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
 (__VLS_ctx.localCategory.IsActive ? 'فعال' : 'غیرفعال');
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "form-group usage-box" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({
+    ...{ class: "switch" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+    type: "checkbox",
+});
+(__VLS_ctx.localCategory.IsKioskVisible);
+__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+    ...{ class: "slider round" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+(__VLS_ctx.localCategory.IsKioskVisible ? 'نمایش داده شود' : 'مخفی باشد');
+__VLS_asFunctionalElement(__VLS_intrinsicElements.small, __VLS_intrinsicElements.small)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "modal-footer" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
@@ -255,6 +247,11 @@ if (__VLS_ctx.showKeyboard && __VLS_ctx.activeInputRef) {
 /** @type {__VLS_StyleScopedClasses['form-group']} */ ;
 /** @type {__VLS_StyleScopedClasses['form-group']} */ ;
 /** @type {__VLS_StyleScopedClasses['form-group']} */ ;
+/** @type {__VLS_StyleScopedClasses['switch']} */ ;
+/** @type {__VLS_StyleScopedClasses['slider']} */ ;
+/** @type {__VLS_StyleScopedClasses['round']} */ ;
+/** @type {__VLS_StyleScopedClasses['form-group']} */ ;
+/** @type {__VLS_StyleScopedClasses['usage-box']} */ ;
 /** @type {__VLS_StyleScopedClasses['switch']} */ ;
 /** @type {__VLS_StyleScopedClasses['slider']} */ ;
 /** @type {__VLS_StyleScopedClasses['round']} */ ;
