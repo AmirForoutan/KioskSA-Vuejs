@@ -83,7 +83,7 @@
 
                 <div class="settings-box">
                     <h4>کاربرد کالا</h4>
-                    <p class="hint">نمایش در کیوسک از سطح دسته‌بندی کنترل می‌شود.</p>
+                    <p class="hint">نمایش کالا در کیوسک مستقل از نمایش دسته‌بندی است؛ هر دو باید فعال باشند تا کالا در کیوسک دیده شود.</p>
                     <div class="usage-grid">
                         <label class="usage-toggle">
                             <input v-model="localProduct.IsPurchasable" type="checkbox" />
@@ -92,6 +92,10 @@
                         <label class="usage-toggle">
                             <input v-model="localProduct.IsSellable" type="checkbox" />
                             <span>نمایش در صفحه فروش PC</span>
+                        </label>
+                        <label class="usage-toggle">
+                            <input v-model="localProduct.IsKioskVisible" type="checkbox" />
+                            <span>نمایش در کیوسک</span>
                         </label>
                     </div>
                 </div>
@@ -214,6 +218,7 @@ function defaultProduct() {
         DefaultWarehouseId: null,
         IsPurchasable: true,
         IsSellable: true,
+        IsKioskVisible: true,
         IsActive: true,
         Saturday: true,
         FromTimeSaturday: '00:00',
@@ -247,6 +252,7 @@ function normalizeProduct(value) {
     merged.ReorderPoint = Number(merged.ReorderPoint || 0)
     merged.IsPurchasable = merged.IsPurchasable !== false
     merged.IsSellable = merged.IsSellable !== false
+    merged.IsKioskVisible = merged.IsKioskVisible !== false
     merged.IsActive = merged.IsActive !== false
     return merged
 }
@@ -404,7 +410,7 @@ function handleKeyPress(key) {
 .settings-box { margin: 12px 0; padding: 12px; border-radius: 14px; background: rgba(15,23,42,.55); border: 1px solid rgba(255,255,255,.08); }
 .settings-box h4 { margin: 0 0 10px; }
 .settings-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-.usage-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.usage-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .usage-toggle { min-height: 44px; display: flex; align-items: center; gap: 8px; padding: 9px 10px; border-radius: 12px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); }
 .usage-toggle input { width: 20px; height: 20px; }
 .hint { margin: -4px 0 10px; color: #94a3b8; font-size: 12px; }
