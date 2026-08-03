@@ -2,8 +2,8 @@
 
 .dw-content,
 .dw-content * {
-  font-family: Vazirmatn, Vazir, IRANSans, Tahoma, Arial, sans-serif !important;
-  font-variant-numeric: tabular-nums;
+  font-family: Vazirmatn FD !important;
+  font-variant-numeric: normal;
 }
 
 .dw-content section,
