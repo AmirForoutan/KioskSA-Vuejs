@@ -188,7 +188,7 @@
       return '<tr><td colspan="' + Math.max(data.headers.length, 1) + '"><b>' + escapeHtml(item[0]) + ':</b> ' + escapeHtml(item[1]) + '</td></tr>';
     }).join('');
 
-    var html = '<html><head><meta charset="UTF-8" /></head><body dir="rtl">' +
+    var html = '<html><head><meta charset="UTF-8" /><style>*{font-family: Vazirmatn FD !important;font-variant-numeric: normal !important;}</style></head><body dir="rtl">' +
       '<h2>' + escapeHtml(title) + '</h2>' +
       '<table>' + metaRows + '</table>' +
       tableHtml(data.headers, data.rows) +
@@ -223,10 +223,10 @@
     win.document.write('<!doctype html><html lang="fa" dir="rtl"><head><meta charset="UTF-8" />' +
       '<title>' + escapeHtml(title) + '</title>' +
       '<style>' +
-      '*{box-sizing:border-box;}' +
+      '*{box-sizing:border-box;font-family: Vazirmatn FD !important;font-variant-numeric: normal !important;}' +
       '@page{size:' + pageSize + ';margin:' + (isReceipt ? '0' : '9mm') + ';}' +
       'html,body{margin:0;padding:0;direction:rtl;}' +
-      'body{font-family:Tahoma,Arial,sans-serif;color:#111827;font-size:' + fontSize + ';line-height:' + (isReceipt ? '1.25' : '1.45') + ';}' +
+      'body{color:#111827;font-size:' + fontSize + ';line-height:' + (isReceipt ? '1.25' : '1.45') + ';}' +
       '.paper{padding:8px;}' +
       '.receipt{width:70mm;max-width:70mm;min-width:70mm;margin:0;padding:1.5mm;overflow:hidden;}' +
       'h2{margin:0 0 ' + (isReceipt ? '3px' : '8px') + ';text-align:center;font-size:' + (isReceipt ? '10px' : '18px') + ';line-height:1.35;}' +
