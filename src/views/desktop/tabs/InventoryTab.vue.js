@@ -1,5 +1,5 @@
 import { computed, onMounted, reactive, ref } from "vue";
-import { loadInventoryBootstrap, saveInventorySettings, saveWarehouse, saveGoodsLimits, saveInventoryDocument, loadStockReport, loadKardexReport, loadInventoryChangeLogs, rebuildInventoryBalances, } from "../../../services/inventoryApi";
+import { loadInventoryBootstrap, saveInventorySettings, saveWarehouse, saveInventoryDocument, loadStockReport, loadKardexReport, loadInventoryChangeLogs, rebuildInventoryBalances, } from "../../../services/inventoryApi";
 const loading = ref(false);
 const message = ref("");
 const activeTab = ref("settings");
@@ -13,7 +13,6 @@ const stockRows = ref([]);
 const kardexRows = ref([]);
 const changeLogRows = ref([]);
 const stockTakingRows = ref([]);
-const goodsSearch = ref("");
 const suppliers = ref(loadSuppliersFromStorage());
 const supplierLedger = ref(loadSupplierLedgerFromStorage());
 const settings = reactive({
@@ -67,15 +66,10 @@ const reportFilter = reactive({
     ToDate: "",
     GoodsId: 0,
 });
+const stockTakingDate = ref(todayFa());
 const historyFilter = reactive({
     FromDate: "",
     ToDate: "",
-});
-const filteredGoods = computed(() => {
-    const q = goodsSearch.value.trim().toLowerCase();
-    if (!q)
-        return goods.value;
-    return goods.value.filter((item) => `${item.GoodsCode} ${item.GoodsName}`.toLowerCase().includes(q));
 });
 const selectedFiscalYear = computed(() => fiscalYears.value.find((f) => f.FiscalYearId === Number(reportFilter.FiscalYearId)) || fiscalYears.value[0]);
 const selectedWarehouseTitle = computed(() => warehouses.value.find((w) => w.WarehouseId === Number(reportFilter.WarehouseId))?.WarehouseTitle || "همه انبارها");
@@ -93,8 +87,29 @@ const supplierBalanceRows = computed(() => suppliers.value.map((supplier) => {
 }));
 const filteredChangeLogRows = computed(() => filterRowsByDate(changeLogRows.value, (row) => String(row.ChangedAt || "").split("-")[0], historyFilter.FromDate, historyFilter.ToDate));
 onMounted(loadAll);
+function padDatePart(value) {
+    const text = String(value || "").trim();
+    if (!text)
+        return "00";
+    return text.length === 1 ? `0${text}` : text;
+}
 function todayFa() {
-    return new Date().toLocaleDateString("fa-IR-u-nu-latn").replace(/-/g, "/");
+    const parts = new Intl.DateTimeFormat("fa-IR-u-ca-persian-nu-latn", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+    }).formatToParts(new Date());
+    const year = parts.find((part) => part.type === "year")?.value || "";
+    const month = parts.find((part) => part.type === "month")?.value || "";
+    const day = parts.find((part) => part.type === "day")?.value || "";
+    return `${year}/${padDatePart(month)}/${padDatePart(day)}`;
+}
+function fiscalYearStatus(row) {
+    if (row.IsClosed)
+        return "بسته شده";
+    if (row.IsActive)
+        return "باز / فعال";
+    return "باز";
 }
 function showMessage(text) {
     message.value = text;
@@ -152,6 +167,8 @@ async function loadAll() {
         documentForm.WarehouseId = defaultWarehouseId.value;
         documentForm.FiscalYearId = fiscalYears.value[0]?.FiscalYearId || 0;
         reportFilter.FiscalYearId = fiscalYears.value[0]?.FiscalYearId || 0;
+        if (!stockTakingDate.value)
+            stockTakingDate.value = todayFa();
     }
     catch (error) {
         showMessage(error instanceof Error ? error.message : "خطا در دریافت اطلاعات انبار");
@@ -247,15 +264,6 @@ function recordSupplierLedger(documentNumber) {
     });
     saveSupplierLedgerToStorage();
 }
-async function saveLimits() {
-    try {
-        const result = await saveGoodsLimits(goods.value);
-        showMessage(result.message || "محدوده موجودی کالاها ذخیره شد");
-    }
-    catch (error) {
-        showMessage(error instanceof Error ? error.message : "خطا در ذخیره محدوده موجودی");
-    }
-}
 function addDocumentItem() {
     documentItems.value.push({ GoodsId: 0, Quantity: 1, UnitPrice: 0, Description: "" });
 }
@@ -330,7 +338,7 @@ async function openStockTaking() {
         reportFilter.WarehouseId = defaultWarehouseId.value;
     }
     if (!Number(reportFilter.WarehouseId)) {
-        showMessage("ابتدا از بخش تنظیمات و کالاها، حداقل یک انبار تعریف کنید");
+        showMessage("ابتدا از بخش تنظیمات انبار، حداقل یک انبار تعریف کنید");
         return;
     }
     await prepareStockTaking();
@@ -370,6 +378,7 @@ async function applyStockTaking() {
         showMessage("ابتدا موجودی سیستم را بارگذاری کنید");
         return;
     }
+    const documentDate = stockTakingDate.value || todayFa();
     const increases = stockTakingRows.value
         .filter((row) => Number(row.DifferenceQuantity) > 0)
         .map((row) => ({
@@ -394,7 +403,7 @@ async function applyStockTaking() {
         if (increases.length) {
             await saveInventoryDocument({
                 DocumentType: 6,
-                DocumentDate: todayFa(),
+                DocumentDate: documentDate,
                 FiscalYearId: Number(reportFilter.FiscalYearId || selectedFiscalYear.value?.FiscalYearId || 0),
                 WarehouseId: Number(reportFilter.WarehouseId),
                 PersonTitle: "سیستم",
@@ -405,7 +414,7 @@ async function applyStockTaking() {
         if (decreases.length) {
             await saveInventoryDocument({
                 DocumentType: 8,
-                DocumentDate: todayFa(),
+                DocumentDate: documentDate,
                 FiscalYearId: Number(reportFilter.FiscalYearId || selectedFiscalYear.value?.FiscalYearId || 0),
                 WarehouseId: Number(reportFilter.WarehouseId),
                 PersonTitle: "سیستم",
@@ -530,6 +539,12 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElement
             __VLS_ctx.activeTab = 'settings';
         } },
     ...{ class: ({ active: __VLS_ctx.activeTab === 'settings' }) },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+    ...{ onClick: (...[$event]) => {
+            __VLS_ctx.activeTab = 'fiscalYears';
+        } },
+    ...{ class: ({ active: __VLS_ctx.activeTab === 'fiscalYears' }) },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
     ...{ onClick: (...[$event]) => {
@@ -671,14 +686,18 @@ if (__VLS_ctx.activeTab === 'settings') {
                 } },
         });
     }
+}
+if (__VLS_ctx.activeTab === 'fiscalYears') {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "inv-card wide" },
+        ...{ class: "inventory-fiscal-years-panel" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "inv-card" },
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.h3, __VLS_intrinsicElements.h3)({});
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
-        placeholder: "جستجوی کالا",
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "inv-warning" },
     });
-    (__VLS_ctx.goodsSearch);
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "inv-table-wrap" },
     });
@@ -689,51 +708,20 @@ if (__VLS_ctx.activeTab === 'settings') {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
     __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
     __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
     __VLS_asFunctionalElement(__VLS_intrinsicElements.tbody, __VLS_intrinsicElements.tbody)({});
-    for (const [g] of __VLS_getVForSourceType((__VLS_ctx.filteredGoods))) {
+    for (const [f] of __VLS_getVForSourceType((__VLS_ctx.fiscalYears))) {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.tr, __VLS_intrinsicElements.tr)({
-            key: (g.GoodsId),
+            key: (f.FiscalYearId),
         });
         __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
-        (g.GoodsCode);
+        (f.Title);
         __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
-        (g.GoodsName);
+        (f.StartDate);
         __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
-            type: "number",
-        });
-        (g.MinStock);
+        (f.EndDate);
         __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
-            type: "number",
-        });
-        (g.MaxStock);
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
-            type: "number",
-        });
-        (g.ReorderPoint);
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.select, __VLS_intrinsicElements.select)({
-            value: (g.DefaultWarehouseId),
-        });
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.option, __VLS_intrinsicElements.option)({
-            value: (null),
-        });
-        for (const [w] of __VLS_getVForSourceType((__VLS_ctx.warehouses))) {
-            __VLS_asFunctionalElement(__VLS_intrinsicElements.option, __VLS_intrinsicElements.option)({
-                key: (w.WarehouseId),
-                value: (w.WarehouseId),
-            });
-            (w.WarehouseTitle);
-        }
+        (__VLS_ctx.fiscalYearStatus(f));
     }
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-        ...{ onClick: (__VLS_ctx.saveLimits) },
-        ...{ class: "inv-primary" },
-    });
 }
 if (__VLS_ctx.activeTab === 'documents') {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
@@ -1122,6 +1110,12 @@ if (__VLS_ctx.activeTab === 'stocktaking') {
         ...{ class: "inv-form-grid stocktaking-filter" },
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+        placeholder: "مثلاً 1405/05/05",
+        'data-jdp': true,
+    });
+    (__VLS_ctx.stockTakingDate);
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({});
     __VLS_asFunctionalElement(__VLS_intrinsicElements.select, __VLS_intrinsicElements.select)({
         value: (__VLS_ctx.reportFilter.FiscalYearId),
     });
@@ -1384,6 +1378,7 @@ if (__VLS_ctx.activeTab === 'history') {
 /** @type {__VLS_StyleScopedClasses['active']} */ ;
 /** @type {__VLS_StyleScopedClasses['active']} */ ;
 /** @type {__VLS_StyleScopedClasses['active']} */ ;
+/** @type {__VLS_StyleScopedClasses['active']} */ ;
 /** @type {__VLS_StyleScopedClasses['inv-grid']} */ ;
 /** @type {__VLS_StyleScopedClasses['two']} */ ;
 /** @type {__VLS_StyleScopedClasses['inv-card']} */ ;
@@ -1391,10 +1386,10 @@ if (__VLS_ctx.activeTab === 'history') {
 /** @type {__VLS_StyleScopedClasses['inv-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['inv-form-row']} */ ;
 /** @type {__VLS_StyleScopedClasses['inv-primary']} */ ;
+/** @type {__VLS_StyleScopedClasses['inventory-fiscal-years-panel']} */ ;
 /** @type {__VLS_StyleScopedClasses['inv-card']} */ ;
-/** @type {__VLS_StyleScopedClasses['wide']} */ ;
+/** @type {__VLS_StyleScopedClasses['inv-warning']} */ ;
 /** @type {__VLS_StyleScopedClasses['inv-table-wrap']} */ ;
-/** @type {__VLS_StyleScopedClasses['inv-primary']} */ ;
 /** @type {__VLS_StyleScopedClasses['inv-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['inv-form-grid']} */ ;
 /** @type {__VLS_StyleScopedClasses['inv-form-grid']} */ ;
@@ -1444,7 +1439,6 @@ const __VLS_self = (await import('vue')).defineComponent({
             stockRows: stockRows,
             kardexRows: kardexRows,
             stockTakingRows: stockTakingRows,
-            goodsSearch: goodsSearch,
             suppliers: suppliers,
             supplierLedger: supplierLedger,
             settings: settings,
@@ -1453,10 +1447,11 @@ const __VLS_self = (await import('vue')).defineComponent({
             documentForm: documentForm,
             documentItems: documentItems,
             reportFilter: reportFilter,
+            stockTakingDate: stockTakingDate,
             historyFilter: historyFilter,
-            filteredGoods: filteredGoods,
             supplierBalanceRows: supplierBalanceRows,
             filteredChangeLogRows: filteredChangeLogRows,
+            fiscalYearStatus: fiscalYearStatus,
             loadAll: loadAll,
             saveSettings: saveSettings,
             submitWarehouse: submitWarehouse,
@@ -1464,7 +1459,6 @@ const __VLS_self = (await import('vue')).defineComponent({
             submitSupplier: submitSupplier,
             editSupplier: editSupplier,
             onSupplierChange: onSupplierChange,
-            saveLimits: saveLimits,
             addDocumentItem: addDocumentItem,
             removeDocumentItem: removeDocumentItem,
             submitDocument: submitDocument,
