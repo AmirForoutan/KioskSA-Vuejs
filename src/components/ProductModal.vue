@@ -83,7 +83,7 @@
 
                 <div class="settings-box">
                     <h4>کاربرد کالا</h4>
-                    <p class="hint">این تنظیمات مشخص می‌کند کالا در کدام بخش‌ها قابل استفاده یا نمایش باشد.</p>
+                    <p class="hint">نمایش در کیوسک از سطح دسته‌بندی کنترل می‌شود.</p>
                     <div class="usage-grid">
                         <label class="usage-toggle">
                             <input v-model="localProduct.IsPurchasable" type="checkbox" />
@@ -92,10 +92,6 @@
                         <label class="usage-toggle">
                             <input v-model="localProduct.IsSellable" type="checkbox" />
                             <span>نمایش در صفحه فروش PC</span>
-                        </label>
-                        <label class="usage-toggle">
-                            <input v-model="localProduct.IsKioskVisible" type="checkbox" />
-                            <span>نمایش در کیوسک</span>
                         </label>
                     </div>
                 </div>
@@ -180,26 +176,12 @@ const minStock = ref(null)
 const maxStock = ref(null)
 const reorderPoint = ref(null)
 
-const toast = useToast({
-    position: 'top-right',
-    style: {
-        fontFamily: 'Vazirmatn-FD-Black'
-    }
-})
+const toast = useToast({ position: 'top-right', style: { fontFamily: 'Vazirmatn-FD-Black' } })
 
 const props = defineProps({
-    product: {
-        type: Object,
-        required: true
-    },
-    categories: {
-        type: Array,
-        required: true
-    },
-    products: {
-        type: Array,
-        default: () => []
-    }
+    product: { type: Object, required: true },
+    categories: { type: Array, required: true },
+    products: { type: Array, default: () => [] }
 })
 
 const emit = defineEmits(['save', 'close'])
@@ -232,7 +214,6 @@ function defaultProduct() {
         DefaultWarehouseId: null,
         IsPurchasable: true,
         IsSellable: true,
-        IsKioskVisible: true,
         IsActive: true,
         Saturday: true,
         FromTimeSaturday: '00:00',
@@ -266,7 +247,6 @@ function normalizeProduct(value) {
     merged.ReorderPoint = Number(merged.ReorderPoint || 0)
     merged.IsPurchasable = merged.IsPurchasable !== false
     merged.IsSellable = merged.IsSellable !== false
-    merged.IsKioskVisible = merged.IsKioskVisible !== false
     merged.IsActive = merged.IsActive !== false
     return merged
 }
@@ -282,39 +262,26 @@ function save() {
         toast.error('کد و نام کالا الزامی است')
         return
     }
-
     if (localProduct.value.GoodsPrice < 0) {
         toast.error('قیمت کالا نمی‌تواند منفی باشد')
         return
     }
-
     emit('save', localProduct.value)
 }
 
-watch(() => localProduct.value, () => {
-    setTimeout(loadDatePicker, 100);
-}, { deep: true });
+watch(() => localProduct.value, () => { setTimeout(loadDatePicker, 100); }, { deep: true });
 
-onMounted(() => {
-    loadDatePicker();
-    IsShowKeyboard.value = ShwoKeyboardStatus();
-});
+onMounted(() => { loadDatePicker(); IsShowKeyboard.value = ShwoKeyboardStatus(); });
 
 function loadDatePicker() {
-    jalaliDatepicker.startWatch({
-        autoShow: false
-    });
-
+    jalaliDatepicker.startWatch({ autoShow: false });
     const inputList = document.querySelectorAll("input[data-jdp]:not([data-jdp-initialized])");
-
     for (let i = 0; i < inputList.length; i++) {
         inputList[i].setAttribute('data-jdp-initialized', 'true');
-
         inputList[i].addEventListener('focus', function () {
             if (this.hasAttribute("data-jdp-option-1")) {
                 jalaliDatepicker.updateOptions({ date: false, time: true, hasSecond: false, showEmptyBtn: false, initTime: '00:00', zIndex: 2502 });
-            }
-            else if (this.hasAttribute("data-jdp-option-2")) {
+            } else if (this.hasAttribute("data-jdp-option-2")) {
                 jalaliDatepicker.updateOptions({ date: false, time: true, hasSecond: false, showEmptyBtn: false, initTime: '23:59', zIndex: 2502 });
             }
             jalaliDatepicker.show(this);
@@ -343,15 +310,11 @@ function generateNewProductCode() {
 
 watch(() => props.product, (newVal) => {
     localProduct.value = normalizeProduct(newVal)
-    if (!newVal.GoodsId && props.products.length > 0) {
-        localProduct.value.GoodsCode = generateNewProductCode()
-    }
+    if (!newVal.GoodsId && props.products.length > 0) localProduct.value.GoodsCode = generateNewProductCode()
 }, { immediate: true })
 
 watch(() => localProduct.value.GoodsGroupId, (newVal) => {
-    if (!props.product.GoodsId && newVal) {
-        localProduct.value.GoodsCode = generateNewProductCode()
-    }
+    if (!props.product.GoodsId && newVal) localProduct.value.GoodsCode = generateNewProductCode()
 })
 
 watch(() => [
@@ -409,12 +372,7 @@ function getInputRef(inputType) {
     }
 }
 
-function hideKeyboard() {
-    showKeyboard.value = false
-    activeInputType.value = ''
-    activeInputRef.value = null
-    isNumberMode.value = false
-}
+function hideKeyboard() { showKeyboard.value = false; activeInputType.value = ''; activeInputRef.value = null; isNumberMode.value = false }
 
 function handleKeyPress(key) {
     if (!activeInputRef.value) return
@@ -446,7 +404,7 @@ function handleKeyPress(key) {
 .settings-box { margin: 12px 0; padding: 12px; border-radius: 14px; background: rgba(15,23,42,.55); border: 1px solid rgba(255,255,255,.08); }
 .settings-box h4 { margin: 0 0 10px; }
 .settings-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-.usage-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.usage-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .usage-toggle { min-height: 44px; display: flex; align-items: center; gap: 8px; padding: 9px 10px; border-radius: 12px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); }
 .usage-toggle input { width: 20px; height: 20px; }
 .hint { margin: -4px 0 10px; color: #94a3b8; font-size: 12px; }
