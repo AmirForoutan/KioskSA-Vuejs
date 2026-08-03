@@ -1,28 +1,90 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, reactive, ref } from "vue";
 import {
   loadInventoryAnalysisBootstrap,
+  loadInventoryBootstrap,
+  loadStockReport,
   saveGoodsRecipe,
   saveGoodsUsage,
   type GoodsUsage,
+  type InventoryStockReportRow,
   type RecipeItem,
 } from "../../../services/inventoryApi";
+import { fetchGoodsApi } from "../../../services/apiService";
+
+type GoodsPriceRow = {
+  GoodsId: number;
+  GoodsCode: number;
+  GoodsName: string;
+  GoodsPrice: number;
+};
 
 const loading = ref(false);
 const message = ref("");
 const goods = ref<GoodsUsage[]>([]);
 const recipes = ref<RecipeItem[]>([]);
+const stockRows = ref<InventoryStockReportRow[]>([]);
+const goodsPrices = ref<GoodsPriceRow[]>([]);
 const selectedProductGoodsId = ref<number>(0);
 const recipeItems = ref<RecipeItem[]>([]);
-const search = ref("");
+const goodsUsageSearch = ref("");
+const productSearch = ref("");
+const ingredientSearch = ref("");
+const activeSection = ref<"recipe" | "usage">("recipe");
 
-const filteredGoods = computed(() => {
-  const q = search.value.trim().toLowerCase();
+const reportFilter = reactive({
+  FiscalYearId: 0,
+  WarehouseId: 0,
+  FromDate: "",
+  ToDate: "",
+  GoodsId: 0,
+});
+
+const goodsPriceMap = computed(() => {
+  const map = new Map<number, GoodsPriceRow>();
+  goodsPrices.value.forEach((item) => map.set(Number(item.GoodsId), item));
+  return map;
+});
+
+const stockCostMap = computed(() => {
+  const map = new Map<number, InventoryStockReportRow>();
+  stockRows.value.forEach((item) => map.set(Number(item.GoodsId), item));
+  return map;
+});
+
+const filteredUsageGoods = computed(() => {
+  const q = goodsUsageSearch.value.trim().toLowerCase();
   if (!q) return goods.value;
   return goods.value.filter((g) => `${g.GoodsCode} ${g.GoodsName}`.toLowerCase().includes(q));
 });
 
+const sellableGoods = computed(() => goods.value.filter((g) => g.IsSellable !== false));
+
+const filteredProducts = computed(() => {
+  const q = productSearch.value.trim().toLowerCase();
+  const list = sellableGoods.value;
+  if (!q) return list;
+  return list.filter((g) => `${g.GoodsCode} ${g.GoodsName}`.toLowerCase().includes(q));
+});
+
+const ingredientGoods = computed(() => goods.value.filter((g) => Number(g.GoodsId) !== Number(selectedProductGoodsId.value) && g.IsPurchasable !== false));
+
+const filteredIngredientGoods = computed(() => {
+  const q = ingredientSearch.value.trim().toLowerCase();
+  if (!q) return ingredientGoods.value;
+  return ingredientGoods.value.filter((g) => `${g.GoodsCode} ${g.GoodsName}`.toLowerCase().includes(q));
+});
+
 const selectedProduct = computed(() => goods.value.find((g) => Number(g.GoodsId) === Number(selectedProductGoodsId.value)) || null);
+
+const selectedProductSalePrice = computed(() => {
+  const productId = Number(selectedProductGoodsId.value || 0);
+  return Number(goodsPriceMap.value.get(productId)?.GoodsPrice || 0);
+});
+
+const recipeCost = computed(() => recipeItems.value.reduce((sum, item) => sum + getRecipeItemCost(item), 0));
+const recipeProfit = computed(() => selectedProductSalePrice.value - recipeCost.value);
+const recipeProfitPercent = computed(() => selectedProductSalePrice.value > 0 ? (recipeProfit.value / selectedProductSalePrice.value) * 100 : 0);
 
 onMounted(loadData);
 
@@ -33,14 +95,48 @@ function showMessage(text: string) {
   }, 3500);
 }
 
+function normalizeGoodsPriceRows(data: unknown): GoodsPriceRow[] {
+  const source = data as any;
+  const list = Array.isArray(source)
+    ? source
+    : Array.isArray(source?.Goods)
+      ? source.Goods
+      : Array.isArray(source?.goods)
+        ? source.goods
+        : Object.values(source || {}).flatMap((value: any) => Array.isArray(value) ? value : []);
+
+  return list
+    .filter((item: any) => Number(item?.GoodsId || item?.goodsId || 0) > 0)
+    .map((item: any) => ({
+      GoodsId: Number(item.GoodsId || item.goodsId || 0),
+      GoodsCode: Number(item.GoodsCode || item.goodsCode || 0),
+      GoodsName: String(item.GoodsName || item.goodsName || ""),
+      GoodsPrice: Number(item.GoodsPrice || item.goodsPrice || 0),
+    }));
+}
+
 async function loadData() {
   loading.value = true;
   try {
-    const result = await loadInventoryAnalysisBootstrap();
-    goods.value = result.goods || [];
-    recipes.value = result.recipes || [];
-    if (!selectedProductGoodsId.value && goods.value.length) {
-      selectedProductGoodsId.value = goods.value[0].GoodsId;
+    const [analysis, bootstrap, rawGoodsPrices] = await Promise.all([
+      loadInventoryAnalysisBootstrap(),
+      loadInventoryBootstrap(),
+      fetchGoodsApi(0),
+    ]);
+
+    goods.value = analysis.goods || [];
+    recipes.value = analysis.recipes || [];
+    goodsPrices.value = normalizeGoodsPriceRows(rawGoodsPrices);
+
+    reportFilter.FiscalYearId = bootstrap.fiscalYears?.[0]?.FiscalYearId || 0;
+    reportFilter.WarehouseId = bootstrap.warehouses?.find((w) => w.IsDefault)?.WarehouseId || bootstrap.warehouses?.[0]?.WarehouseId || 0;
+
+    const stock = await loadStockReport(reportFilter);
+    stockRows.value = stock.rows || [];
+
+    if (!selectedProductGoodsId.value && sellableGoods.value.length) {
+      selectProduct(sellableGoods.value[0].GoodsId);
+    } else {
       loadRecipeForSelectedProduct();
     }
   } catch (error) {
@@ -48,6 +144,11 @@ async function loadData() {
   } finally {
     loading.value = false;
   }
+}
+
+function selectProduct(goodsId: number) {
+  selectedProductGoodsId.value = Number(goodsId || 0);
+  loadRecipeForSelectedProduct();
 }
 
 function loadRecipeForSelectedProduct() {
@@ -72,6 +173,36 @@ function removeRecipeItem(index: number) {
   recipeItems.value.splice(index, 1);
 }
 
+function getGoodsTitle(goodsId: number) {
+  const item = goods.value.find((g) => Number(g.GoodsId) === Number(goodsId));
+  return item ? `${item.GoodsCode} - ${item.GoodsName}` : "انتخاب نشده";
+}
+
+function getIngredientUnitCost(goodsId: number) {
+  const row = stockCostMap.value.get(Number(goodsId));
+  if (!row) return 0;
+  return Number(row.AveragePrice || row.LastPurchasePrice || 0);
+}
+
+function getEffectiveQuantity(item: RecipeItem) {
+  const quantity = Number(item.Quantity || 0);
+  const waste = Number(item.WastePercent || 0);
+  return waste > 0 ? quantity + (quantity * waste / 100) : quantity;
+}
+
+function getRecipeItemCost(item: RecipeItem) {
+  return getEffectiveQuantity(item) * getIngredientUnitCost(Number(item.IngredientGoodsId || 0));
+}
+
+function formatMoney(value: number) {
+  return Math.round(Number(value || 0)).toLocaleString();
+}
+
+function formatNumber(value: number) {
+  const num = Number(value || 0);
+  return Number.isInteger(num) ? num.toLocaleString() : num.toLocaleString(undefined, { maximumFractionDigits: 3 });
+}
+
 async function submitGoodsUsage() {
   try {
     const result = await saveGoodsUsage(goods.value);
@@ -84,7 +215,7 @@ async function submitGoodsUsage() {
 
 async function submitRecipe() {
   if (!selectedProductGoodsId.value) {
-    showMessage("ابتدا کالای اصلی را انتخاب کنید");
+    showMessage("ابتدا کالای قابل فروش را انتخاب کنید");
     return;
   }
 
@@ -111,32 +242,126 @@ async function submitRecipe() {
   <section class="analysis-tab">
     <header class="analysis-header">
       <div>
-        <h2>آنالیز کالا و کاربرد کالاها</h2>
-        <p>برای کالاهای دارای رسپی، هنگام فروش مواد اولیه از انبار کسر می‌شود؛ اگر رسپی نداشته باشد خود کالا کسر می‌شود.</p>
+        <h2>آنالیز کالا</h2>
+        <p>کالای فروش را انتخاب کن، مواد اولیه را مشخص کن و Cost / سود را همان لحظه ببین.</p>
       </div>
-      <button class="primary" @click="loadData" :disabled="loading">بروزرسانی</button>
+      <div class="header-actions">
+        <button :class="{ active: activeSection === 'recipe' }" @click="activeSection = 'recipe'">آنالیز و سود کالا</button>
+        <button :class="{ active: activeSection === 'usage' }" @click="activeSection = 'usage'">کاربرد کالاها</button>
+        <button class="primary" @click="loadData" :disabled="loading">بروزرسانی</button>
+      </div>
     </header>
 
     <div v-if="message" class="message">{{ message }}</div>
 
-    <div class="grid">
+    <template v-if="activeSection === 'recipe'">
+      <div class="analysis-layout">
+        <aside class="card product-picker">
+          <h3>انتخاب کالای قابل فروش</h3>
+          <input v-model="productSearch" placeholder="جستجوی نام یا کد کالا" />
+          <div class="product-list">
+            <button
+              v-for="item in filteredProducts"
+              :key="item.GoodsId"
+              type="button"
+              class="product-row"
+              :class="{ selected: Number(item.GoodsId) === Number(selectedProductGoodsId) }"
+              @click="selectProduct(item.GoodsId)"
+            >
+              <span>{{ item.GoodsCode }} - {{ item.GoodsName }}</span>
+              <small>{{ formatMoney(goodsPriceMap.get(Number(item.GoodsId))?.GoodsPrice || 0) }} فروش</small>
+            </button>
+          </div>
+        </aside>
+
+        <main class="card recipe-card">
+          <div class="recipe-title-row">
+            <div>
+              <h3>{{ selectedProduct ? selectedProduct.GoodsName : 'کالایی انتخاب نشده' }}</h3>
+              <p>اگر کالا رسپی داشته باشد، فروش آن مواد اولیه را از انبار کم می‌کند.</p>
+            </div>
+            <div class="profit-cards">
+              <div><span>قیمت فروش</span><strong>{{ formatMoney(selectedProductSalePrice) }}</strong></div>
+              <div><span>Cost</span><strong>{{ formatMoney(recipeCost) }}</strong></div>
+              <div :class="recipeProfit >= 0 ? 'positive' : 'negative'"><span>سود</span><strong>{{ formatMoney(recipeProfit) }}</strong><small>{{ formatNumber(recipeProfitPercent) }}%</small></div>
+            </div>
+          </div>
+
+          <div class="ingredient-toolbar">
+            <input v-model="ingredientSearch" placeholder="جستجوی ماده اولیه برای انتخاب سریع‌تر" />
+            <button @click="addRecipeItem">افزودن ماده اولیه</button>
+          </div>
+
+          <div class="table-wrap recipe-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>ماده اولیه</th>
+                  <th>مقدار مصرف</th>
+                  <th>درصد پرت</th>
+                  <th>مقدار نهایی</th>
+                  <th>قیمت واحد</th>
+                  <th>Cost خط</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(item, index) in recipeItems" :key="index">
+                  <td>
+                    <select v-model.number="item.IngredientGoodsId">
+                      <option :value="0">انتخاب کالا</option>
+                      <option
+                        v-for="g in filteredIngredientGoods"
+                        :key="g.GoodsId"
+                        :value="g.GoodsId"
+                      >
+                        {{ g.GoodsCode }} - {{ g.GoodsName }}
+                      </option>
+                    </select>
+                    <small v-if="item.IngredientGoodsId" class="selected-ingredient">{{ getGoodsTitle(Number(item.IngredientGoodsId)) }}</small>
+                  </td>
+                  <td><input type="number" min="0" step="0.001" v-model.number="item.Quantity" /></td>
+                  <td><input type="number" min="0" step="0.01" v-model.number="item.WastePercent" /></td>
+                  <td>{{ formatNumber(getEffectiveQuantity(item)) }}</td>
+                  <td>{{ formatMoney(getIngredientUnitCost(Number(item.IngredientGoodsId || 0))) }}</td>
+                  <td>{{ formatMoney(getRecipeItemCost(item)) }}</td>
+                  <td><button class="danger" @click="removeRecipeItem(index)">حذف</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <footer class="recipe-actions">
+            <button @click="addRecipeItem">افزودن ردیف</button>
+            <button class="primary" @click="submitRecipe">ذخیره آنالیز کالا</button>
+          </footer>
+        </main>
+      </div>
+    </template>
+
+    <template v-else>
       <div class="card usage-card">
-        <h3>کاربرد کالاها</h3>
-        <p class="hint">با این تیک‌ها مشخص می‌شود کالا در فاکتور خرید، فروش و کیوسک نمایش داده شود یا نه.</p>
-        <input v-model="search" placeholder="جستجوی کالا" />
+        <div class="section-title-row">
+          <div>
+            <h3>کاربرد کالاها</h3>
+            <p>این موارد ویژگی خود کالا هستند: فروش PC، نمایش کیوسک و امکان خرید.</p>
+          </div>
+          <button class="primary" @click="submitGoodsUsage">ذخیره کاربرد کالاها</button>
+        </div>
+        <input v-model="goodsUsageSearch" placeholder="جستجوی کالا" />
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
                 <th>کد</th>
                 <th>نام کالا</th>
-                <th>خرید</th>
-                <th>فروش</th>
+                <th>فاکتور خرید</th>
+                <th>صفحه فروش PC</th>
                 <th>کیوسک</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="item in filteredGoods" :key="item.GoodsId">
+              <tr v-for="item in filteredUsageGoods" :key="item.GoodsId">
                 <td>{{ item.GoodsCode }}</td>
                 <td>{{ item.GoodsName }}</td>
                 <td><input type="checkbox" v-model="item.IsPurchasable" /></td>
@@ -146,75 +371,48 @@ async function submitRecipe() {
             </tbody>
           </table>
         </div>
-        <button class="primary" @click="submitGoodsUsage">ذخیره کاربرد کالاها</button>
       </div>
-
-      <div class="card recipe-card">
-        <h3>رسپی / آنالیز کالا</h3>
-        <label>کالای قابل فروش</label>
-        <select v-model.number="selectedProductGoodsId" @change="loadRecipeForSelectedProduct">
-          <option v-for="item in goods.filter(g => g.IsSellable)" :key="item.GoodsId" :value="item.GoodsId">
-            {{ item.GoodsCode }} - {{ item.GoodsName }}
-          </option>
-        </select>
-
-        <div v-if="selectedProduct" class="selected-box">
-          کالای انتخاب‌شده: <strong>{{ selectedProduct.GoodsName }}</strong>
-        </div>
-
-        <div class="table-wrap recipe-table">
-          <table>
-            <thead>
-              <tr>
-                <th>ماده اولیه / کالای انباری</th>
-                <th>مقدار مصرف برای یک عدد</th>
-                <th>درصد پرت</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(item, index) in recipeItems" :key="index">
-                <td>
-                  <select v-model.number="item.IngredientGoodsId">
-                    <option :value="0">انتخاب کالا</option>
-                    <option v-for="g in goods.filter(x => x.IsPurchasable)" :key="g.GoodsId" :value="g.GoodsId">
-                      {{ g.GoodsCode }} - {{ g.GoodsName }}
-                    </option>
-                  </select>
-                </td>
-                <td><input type="number" min="0" step="0.001" v-model.number="item.Quantity" /></td>
-                <td><input type="number" min="0" step="0.01" v-model.number="item.WastePercent" /></td>
-                <td><button @click="removeRecipeItem(index)">حذف</button></td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <button @click="addRecipeItem">افزودن ماده</button>
-        <button class="primary" @click="submitRecipe">ذخیره آنالیز کالا</button>
-      </div>
-    </div>
+    </template>
   </section>
 </template>
 
 <style scoped>
-.analysis-tab { direction: rtl; color: #e5e7eb; height: 100%; overflow: auto; }
+.analysis-tab { direction: rtl; color: #e5e7eb; height: 100%; overflow: auto; padding: 4px; }
 .analysis-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
 .analysis-header h2 { margin: 0; font-size: 24px; }
-.analysis-header p, .hint { margin: 4px 0 0; color: #94a3b8; }
-.grid { display: grid; grid-template-columns: 1.2fr .8fr; gap: 12px; }
-.card { background: rgba(255,255,255,.045); border: 1px solid rgba(255,255,255,.08); border-radius: 16px; padding: 14px; }
+.analysis-header p, .section-title-row p, .recipe-title-row p { margin: 4px 0 0; color: #94a3b8; }
+.header-actions, .recipe-actions, .ingredient-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.analysis-layout { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 12px; align-items: start; }
+.card { background: rgba(255,255,255,.045); border: 1px solid rgba(255,255,255,.08); border-radius: 18px; padding: 14px; box-shadow: 0 16px 36px rgba(2,6,23,.18); }
 .card h3 { margin: 0 0 10px; }
 .message { padding: 10px 12px; border-radius: 12px; margin-bottom: 10px; background: rgba(59,130,246,.14); border: 1px solid rgba(59,130,246,.28); }
-.primary, button { border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.05); color: #e5e7eb; border-radius: 10px; padding: 9px 12px; cursor: pointer; margin: 4px; }
-.primary { background: rgba(20,184,166,.18) !important; border-color: rgba(20,184,166,.45) !important; color: #ccfbf1 !important; }
-input, select { width: 100%; min-height: 38px; border-radius: 10px; border: 1px solid rgba(255,255,255,.1); background: #111827; color: #e5e7eb; padding: 7px 9px; box-sizing: border-box; }
+button { border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.05); color: #e5e7eb; border-radius: 12px; padding: 9px 12px; cursor: pointer; }
+button.active, .primary { background: rgba(20,184,166,.18) !important; border-color: rgba(20,184,166,.45) !important; color: #ccfbf1 !important; }
+button.danger { background: rgba(239,68,68,.12); border-color: rgba(239,68,68,.35); color: #fecaca; }
+input, select { width: 100%; min-height: 38px; border-radius: 12px; border: 1px solid rgba(255,255,255,.1); background: #111827; color: #e5e7eb; padding: 7px 9px; box-sizing: border-box; }
 input[type="checkbox"] { width: 22px; height: 22px; min-height: 22px; }
-label { display: block; margin: 8px 0; color: #d1d5db; }
-.table-wrap { max-height: 520px; overflow: auto; border-radius: 12px; border: 1px solid rgba(255,255,255,.08); margin: 10px 0; }
-table { width: 100%; border-collapse: collapse; min-width: 680px; }
-th, td { padding: 9px 10px; border-bottom: 1px solid rgba(255,255,255,.07); text-align: right; }
+.product-list { margin-top: 10px; max-height: 620px; overflow: auto; display: flex; flex-direction: column; gap: 8px; }
+.product-row { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; text-align: right; }
+.product-row.selected { border-color: rgba(20,184,166,.55); background: rgba(20,184,166,.14); }
+.product-row small { color: #94a3b8; white-space: nowrap; }
+.recipe-title-row, .section-title-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; margin-bottom: 12px; }
+.profit-cards { display: grid; grid-template-columns: repeat(3, minmax(110px, 1fr)); gap: 8px; min-width: 360px; }
+.profit-cards div { border: 1px solid rgba(255,255,255,.08); border-radius: 14px; padding: 10px; background: rgba(15,23,42,.55); }
+.profit-cards span { display: block; color: #94a3b8; font-size: 12px; margin-bottom: 6px; }
+.profit-cards strong { display: block; font-size: 18px; }
+.profit-cards small { color: #94a3b8; }
+.positive strong { color: #86efac; }
+.negative strong { color: #fca5a5; }
+.ingredient-toolbar { margin-bottom: 10px; }
+.ingredient-toolbar input { max-width: 420px; }
+.table-wrap { max-height: 620px; overflow: auto; border-radius: 14px; border: 1px solid rgba(255,255,255,.08); margin: 10px 0; }
+table { width: 100%; border-collapse: collapse; min-width: 850px; }
+th, td { padding: 9px 10px; border-bottom: 1px solid rgba(255,255,255,.07); text-align: right; vertical-align: middle; }
 th { position: sticky; top: 0; background: #151b27; z-index: 1; color: #cbd5e1; }
-.selected-box { margin: 10px 0; padding: 10px; border-radius: 12px; background: rgba(20,184,166,.1); border: 1px solid rgba(20,184,166,.22); }
-@media (max-width: 1000px) { .grid { grid-template-columns: 1fr; } }
+.selected-ingredient { display: block; margin-top: 5px; color: #94a3b8; }
+@media (max-width: 1150px) {
+  .analysis-layout { grid-template-columns: 1fr; }
+  .profit-cards { min-width: 0; width: 100%; }
+  .recipe-title-row, .section-title-row { flex-direction: column; }
+}
 </style>
