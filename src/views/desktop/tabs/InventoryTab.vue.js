@@ -514,7 +514,6 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.header, __VLS_intrinsicElement
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.h2, __VLS_intrinsicElements.h2)({});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
     ...{ onClick: (__VLS_ctx.loadAll) },
     ...{ class: "inv-primary" },
@@ -695,9 +694,6 @@ if (__VLS_ctx.activeTab === 'fiscalYears') {
         ...{ class: "inv-card" },
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.h3, __VLS_intrinsicElements.h3)({});
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "inv-warning" },
-    });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "inv-table-wrap" },
     });
@@ -1388,7 +1384,6 @@ if (__VLS_ctx.activeTab === 'history') {
 /** @type {__VLS_StyleScopedClasses['inv-primary']} */ ;
 /** @type {__VLS_StyleScopedClasses['inventory-fiscal-years-panel']} */ ;
 /** @type {__VLS_StyleScopedClasses['inv-card']} */ ;
-/** @type {__VLS_StyleScopedClasses['inv-warning']} */ ;
 /** @type {__VLS_StyleScopedClasses['inv-table-wrap']} */ ;
 /** @type {__VLS_StyleScopedClasses['inv-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['inv-form-grid']} */ ;
