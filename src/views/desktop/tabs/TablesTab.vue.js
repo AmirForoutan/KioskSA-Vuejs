@@ -32,6 +32,10 @@ const moveTable = ref(null);
 const targetTableId = ref(null);
 const activeGroups = computed(() => groups.value.filter((group) => group.IsActive !== false));
 const visibleTables = computed(() => tables.value.filter((table) => selectedGroupId.value === null || table.TableGroupId === selectedGroupId.value));
+const selectedGroupTables = computed(() => tables.value.filter((table) => table.TableGroupId === tableForm.value.TableGroupId));
+const selectedGroupTitle = computed(() => groups.value.find((group) => group.TableGroupId === tableForm.value.TableGroupId)?.GroupTitle || "گروه انتخاب نشده");
+const nextGroupCodePreview = computed(() => nextGroupCode());
+const nextTableCodePreview = computed(() => tableForm.value.TableGroupId ? nextTableCode(tableForm.value.TableGroupId) : "");
 const freeTargetTables = computed(() => tables.value.filter((table) => table.IsActive !== false && !table.IsOccupied && table.TableId !== moveTable.value?.TableId));
 const settlePayable = computed(() => amount(settlingTable.value?.Payable));
 const settlePos = computed(() => Math.max(0, settlePayable.value - amount(settleCash.value)));
@@ -56,6 +60,7 @@ async function loadTables() {
         if (!tableForm.value.TableGroupId) {
             tableForm.value.TableGroupId = result.groups[0]?.TableGroupId || 0;
         }
+        refreshNewFormCodes();
     }
     catch (error) {
         message.value = error instanceof Error ? error.message : "خطا در دریافت میزها";
@@ -94,11 +99,19 @@ function toPosDeviceAmount(value) {
 function responseIsOk(response) {
     return response.status === true || response.status === "ok" || response.status === undefined;
 }
+function refreshNewFormCodes() {
+    if (groupForm.value.TableGroupId === 0 && !groupForm.value.GroupCode) {
+        groupForm.value.GroupCode = nextGroupCode();
+    }
+    if (tableForm.value.TableId === 0 && tableForm.value.TableGroupId) {
+        tableForm.value.TableCode = nextTableCode(tableForm.value.TableGroupId);
+    }
+}
 function resetGroupForm() {
     groupForm.value = {
         TableGroupId: 0,
         GroupTitle: "",
-        GroupCode: "",
+        GroupCode: nextGroupCode(),
         IsActive: true,
     };
 }
@@ -112,6 +125,14 @@ function resetTableForm() {
         IsActive: true,
         IsOccupied: false,
     };
+}
+function useNextGroupCode() {
+    groupForm.value.GroupCode = nextGroupCode();
+}
+function useNextTableCode() {
+    if (!tableForm.value.TableGroupId)
+        return;
+    tableForm.value.TableCode = nextTableCode(tableForm.value.TableGroupId);
 }
 function editGroup(group) {
     groupForm.value = { ...group };
@@ -132,6 +153,8 @@ async function saveGroup() {
         if (responseIsOk(result)) {
             await loadTables();
             resetGroupForm();
+            if (!selectedGroupId.value && groups.value.length)
+                selectedGroupId.value = groups.value[0].TableGroupId;
         }
     }
     catch (error) {
@@ -151,8 +174,8 @@ async function saveTable() {
         const result = await saveDesktopTable(tableForm.value);
         message.value = result.message || "میز ذخیره شد";
         if (responseIsOk(result)) {
-            resetTableForm();
             await loadTables();
+            resetTableForm();
         }
     }
     catch (error) {
@@ -331,7 +354,7 @@ function nextGroupCode() {
 function nextTableCode(groupId) {
     const group = groups.value.find(g => g.TableGroupId === groupId);
     const groupCode = Number(group?.GroupCode || 0);
-    const start = groupCode * 100;
+    const start = groupCode > 0 ? groupCode * 100 : 100;
     const maxCode = Math.max(start - 1, ...tables.value
         .filter(t => t.TableGroupId === groupId)
         .map(t => Number(t.TableCode))
@@ -343,19 +366,33 @@ watch(() => tableForm.value.TableGroupId, (groupId) => {
         tableForm.value.TableCode = nextTableCode(groupId);
     }
 });
+watch(selectedGroupId, (groupId) => {
+    if (tableForm.value.TableId === 0 && groupId) {
+        tableForm.value.TableGroupId = groupId;
+        tableForm.value.TableCode = nextTableCode(groupId);
+    }
+});
+watch([groups, tables], () => {
+    refreshNewFormCodes();
+}, { deep: true });
 debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
 let __VLS_components;
 let __VLS_directives;
+/** @type {__VLS_StyleScopedClasses['tables-head']} */ ;
+/** @type {__VLS_StyleScopedClasses['admin-title']} */ ;
 /** @type {__VLS_StyleScopedClasses['admin-box']} */ ;
 /** @type {__VLS_StyleScopedClasses['admin-box']} */ ;
 /** @type {__VLS_StyleScopedClasses['field']} */ ;
+/** @type {__VLS_StyleScopedClasses['code-preview']} */ ;
 /** @type {__VLS_StyleScopedClasses['t-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['t-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['t-btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['code-preview']} */ ;
 /** @type {__VLS_StyleScopedClasses['group-strip']} */ ;
 /** @type {__VLS_StyleScopedClasses['group-strip']} */ ;
 /** @type {__VLS_StyleScopedClasses['group-strip']} */ ;
+/** @type {__VLS_StyleScopedClasses['table-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['table-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['table-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['table-card']} */ ;
@@ -363,13 +400,27 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['table-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['admin-box']} */ ;
 /** @type {__VLS_StyleScopedClasses['admin-title']} */ ;
+/** @type {__VLS_StyleScopedClasses['admin-title']} */ ;
+/** @type {__VLS_StyleScopedClasses['code-preview']} */ ;
+/** @type {__VLS_StyleScopedClasses['code-preview']} */ ;
+/** @type {__VLS_StyleScopedClasses['code-preview']} */ ;
+/** @type {__VLS_StyleScopedClasses['code-preview']} */ ;
+/** @type {__VLS_StyleScopedClasses['admin-field']} */ ;
+/** @type {__VLS_StyleScopedClasses['field']} */ ;
 /** @type {__VLS_StyleScopedClasses['admin-box']} */ ;
 /** @type {__VLS_StyleScopedClasses['admin-box']} */ ;
 /** @type {__VLS_StyleScopedClasses['field']} */ ;
 /** @type {__VLS_StyleScopedClasses['field']} */ ;
 /** @type {__VLS_StyleScopedClasses['admin-box']} */ ;
+/** @type {__VLS_StyleScopedClasses['admin-box']} */ ;
+/** @type {__VLS_StyleScopedClasses['field']} */ ;
+/** @type {__VLS_StyleScopedClasses['field']} */ ;
+/** @type {__VLS_StyleScopedClasses['status-toggle']} */ ;
 /** @type {__VLS_StyleScopedClasses['quick-list']} */ ;
 /** @type {__VLS_StyleScopedClasses['quick-list']} */ ;
+/** @type {__VLS_StyleScopedClasses['quick-list']} */ ;
+/** @type {__VLS_StyleScopedClasses['quick-list']} */ ;
+/** @type {__VLS_StyleScopedClasses['inactive']} */ ;
 /** @type {__VLS_StyleScopedClasses['context-menu']} */ ;
 /** @type {__VLS_StyleScopedClasses['context-menu']} */ ;
 /** @type {__VLS_StyleScopedClasses['context-menu']} */ ;
@@ -382,6 +433,8 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['tables-layout']} */ ;
 /** @type {__VLS_StyleScopedClasses['table-admin']} */ ;
 /** @type {__VLS_StyleScopedClasses['table-admin']} */ ;
+/** @type {__VLS_StyleScopedClasses['code-preview']} */ ;
+/** @type {__VLS_StyleScopedClasses['code-preview']} */ ;
 // CSS variable injection 
 // CSS variable injection end 
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
@@ -480,9 +533,7 @@ else {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
             ...{ class: "table-time" },
         });
-        (table.IsOccupied
-            ? __VLS_ctx.formatDuration(table.OccupiedMinutes)
-            : table.TableCode);
+        (table.IsOccupied ? __VLS_ctx.formatDuration(table.OccupiedMinutes) : table.TableCode);
         __VLS_asFunctionalElement(__VLS_intrinsicElements.strong, __VLS_intrinsicElements.strong)({});
         (table.TableTitle);
         __VLS_asFunctionalElement(__VLS_intrinsicElements.small, __VLS_intrinsicElements.small)({});
@@ -493,25 +544,48 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.aside, __VLS_intrinsicElements
     ...{ class: "table-admin" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.section, __VLS_intrinsicElements.section)({
-    ...{ class: "admin-box" },
+    ...{ class: "admin-box setup-card group-setup-card" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "admin-title" },
 });
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.small, __VLS_intrinsicElements.small)({});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
     ...{ onClick: (__VLS_ctx.resetGroupForm) },
     ...{ class: "mini" },
+    type: "button",
 });
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "code-preview" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.b, __VLS_intrinsicElements.b)({});
+(__VLS_ctx.nextGroupCodePreview);
+__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+    ...{ onClick: (__VLS_ctx.useNextGroupCode) },
+    type: "button",
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({
+    ...{ class: "admin-field" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
-    placeholder: "عنوان گروه",
+    placeholder: "مثلاً سالن اصلی",
 });
 (__VLS_ctx.groupForm.GroupTitle);
+__VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({
+    ...{ class: "admin-field code-field" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
-    placeholder: "کد گروه",
+    placeholder: "مثلاً 1",
 });
 (__VLS_ctx.groupForm.GroupCode);
-__VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({
+    ...{ class: "status-toggle" },
+});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
     type: "checkbox",
@@ -523,7 +597,10 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElement
     disabled: (__VLS_ctx.saving),
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "quick-list" },
+    ...{ class: "quick-title" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "quick-list group-list" },
 });
 for (const [group] of __VLS_getVForSourceType((__VLS_ctx.groups))) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
@@ -531,22 +608,49 @@ for (const [group] of __VLS_getVForSourceType((__VLS_ctx.groups))) {
                 __VLS_ctx.editGroup(group);
             } },
         key: (group.TableGroupId),
+        type: "button",
+        ...{ class: ({ inactive: group.IsActive === false }) },
     });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
     (group.GroupTitle);
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.small, __VLS_intrinsicElements.small)({});
+    (group.GroupCode || '-');
 }
 __VLS_asFunctionalElement(__VLS_intrinsicElements.section, __VLS_intrinsicElements.section)({
-    ...{ class: "admin-box" },
+    ...{ class: "admin-box setup-card table-setup-card" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "admin-title" },
 });
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.small, __VLS_intrinsicElements.small)({});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
     ...{ onClick: (__VLS_ctx.resetTableForm) },
     ...{ class: "mini" },
+    type: "button",
 });
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "code-preview table-code-preview" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+(__VLS_ctx.selectedGroupTitle);
+__VLS_asFunctionalElement(__VLS_intrinsicElements.b, __VLS_intrinsicElements.b)({});
+(__VLS_ctx.nextTableCodePreview || '-');
+__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+    ...{ onClick: (__VLS_ctx.useNextTableCode) },
+    type: "button",
+    disabled: (!__VLS_ctx.tableForm.TableGroupId),
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({
+    ...{ class: "admin-field" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.select, __VLS_intrinsicElements.select)({
     value: (__VLS_ctx.tableForm.TableGroupId),
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.option, __VLS_intrinsicElements.option)({
+    value: (0),
 });
 for (const [group] of __VLS_getVForSourceType((__VLS_ctx.groups))) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.option, __VLS_intrinsicElements.option)({
@@ -555,15 +659,25 @@ for (const [group] of __VLS_getVForSourceType((__VLS_ctx.groups))) {
     });
     (group.GroupTitle);
 }
+__VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({
+    ...{ class: "admin-field" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
-    placeholder: "عنوان میز",
+    placeholder: "مثلاً میز 1",
 });
 (__VLS_ctx.tableForm.TableTitle);
+__VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({
+    ...{ class: "admin-field code-field" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
-    placeholder: "کد میز",
+    placeholder: "کد خودکار",
 });
 (__VLS_ctx.tableForm.TableCode);
-__VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({
+    ...{ class: "status-toggle" },
+});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
     type: "checkbox",
@@ -575,16 +689,24 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElement
     disabled: (__VLS_ctx.saving || !__VLS_ctx.groups.length),
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "quick-list" },
+    ...{ class: "quick-title" },
 });
-for (const [table] of __VLS_getVForSourceType((__VLS_ctx.visibleTables))) {
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "quick-list table-list" },
+});
+for (const [table] of __VLS_getVForSourceType((__VLS_ctx.selectedGroupTables))) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
         ...{ onClick: (...[$event]) => {
                 __VLS_ctx.editTable(table);
             } },
         key: (`edit-${table.TableId}`),
+        type: "button",
+        ...{ class: ({ inactive: table.IsActive === false }) },
     });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
     (table.TableTitle);
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.small, __VLS_intrinsicElements.small)({});
+    (table.TableCode || '-');
 }
 if (__VLS_ctx.message) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
@@ -811,17 +933,39 @@ if (__VLS_ctx.moveTable) {
 /** @type {__VLS_StyleScopedClasses['table-time']} */ ;
 /** @type {__VLS_StyleScopedClasses['table-admin']} */ ;
 /** @type {__VLS_StyleScopedClasses['admin-box']} */ ;
+/** @type {__VLS_StyleScopedClasses['setup-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['group-setup-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['admin-title']} */ ;
 /** @type {__VLS_StyleScopedClasses['mini']} */ ;
+/** @type {__VLS_StyleScopedClasses['code-preview']} */ ;
+/** @type {__VLS_StyleScopedClasses['admin-field']} */ ;
+/** @type {__VLS_StyleScopedClasses['admin-field']} */ ;
+/** @type {__VLS_StyleScopedClasses['code-field']} */ ;
+/** @type {__VLS_StyleScopedClasses['status-toggle']} */ ;
 /** @type {__VLS_StyleScopedClasses['t-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['primary']} */ ;
+/** @type {__VLS_StyleScopedClasses['quick-title']} */ ;
 /** @type {__VLS_StyleScopedClasses['quick-list']} */ ;
+/** @type {__VLS_StyleScopedClasses['group-list']} */ ;
+/** @type {__VLS_StyleScopedClasses['inactive']} */ ;
 /** @type {__VLS_StyleScopedClasses['admin-box']} */ ;
+/** @type {__VLS_StyleScopedClasses['setup-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['table-setup-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['admin-title']} */ ;
 /** @type {__VLS_StyleScopedClasses['mini']} */ ;
+/** @type {__VLS_StyleScopedClasses['code-preview']} */ ;
+/** @type {__VLS_StyleScopedClasses['table-code-preview']} */ ;
+/** @type {__VLS_StyleScopedClasses['admin-field']} */ ;
+/** @type {__VLS_StyleScopedClasses['admin-field']} */ ;
+/** @type {__VLS_StyleScopedClasses['admin-field']} */ ;
+/** @type {__VLS_StyleScopedClasses['code-field']} */ ;
+/** @type {__VLS_StyleScopedClasses['status-toggle']} */ ;
 /** @type {__VLS_StyleScopedClasses['t-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['primary']} */ ;
+/** @type {__VLS_StyleScopedClasses['quick-title']} */ ;
 /** @type {__VLS_StyleScopedClasses['quick-list']} */ ;
+/** @type {__VLS_StyleScopedClasses['table-list']} */ ;
+/** @type {__VLS_StyleScopedClasses['inactive']} */ ;
 /** @type {__VLS_StyleScopedClasses['table-message']} */ ;
 /** @type {__VLS_StyleScopedClasses['context-menu']} */ ;
 /** @type {__VLS_StyleScopedClasses['danger']} */ ;
@@ -869,6 +1013,10 @@ const __VLS_self = (await import('vue')).defineComponent({
             targetTableId: targetTableId,
             activeGroups: activeGroups,
             visibleTables: visibleTables,
+            selectedGroupTables: selectedGroupTables,
+            selectedGroupTitle: selectedGroupTitle,
+            nextGroupCodePreview: nextGroupCodePreview,
+            nextTableCodePreview: nextTableCodePreview,
             freeTargetTables: freeTargetTables,
             settlePayable: settlePayable,
             settlePos: settlePos,
@@ -877,6 +1025,8 @@ const __VLS_self = (await import('vue')).defineComponent({
             formatDuration: formatDuration,
             resetGroupForm: resetGroupForm,
             resetTableForm: resetTableForm,
+            useNextGroupCode: useNextGroupCode,
+            useNextTableCode: useNextTableCode,
             editGroup: editGroup,
             editTable: editTable,
             saveGroup: saveGroup,
