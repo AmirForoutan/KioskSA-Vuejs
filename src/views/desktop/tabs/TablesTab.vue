@@ -26,6 +26,8 @@ const loading = ref(false);
 const saving = ref(false);
 const message = ref("");
 const currencyIsRial = ref(false);
+const groupModalOpen = ref(false);
+const tableModalOpen = ref(false);
 
 useDesktopToastMessage(message);
 
@@ -162,6 +164,36 @@ function resetTableForm() {
   };
 }
 
+function openGroupManager() {
+  if (groupForm.value.TableGroupId === 0 && !groupForm.value.GroupCode) resetGroupForm();
+  groupModalOpen.value = true;
+}
+
+function openTableManager(groupId?: number | null) {
+  const desiredGroupId = groupId || selectedGroupId.value || groups.value[0]?.TableGroupId || 0;
+  if (tableForm.value.TableId === 0) {
+    tableForm.value.TableGroupId = desiredGroupId;
+    tableForm.value.TableCode = desiredGroupId ? nextTableCode(desiredGroupId) : "";
+  }
+  tableModalOpen.value = true;
+}
+
+function openNewTable() {
+  resetTableForm();
+  tableModalOpen.value = true;
+}
+
+function openEditTable(table: DesktopDiningTable) {
+  closeContextMenu();
+  editTable(table);
+  tableModalOpen.value = true;
+}
+
+function openEditGroup(group: DesktopTableGroup) {
+  editGroup(group);
+  groupModalOpen.value = true;
+}
+
 function useNextGroupCode() {
   groupForm.value.GroupCode = nextGroupCode();
 }
@@ -229,7 +261,7 @@ function openContext(event: MouseEvent, table: DesktopDiningTable) {
   event.preventDefault();
 
   const menuWidth = 220;
-  const menuHeight = table.IsOccupied ? 270 : 60;
+  const menuHeight = table.IsOccupied ? 310 : 100;
   const padding = 8;
 
   let x = event.clientX;
@@ -445,9 +477,13 @@ watch([groups, tables], () => {
         <div class="tables-title">میزها</div>
         <div class="tables-sub">{{ tables.length.toLocaleString() }} میز، {{ activeGroups.length.toLocaleString() }} گروه فعال</div>
       </div>
-      <button class="t-btn" :disabled="loading" @click="loadTables">
-        {{ loading ? "در حال دریافت" : "بازخوانی" }}
-      </button>
+      <div class="head-actions">
+        <button class="t-btn" type="button" @click="openGroupManager">مدیریت گروه‌ها</button>
+        <button class="t-btn primary" type="button" :disabled="!groups.length" @click="openTableManager(selectedGroupId)">مدیریت میزها</button>
+        <button class="t-btn" :disabled="loading" @click="loadTables">
+          {{ loading ? "در حال دریافت" : "بازخوانی" }}
+        </button>
+      </div>
     </header>
 
     <div class="group-strip">
@@ -483,105 +519,145 @@ watch([groups, tables], () => {
           </button>
         </template>
       </section>
-
-      <aside class="table-admin">
-        <section class="admin-box setup-card group-setup-card">
-          <div class="admin-title">
-            <div>
-              <span>تعریف گروه میز</span>
-              <small>مثل سالن اصلی، VIP، تراس</small>
-            </div>
-            <button class="mini" type="button" @click="resetGroupForm">گروه جدید</button>
-          </div>
-
-          <div class="code-preview">
-            <span>کد پیشنهادی گروه بعدی</span>
-            <b>{{ nextGroupCodePreview }}</b>
-            <button type="button" @click="useNextGroupCode">استفاده</button>
-          </div>
-
-          <label class="admin-field">
-            <span>عنوان گروه</span>
-            <input v-model="groupForm.GroupTitle" placeholder="مثلاً سالن اصلی" />
-          </label>
-          <label class="admin-field code-field">
-            <span>کد گروه</span>
-            <input v-model="groupForm.GroupCode" placeholder="مثلاً 1" />
-          </label>
-          <label class="status-toggle">
-            <span>گروه فعال باشد</span>
-            <input v-model="groupForm.IsActive" type="checkbox" />
-          </label>
-          <button class="t-btn primary" :disabled="saving" @click="saveGroup">ذخیره گروه میز</button>
-
-          <div class="quick-title">گروه‌های تعریف‌شده</div>
-          <div class="quick-list group-list">
-            <button v-for="group in groups" :key="group.TableGroupId" type="button" :class="{ inactive: group.IsActive === false }" @click="editGroup(group)">
-              <span>{{ group.GroupTitle }}</span>
-              <small>کد {{ group.GroupCode || '-' }}</small>
-            </button>
-          </div>
-        </section>
-
-        <section class="admin-box setup-card table-setup-card">
-          <div class="admin-title">
-            <div>
-              <span>تعریف میز</span>
-              <small>میز را داخل گروه انتخاب‌شده بساز</small>
-            </div>
-            <button class="mini" type="button" @click="resetTableForm">میز جدید</button>
-          </div>
-
-          <div class="code-preview table-code-preview">
-            <span>کد پیشنهادی میز بعدی در {{ selectedGroupTitle }}</span>
-            <b>{{ nextTableCodePreview || '-' }}</b>
-            <button type="button" :disabled="!tableForm.TableGroupId" @click="useNextTableCode">استفاده</button>
-          </div>
-
-          <label class="admin-field">
-            <span>گروه میز</span>
-            <select v-model.number="tableForm.TableGroupId">
-              <option :value="0">انتخاب گروه</option>
-              <option v-for="group in groups" :key="group.TableGroupId" :value="group.TableGroupId">{{ group.GroupTitle }}</option>
-            </select>
-          </label>
-          <label class="admin-field">
-            <span>عنوان میز</span>
-            <input v-model="tableForm.TableTitle" placeholder="مثلاً میز 1" />
-          </label>
-          <label class="admin-field code-field">
-            <span>کد میز</span>
-            <input v-model="tableForm.TableCode" placeholder="کد خودکار" />
-          </label>
-          <label class="status-toggle">
-            <span>میز فعال باشد</span>
-            <input v-model="tableForm.IsActive" type="checkbox" />
-          </label>
-          <button class="t-btn primary" :disabled="saving || !groups.length" @click="saveTable">ذخیره میز</button>
-
-          <div class="quick-title">میزهای همین گروه</div>
-          <div class="quick-list table-list">
-            <button v-for="table in selectedGroupTables" :key="`edit-${table.TableId}`" type="button" :class="{ inactive: table.IsActive === false }" @click="editTable(table)">
-              <span>{{ table.TableTitle }}</span>
-              <small>کد {{ table.TableCode || '-' }}</small>
-            </button>
-          </div>
-        </section>
-      </aside>
     </main>
 
     <div v-if="message" class="table-message">{{ message }}</div>
 
+    <div v-if="groupModalOpen" class="modal-overlay" @click.self="groupModalOpen = false">
+      <div class="table-modal setup-modal">
+        <div class="modal-head">
+          <div>
+            <div class="modal-title">مدیریت گروه‌های میز</div>
+            <div class="modal-sub">گروه‌های سالن را تعریف و از همین‌جا ویرایش کن.</div>
+          </div>
+          <button class="icon" @click="groupModalOpen = false">×</button>
+        </div>
+        <div class="setup-modal-body">
+          <section class="admin-box setup-form-card">
+            <div class="admin-title">
+              <div>
+                <span>{{ groupForm.TableGroupId ? 'ویرایش گروه میز' : 'تعریف گروه میز' }}</span>
+                <small>مثل سالن اصلی، VIP، تراس</small>
+              </div>
+              <button class="mini" type="button" @click="resetGroupForm">گروه جدید</button>
+            </div>
+
+            <div class="code-preview">
+              <span>کد پیشنهادی گروه بعدی</span>
+              <b>{{ nextGroupCodePreview }}</b>
+              <button type="button" @click="useNextGroupCode">استفاده</button>
+            </div>
+
+            <label class="admin-field">
+              <span>عنوان گروه</span>
+              <input v-model="groupForm.GroupTitle" placeholder="مثلاً سالن اصلی" />
+            </label>
+            <label class="admin-field code-field">
+              <span>کد گروه</span>
+              <input v-model="groupForm.GroupCode" placeholder="مثلاً 1" />
+            </label>
+            <label class="status-toggle">
+              <span>گروه فعال باشد</span>
+              <input v-model="groupForm.IsActive" type="checkbox" />
+            </label>
+            <button class="t-btn primary" :disabled="saving" @click="saveGroup">ذخیره گروه میز</button>
+          </section>
+
+          <section class="admin-box setup-list-card">
+            <div class="admin-title">
+              <div>
+                <span>لیست گروه‌ها</span>
+                <small>{{ groups.length.toLocaleString() }} گروه تعریف شده</small>
+              </div>
+            </div>
+            <div class="modal-list group-modal-list">
+              <button v-for="group in groups" :key="group.TableGroupId" type="button" :class="{ inactive: group.IsActive === false }" @click="openEditGroup(group)">
+                <span>{{ group.GroupTitle }}</span>
+                <small>کد {{ group.GroupCode || '-' }}</small>
+              </button>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="tableModalOpen" class="modal-overlay" @click.self="tableModalOpen = false">
+      <div class="table-modal setup-modal">
+        <div class="modal-head">
+          <div>
+            <div class="modal-title">مدیریت میزها</div>
+            <div class="modal-sub">هر گروه را انتخاب کن؛ فقط میزهای همان گروه نمایش داده می‌شود.</div>
+          </div>
+          <button class="icon" @click="tableModalOpen = false">×</button>
+        </div>
+        <div class="setup-modal-body">
+          <section class="admin-box setup-form-card">
+            <div class="admin-title">
+              <div>
+                <span>{{ tableForm.TableId ? 'ویرایش میز' : 'تعریف میز' }}</span>
+                <small>میز را داخل گروه انتخاب‌شده بساز</small>
+              </div>
+              <button class="mini" type="button" @click="openNewTable">میز جدید</button>
+            </div>
+
+            <div class="code-preview table-code-preview">
+              <span>کد پیشنهادی میز بعدی در {{ selectedGroupTitle }}</span>
+              <b>{{ nextTableCodePreview || '-' }}</b>
+              <button type="button" :disabled="!tableForm.TableGroupId" @click="useNextTableCode">استفاده</button>
+            </div>
+
+            <label class="admin-field">
+              <span>گروه میز</span>
+              <select v-model.number="tableForm.TableGroupId">
+                <option :value="0">انتخاب گروه</option>
+                <option v-for="group in groups" :key="group.TableGroupId" :value="group.TableGroupId">{{ group.GroupTitle }}</option>
+              </select>
+            </label>
+            <label class="admin-field">
+              <span>عنوان میز</span>
+              <input v-model="tableForm.TableTitle" placeholder="مثلاً میز 1" />
+            </label>
+            <label class="admin-field code-field">
+              <span>کد میز</span>
+              <input v-model="tableForm.TableCode" placeholder="کد خودکار" />
+            </label>
+            <label class="status-toggle">
+              <span>میز فعال باشد</span>
+              <input v-model="tableForm.IsActive" type="checkbox" />
+            </label>
+            <button class="t-btn primary" :disabled="saving || !groups.length" @click="saveTable">ذخیره میز</button>
+          </section>
+
+          <section class="admin-box setup-list-card">
+            <div class="admin-title">
+              <div>
+                <span>میزهای {{ selectedGroupTitle }}</span>
+                <small>{{ selectedGroupTables.length.toLocaleString() }} میز در این گروه</small>
+              </div>
+            </div>
+            <div v-if="!tableForm.TableGroupId" class="table-empty">ابتدا یک گروه میز انتخاب کن.</div>
+            <div v-else-if="!selectedGroupTables.length" class="table-empty">برای این گروه هنوز میزی تعریف نشده است.</div>
+            <div v-else class="modal-list table-modal-list">
+              <button v-for="table in selectedGroupTables" :key="`modal-edit-${table.TableId}`" type="button" :class="{ inactive: table.IsActive === false, occupied: table.IsOccupied }" @click="editTable(table)">
+                <span>{{ table.TableTitle }}</span>
+                <small>کد {{ table.TableCode || '-' }} | {{ table.IsOccupied ? 'اشغال' : 'آزاد' }}</small>
+              </button>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+
     <div v-if="contextMenu" class="context-menu" :style="{ top: `${contextMenu.y}px`, left: `${contextMenu.x}px` }">
+      <button @click="openEditTable(contextMenu.table)">ویرایش مشخصات میز</button>
       <template v-if="contextMenu.table.IsOccupied">
-        <button @click="editInvoice(contextMenu.table)">ویرایش</button>
+        <button @click="editInvoice(contextMenu.table)">ویرایش فاکتور</button>
         <button @click="openSettle(contextMenu.table)">تسویه</button>
         <button @click="printTableInvoice(contextMenu.table, 'kitchen')">چاپ فاکتور آشپزخانه</button>
         <button @click="printTableInvoice(contextMenu.table, 'customer')">چاپ فاکتور مشتری</button>
         <button @click="openMove(contextMenu.table)">جابجایی میز</button>
         <button class="danger" @click="cancelInvoice(contextMenu.table)">ابطال</button>
       </template>
-      <button v-else @click="editTable(contextMenu.table); closeContextMenu()">ویرایش میز</button>
     </div>
 
     <div v-if="settlingTable" class="modal-overlay">
@@ -651,11 +727,17 @@ watch([groups, tables], () => {
 .tables-head,
 .admin-title,
 .modal-head,
-.modal-actions {
+.modal-actions,
+.head-actions {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+.head-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .tables-head {
@@ -687,13 +769,13 @@ watch([groups, tables], () => {
 .admin-box input,
 .admin-box select,
 .admin-box label,
-.quick-list button,
 .context-menu button,
 .field input,
 .field select,
 .icon,
 .code-preview,
-.code-preview button {
+.code-preview button,
+.modal-list button {
   border-radius: 12px;
   font-family: inherit;
 }
@@ -747,8 +829,6 @@ watch([groups, tables], () => {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 380px;
-  gap: 14px;
 }
 
 .tables-board {
@@ -824,14 +904,6 @@ watch([groups, tables], () => {
 
 .table-amount {
   font-weight: 900;
-}
-
-.table-admin {
-  min-height: 0;
-  overflow: auto;
-  display: grid;
-  gap: 14px;
-  align-content: start;
 }
 
 .admin-box {
@@ -952,44 +1024,6 @@ watch([groups, tables], () => {
   accent-color: #14b8a6;
 }
 
-.quick-title {
-  margin-top: 4px;
-  color: #a7b0c3;
-  font-size: 12px;
-  font-weight: 900;
-}
-
-.quick-list {
-  max-height: 138px;
-  overflow: auto;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
-  gap: 7px;
-}
-
-.quick-list button {
-  min-height: 42px;
-  display: grid;
-  gap: 2px;
-  text-align: right;
-  padding: 7px 9px;
-  color: #dbeafe;
-  background: rgba(59, 130, 246, 0.12);
-  border: 1px solid rgba(59, 130, 246, 0.22);
-  cursor: pointer;
-}
-
-.quick-list button small {
-  color: #93c5fd;
-  font-size: 11px;
-}
-
-.quick-list button.inactive {
-  color: #d1d5db;
-  background: rgba(107, 114, 128, 0.12);
-  border-color: rgba(107, 114, 128, 0.22);
-}
-
 .table-empty,
 .table-message {
   border-radius: 12px;
@@ -1047,6 +1081,64 @@ watch([groups, tables], () => {
   overflow: hidden;
 }
 
+.setup-modal {
+  width: min(980px, calc(100vw - 42px));
+  max-height: calc(100vh - 56px);
+  display: flex;
+  flex-direction: column;
+}
+
+.setup-modal-body {
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  grid-template-columns: minmax(300px, 0.85fr) minmax(360px, 1.15fr);
+  gap: 14px;
+  padding: 14px;
+}
+
+.setup-list-card {
+  min-height: 0;
+}
+
+.modal-list {
+  min-height: 0;
+  max-height: 520px;
+  overflow: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 9px;
+}
+
+.modal-list button {
+  min-height: 58px;
+  display: grid;
+  gap: 4px;
+  text-align: right;
+  padding: 9px 10px;
+  color: #dbeafe;
+  background: rgba(59, 130, 246, 0.12);
+  border: 1px solid rgba(59, 130, 246, 0.22);
+  cursor: pointer;
+}
+
+.modal-list button small {
+  color: #93c5fd;
+  font-size: 11px;
+}
+
+.modal-list button.occupied {
+  color: #fecaca;
+  background: rgba(239, 68, 68, 0.13);
+  border-color: rgba(239, 68, 68, 0.26);
+}
+
+.modal-list button.inactive {
+  color: #d1d5db;
+  background: rgba(107, 114, 128, 0.12);
+  border-color: rgba(107, 114, 128, 0.22);
+}
+
 .modal-head,
 .modal-actions {
   padding: 14px;
@@ -1095,21 +1187,25 @@ watch([groups, tables], () => {
   cursor: pointer;
 }
 
-@media (max-width: 1180px) {
-  .tables-layout {
-    grid-template-columns: 1fr;
+@media (max-width: 900px) {
+  .tables-head {
+    display: grid;
   }
 
-  .table-admin {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .head-actions {
+    justify-content: stretch;
+  }
+
+  .head-actions .t-btn {
+    flex: 1;
+  }
+
+  .setup-modal-body {
+    grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 720px) {
-  .table-admin {
-    grid-template-columns: 1fr;
-  }
-
   .code-preview {
     grid-template-columns: 1fr auto;
   }
