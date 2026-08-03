@@ -20,25 +20,11 @@ const stockInventory = ref(null);
 const minStock = ref(null);
 const maxStock = ref(null);
 const reorderPoint = ref(null);
-const toast = useToast({
-    position: 'top-right',
-    style: {
-        fontFamily: 'Vazirmatn-FD-Black'
-    }
-});
+const toast = useToast({ position: 'top-right', style: { fontFamily: 'Vazirmatn-FD-Black' } });
 const props = defineProps({
-    product: {
-        type: Object,
-        required: true
-    },
-    categories: {
-        type: Array,
-        required: true
-    },
-    products: {
-        type: Array,
-        default: () => []
-    }
+    product: { type: Object, required: true },
+    categories: { type: Array, required: true },
+    products: { type: Array, default: () => [] }
 });
 const emit = defineEmits(['save', 'close']);
 const daysOfWeek = [
@@ -68,7 +54,6 @@ function defaultProduct() {
         DefaultWarehouseId: null,
         IsPurchasable: true,
         IsSellable: true,
-        IsKioskVisible: true,
         IsActive: true,
         Saturday: true,
         FromTimeSaturday: '00:00',
@@ -101,7 +86,6 @@ function normalizeProduct(value) {
     merged.ReorderPoint = Number(merged.ReorderPoint || 0);
     merged.IsPurchasable = merged.IsPurchasable !== false;
     merged.IsSellable = merged.IsSellable !== false;
-    merged.IsKioskVisible = merged.IsKioskVisible !== false;
     merged.IsActive = merged.IsActive !== false;
     return merged;
 }
@@ -120,17 +104,10 @@ function save() {
     }
     emit('save', localProduct.value);
 }
-watch(() => localProduct.value, () => {
-    setTimeout(loadDatePicker, 100);
-}, { deep: true });
-onMounted(() => {
-    loadDatePicker();
-    IsShowKeyboard.value = ShwoKeyboardStatus();
-});
+watch(() => localProduct.value, () => { setTimeout(loadDatePicker, 100); }, { deep: true });
+onMounted(() => { loadDatePicker(); IsShowKeyboard.value = ShwoKeyboardStatus(); });
 function loadDatePicker() {
-    jalaliDatepicker.startWatch({
-        autoShow: false
-    });
+    jalaliDatepicker.startWatch({ autoShow: false });
     const inputList = document.querySelectorAll("input[data-jdp]:not([data-jdp-initialized])");
     for (let i = 0; i < inputList.length; i++) {
         inputList[i].setAttribute('data-jdp-initialized', 'true');
@@ -166,14 +143,12 @@ function generateNewProductCode() {
 }
 watch(() => props.product, (newVal) => {
     localProduct.value = normalizeProduct(newVal);
-    if (!newVal.GoodsId && props.products.length > 0) {
+    if (!newVal.GoodsId && props.products.length > 0)
         localProduct.value.GoodsCode = generateNewProductCode();
-    }
 }, { immediate: true });
 watch(() => localProduct.value.GoodsGroupId, (newVal) => {
-    if (!props.product.GoodsId && newVal) {
+    if (!props.product.GoodsId && newVal)
         localProduct.value.GoodsCode = generateNewProductCode();
-    }
 });
 watch(() => [
     localProduct.value.Saturday,
@@ -225,12 +200,7 @@ function getInputRef(inputType) {
         default: return null;
     }
 }
-function hideKeyboard() {
-    showKeyboard.value = false;
-    activeInputType.value = '';
-    activeInputRef.value = null;
-    isNumberMode.value = false;
-}
+function hideKeyboard() { showKeyboard.value = false; activeInputType.value = ''; activeInputRef.value = null; isNumberMode.value = false; }
 function handleKeyPress(key) {
     if (!activeInputRef.value)
         return;
@@ -509,14 +479,6 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
 });
 (__VLS_ctx.localProduct.IsSellable);
 __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({
-    ...{ class: "usage-toggle" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
-    type: "checkbox",
-});
-(__VLS_ctx.localProduct.IsKioskVisible);
-__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "form-group" },
 });
@@ -671,7 +633,6 @@ if (__VLS_ctx.showKeyboard && __VLS_ctx.activeInputRef) {
 /** @type {__VLS_StyleScopedClasses['settings-box']} */ ;
 /** @type {__VLS_StyleScopedClasses['hint']} */ ;
 /** @type {__VLS_StyleScopedClasses['usage-grid']} */ ;
-/** @type {__VLS_StyleScopedClasses['usage-toggle']} */ ;
 /** @type {__VLS_StyleScopedClasses['usage-toggle']} */ ;
 /** @type {__VLS_StyleScopedClasses['usage-toggle']} */ ;
 /** @type {__VLS_StyleScopedClasses['form-group']} */ ;
